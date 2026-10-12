@@ -2,49 +2,45 @@ import {
   CartesianGrid,
   Line,
   LineChart,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from 'recharts';
+import { useEffect, useRef } from 'react';
 
+import { sampleDisplacement } from '@/lib/time';
+import { formatMm } from '@/lib/utils';
 import { useCssVar } from '@/lib/useCssVar';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
-import { formatMm } from '@/lib/utils';
+import type { SimulationResult } from '@/types';
 
 /* =========================================================================
    Displacement over time
    -------------------------------------------------------------------------
-   Plots the selected floor's displacement from `result.floorDisp`, the same
-   array the 3D view reads. There is deliberately no second copy: if the
+   Plots the selected floor's displacement from `result.floorDisp` — the same
+   array the 3D view samples. There is deliberately no second copy: if the
    animation and the chart could disagree, they eventually will.
 
-   The ground-motion line is scaled to fit the same axis. It is a shape
-   reference, not a measurement in millimetres, so it is dashed and labelled
-   as scaled — never presented as a comparable quantity.
+   CURSOR PERFORMANCE: the playback cursor is an absolutely-positioned div
+   moved with `transform`, driven from a requestAnimationFrame loop reading the
+   playback store directly. A `<ReferenceLine>` bound to React state would
+   re-render the whole Recharts tree on every animation frame.
+
+   The ground-motion trace is scaled to fit and drawn dashed. It is a shape
+   reference, not a measurement in millimetres, so it is never presented as a
+   comparable quantity.
    ========================================================================= */
 
 const M2S_TO_MM = 1000;
-
-/** Recharts hands us the x value from the axis; snap to the nearest sample. */
-function nearestIndex(time: number[], target: number): number {
-  let low = 0;
-  let high = time.length - 1;
-  while (low < high) {
-    const mid = (low + high) >> 1;
-    if (time[mid]! < target) low = mid + 1;
-    else high = mid;
-  }
-  return low;
-}
+const MAX_POINTS = 400;
 
 export function DisplacementChart() {
   const result = useConfigStore((s) => s.result);
   const building = useConfigStore((s) => s.building);
   const activeFloor = useConfigStore((s) => s.activeFloor);
-  const playbackTime = usePlaybackStore((s) => s.time);
+  const showGround = activeFloor === null;
 
   const seriesColor = useCssVar('--series-a');
   const groundColor = useCssVar('--series-ground');
@@ -55,8 +51,35 @@ export function DisplacementChart() {
   const floorIndex = (activeFloor ?? building.floors) - 1;
   const floorLabel = activeFloor ?? building.floors;
 
-  const data = buildChartData(result, floorIndex, activeFloor !== null);
-  const currentValue = result.floorDisp[floorIndex]?.[nearestIndex(result.time, playbackTime)] ?? 0;
+  const data = buildChartData(result, floorIndex, showGround);
+
+  // ---- Imperative playback cursor ----
+  const plotAreaRef = useRef<HTMLDivElement>(null);
+  const cursorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let frame = 0;
+
+    const move = () => {
+      const area = plotAreaRef.current;
+      const cursor = cursorRef.current;
+      if (!area || !cursor) return;
+
+      const duration = useConfigStore.getState().motion.durationS;
+      const time = usePlaybackStore.getState().time;
+      const fraction = duration > 0 ? Math.min(1, Math.max(0, time / duration)) : 0;
+
+      cursor.style.transform = `translateX(${fraction * area.clientWidth}px)`;
+    };
+
+    const tick = () => {
+      move();
+      frame = requestAnimationFrame(tick);
+    };
+
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   return (
     <section
@@ -68,11 +91,11 @@ export function DisplacementChart() {
           Displacement over time
         </h2>
         <span className="font-mono-nums text-xs text-muted-foreground">
-          Floor {floorLabel} · {seriesColor ? 'mm' : ''}
+          Floor {floorLabel} · mm
         </span>
       </div>
 
-      <div className="h-56 w-full">
+      <div className="relative h-56 w-full" ref={plotAreaRef}>
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 8, bottom: 4, left: -12 }}>
             <CartesianGrid stroke={gridColor} strokeDasharray="2 4" vertical={false} />
@@ -117,9 +140,7 @@ export function DisplacementChart() {
               labelFormatter={(t) => `t = ${Number(t).toFixed(2)} s`}
             />
 
-            <ReferenceLine x={playbackTime} stroke={cursorColor} strokeWidth={2} />
-
-            {activeFloor === null ? (
+            {showGround ? (
               <Line
                 type="monotone"
                 dataKey="ground"
@@ -143,30 +164,69 @@ export function DisplacementChart() {
             />
           </LineChart>
         </ResponsiveContainer>
+
+        {/* Playback cursor. Moves via transform, never a React re-render. */}
+        <div
+          ref={cursorRef}
+          aria-hidden="true"
+          className="pointer-events-none absolute top-0 left-0 h-full w-0.5"
+          style={{ backgroundColor: cursorColor, willChange: 'transform' }}
+        />
       </div>
 
-      <p className="mt-2 font-mono-nums text-xs text-muted-foreground">
-        Now: <span className="text-foreground">{playbackTime.toFixed(1)} s</span> ·{' '}
-        {formatMm(currentValue * M2S_TO_MM)} mm
-      </p>
+      <TimeReadout />
+
+      <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        <li className="flex items-center gap-1.5">
+          <span className="h-0.5 w-4 rounded" style={{ backgroundColor: seriesColor }} />
+          Floor {floorLabel} displacement
+        </li>
+        {showGround ? (
+          <li className="flex items-center gap-1.5">
+            <span
+              className="h-0.5 w-4 rounded"
+              style={{
+                backgroundImage: `repeating-linear-gradient(90deg, ${groundColor} 0 3px, transparent 3px 6px)`,
+              }}
+            />
+            Ground motion (scaled, not in mm)
+          </li>
+        ) : null}
+      </ul>
     </section>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
-/**
- * Downsample before plotting. A 60 s run at dt=0.01 is 6000 points; a chart
- * that reacts to a slider must not try to render all of them per frame.
- */
-const MAX_POINTS = 400;
+/** The "now" readout. One of the few places that re-renders on the clock. */
+function TimeReadout() {
+  const time = usePlaybackStore((s) => s.time);
+  const result = useConfigStore((s) => s.result);
+  const building = useConfigStore((s) => s.building);
+  const activeFloor = useConfigStore((s) => s.activeFloor);
 
-function buildChartData(
-  result: ReturnType<typeof useConfigStore.getState>['result'],
-  floorIndex: number,
-  includeGround: boolean,
-) {
+  const floorIndex = (activeFloor ?? building.floors) - 1;
+  // Same interpolating sampler the 3D view uses, so the two readouts agree.
+  const value = sampleDisplacement(result.floorDisp, result.time, floorIndex, time);
+
+  return (
+    <p className="mt-2 font-mono-nums text-xs text-muted-foreground">
+      Now: <span className="text-foreground">{time.toFixed(1)} s</span> ·{' '}
+      <span className="text-foreground">{formatMm(value * M2S_TO_MM)} mm</span>
+    </p>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Downsample before plotting. A 60 s run at dt = 0.01 is 6,000 points; a chart
+ * that has to react to a slider must not render all of them per frame.
+ */
+function buildChartData(result: SimulationResult, floorIndex: number, includeGround: boolean) {
   const total = result.time.length;
+  if (total === 0) return [];
   const stride = Math.max(1, Math.ceil(total / MAX_POINTS));
   const series = result.floorDisp[floorIndex] ?? [];
 
@@ -175,7 +235,6 @@ function buildChartData(
     rows.push({
       t: result.time[i]!,
       floor: (series[i] ?? 0) * M2S_TO_MM,
-      // Scaled to roughly the same amplitude so the shape is comparable.
       ground: includeGround ? result.groundAccel[i]! * 40 : 0,
     });
   }

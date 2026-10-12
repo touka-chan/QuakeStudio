@@ -8,6 +8,7 @@ import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumpt
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
 import { useConfigStore } from '@/store/configStore';
+import { usePlaybackStore } from '@/store/playbackStore';
 
 /* ==========================================================================
    Phase 1 — UI shell tests
@@ -300,10 +301,26 @@ describe('results panel', () => {
 describe('playback bar', () => {
   beforeEach(skipFirstRun);
 
-  it('is disabled and says why, rather than implying the simulation is live', () => {
+  beforeEach(() => {
+    usePlaybackStore.setState({ time: 0, playing: false, speed: 1, loop: true });
+  });
+
+  it('starts paused, so nothing moves until the user asks', () => {
     render(<AppShell forceDesktopLayout />);
-    expect(screen.getByRole('button', { name: /^play$/i })).toBeDisabled();
-    expect(screen.getByText(/playback arrives in phase 3/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeEnabled();
+    expect(usePlaybackStore.getState().playing).toBe(false);
+    expect(usePlaybackStore.getState().time).toBe(0);
+  });
+
+  it('toggles between play and pause', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    await user.click(screen.getByRole('button', { name: /^play$/i }));
+    expect(screen.getByRole('button', { name: /^pause$/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: /^pause$/i }));
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeInTheDocument();
   });
 
   it('offers a motion exaggeration control labelled in real terms', () => {
@@ -313,6 +330,12 @@ describe('playback bar', () => {
       'aria-valuetext',
       expect.stringContaining('times real movement'),
     );
+  });
+
+  it('states that the numbers are unexaggerated even when the view is not', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByText(/drawn 20× larger/i)).toBeInTheDocument();
+    expect(screen.getByText(/the numbers are the true values/i)).toBeInTheDocument();
   });
 
   it('moves the readout when the timeline is scrubbed', async () => {
@@ -327,5 +350,12 @@ describe('playback bar', () => {
       'aria-valuetext',
       expect.stringContaining('seconds'),
     );
+    expect(usePlaybackStore.getState().time).toBeGreaterThan(0);
+  });
+
+  it('exposes speed and loop as keyboard-reachable controls', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('radiogroup', { name: /playback speed/i })).toBeInTheDocument();
+    expect(screen.getByRole('checkbox', { name: /loop/i })).toBeInTheDocument();
   });
 });

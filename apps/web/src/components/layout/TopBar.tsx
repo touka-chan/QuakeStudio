@@ -4,7 +4,8 @@ import { Download, Info, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { DISCLAIMER_SHORT } from '@/config/engineeringAssumptions';
+import { buildCsv, csvFilename, downloadCsv } from '@/lib/csv';
+import { useConfigStore } from '@/store/configStore';
 import {
   applyTheme,
   prefersDark,
@@ -33,6 +34,20 @@ export function TopBar({
   onTogglePanel: () => void;
   panelOpen: boolean;
 }) {
+  const building = useConfigStore((s) => s.building);
+  const motion = useConfigStore((s) => s.motion);
+  const result = useConfigStore((s) => s.result);
+  const [exported, setExported] = useState<string | null>(null);
+
+  // Export writes the SAME result object the charts render, so the file and
+  // the screen cannot disagree. See lib/csv.ts.
+  const exportCsv = () => {
+    if (result.time.length === 0) return;
+    const filename = csvFilename(building);
+    downloadCsv(filename, buildCsv(building, motion, result));
+    setExported(filename);
+  };
+
   return (
     <header className="z-20 flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface px-3 py-2 sm:px-4">
       <div className="flex items-center gap-2">
@@ -61,12 +76,27 @@ export function TopBar({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="hidden md:block">
-              <ComingSoonButton icon={Download} label="Export CSV" />
-            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={exportCsv}
+              disabled={result.time.length === 0}
+              aria-label="Export this run as a CSV file"
+            >
+              <Download aria-hidden="true" />
+              Export CSV
+            </Button>
           </TooltipTrigger>
-          <TooltipContent className="text-xs">Arrives in Phase 3</TooltipContent>
+          <TooltipContent className="max-w-xs text-xs">
+            Writes the current run at full precision, in the same units shown on screen.
+          </TooltipContent>
         </Tooltip>
+
+        {/* Announces the download to assistive tech without shifting the
+            toolbar with a toast. */}
+        <span className="sr-only" role="status" aria-live="polite">
+          {exported ? `Exported ${exported}` : ''}
+        </span>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -181,4 +211,4 @@ function BuildingIcon() {
   );
 }
 
-export { DISCLAIMER_SHORT };
+export { DISCLAIMER_SHORT } from '@/config/engineeringAssumptions';

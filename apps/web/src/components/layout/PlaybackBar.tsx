@@ -2,21 +2,20 @@ import { Pause, Play, SkipBack } from 'lucide-react';
 
 import { Slider } from '@/components/ui/slider';
 import { Button } from '@/components/ui/button';
-import { VIEWPORT } from '@/config/engineeringAssumptions';
+import { VIEWPORT, type PlaybackSpeed } from '@/config/engineeringAssumptions';
+import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
-import type { PlaybackSpeed } from '@/config/engineeringAssumptions';
 
 /* =========================================================================
    Playback bar — sits under the 3D viewport.
    -------------------------------------------------------------------------
-   Phase 1: the transport is present and the scrubber moves the readout, but
-   nothing plays. Phase 3 wires the clock to the solver output.
+   Drives the single playback clock. Nothing here computes displacement: it
+   only moves time, and the 3D view and the chart cursor follow from that.
 
-   Deliberate decision: it starts PAUSED and says so. A mock animation running
-   on loop would imply the simulation is live, which it is not. When Phase 3
-   lands, `prefers-reduced-motion` keeps the paused start and lowers the
-   default speed.
+   Starts PAUSED. `prefers-reduced-motion` keeps it paused and halves the
+   default speed — an earthquake animation looping unbidden is exactly the
+   kind of motion that setting asks us not to produce.
    ========================================================================= */
 
 const SPEEDS: PlaybackSpeed[] = [0.25, 0.5, 1, 2];
@@ -37,18 +36,13 @@ export function PlaybackBar() {
   } = usePlaybackStore();
 
   const clampedTime = Math.min(time, duration);
+  const reducedMotion = usePrefersReducedMotion();
 
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-3 border-t border-line bg-surface px-4 py-3">
       {/* ---- Transport ---- */}
       <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setTime(0)}
-          aria-label="Go to start"
-          disabled
-        >
+        <Button variant="outline" size="icon" onClick={() => setTime(0)} aria-label="Go to start">
           <SkipBack aria-hidden="true" />
         </Button>
 
@@ -56,7 +50,7 @@ export function PlaybackBar() {
           size="icon"
           onClick={togglePlaying}
           aria-label={playing ? 'Pause' : 'Play'}
-          disabled
+          aria-pressed={playing}
           className="size-11 rounded-full"
         >
           {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" className="ml-0.5" />}
@@ -73,7 +67,6 @@ export function PlaybackBar() {
           onValueChange={(next) => setTime(next[0] ?? 0)}
           aria-label="Simulation time"
           aria-valuetext={`${clampedTime.toFixed(1)} of ${duration} seconds`}
-          disabled={false}
         />
         <span className="font-mono-nums shrink-0 text-sm text-muted-foreground">
           <span className="text-foreground">{clampedTime.toFixed(1)}</span> / {duration.toFixed(1)}{' '}
@@ -99,12 +92,11 @@ export function PlaybackBar() {
                 type="button"
                 role="radio"
                 aria-checked={selected}
-                disabled
                 onClick={() => setSpeed(value)}
                 className={`rounded-app px-2 py-1 font-mono-nums text-xs transition-colors ${
                   selected
                     ? 'bg-primary font-medium text-primary-foreground'
-                    : 'text-muted-foreground'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {value}×
@@ -120,7 +112,7 @@ export function PlaybackBar() {
           htmlFor="exaggeration"
           className="text-xs font-semibold tracking-wide text-muted-foreground uppercase"
         >
-          Motion exaggeration
+          Motion
         </label>
         <Slider
           id="exaggeration"
@@ -148,7 +140,9 @@ export function PlaybackBar() {
       </label>
 
       <p className="w-full text-xs text-muted-foreground">
-        Playback arrives in Phase 3. Right now you can scrub to read the chart at any moment.
+        Motion is drawn {exaggeration}× larger so millimetres are visible — the numbers are the true
+        values.
+        {reducedMotion ? ' Reduced-motion is on, so playback starts paused at half speed.' : ''}
       </p>
     </div>
   );

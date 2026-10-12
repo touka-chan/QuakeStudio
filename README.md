@@ -9,17 +9,17 @@ building, shake it, and watch how it sways.
 
 ## Status
 
-**Phase 2 — Simulation engine.** Complete. The numbers on screen now come from
-a real Newmark-β solver running in a Web Worker. **They are still not
-validated** — every coefficient is a placeholder, and Phase 5 compares this
-engine against an independent Python implementation.
+**Phase 3 — Real-time response & data output.** Complete. The building sways,
+the chart cursor tracks it, and a run exports to CSV. **Still not validated**
+— every coefficient is a placeholder, and Phase 5 compares this engine against
+an independent Python implementation.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: tooling, tokens, assumptions config | ✅ |
 | 1 | UI shell & static prototype | ✅ |
 | 2 | Simulation engine + Web Worker | ✅ |
-| 3 | Real-time response & data output | ⏳ |
+| 3 | Real-time response & data output | ✅ |
 | 4 | Parameter comparison & persistence | ⏳ |
 | 5 | Verification, accessibility, polish | ⏳ |
 | 6 | Usability testing | ⏳ |
@@ -131,6 +131,33 @@ controls you can see.
 
 See [`src/engine/README.md`](apps/web/src/engine/README.md) for the invariants
 and why each method was chosen.
+
+## Playback
+
+One clock drives everything. The 3D sway and the chart cursor both sample
+displacement from the same `result.floorDisp` array via `sampleDisplacement`,
+which interpolates between engine timesteps — nearest-sample lookup makes the
+building visibly twitch rather than sway.
+
+The animation writes to Three.js transforms inside `useFrame` and never calls
+`setState`, and the chart cursor is moved with `transform` from its own
+`requestAnimationFrame` loop. A 60 fps animation therefore causes zero React
+renders.
+
+**Motion exaggeration (×20 by default)** magnifies the 3D view only, because
+real movement is millimetres. The numbers stay true, and the playback bar says
+so in as many words.
+
+`prefers-reduced-motion` keeps playback paused on load and halves the default
+speed.
+
+## CSV export
+
+`Export CSV` writes the current run at full precision, in the units the UI
+shows (displacement in mm, drift in percent, ground acceleration in m/s²).
+Displacement columns come from the same `SimulationResult` the charts render,
+so the file and the screen cannot disagree. The header block also states each
+headline figure *exactly as displayed*, which makes the match checkable.
 
 ## Repository layout
 

@@ -301,13 +301,117 @@ test.describe('the simulation engine', () => {
   });
 });
 
-test.describe('honesty about results', () => {
-  test('playback is disabled and labelled as future work', async ({ page }) => {
+test.describe('playback', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect
+      .poll(
+        async () => Number.parseFloat(await page.getByTestId('metric-peak-disp-value').innerText()),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
+  });
+
+  test('starts paused, so nothing moves until asked', async ({ page }) => {
+    await expect(page.getByRole('button', { name: /^play$/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /^pause$/i })).toHaveCount(0);
+
+    const timeSlider = page.getByRole('slider', { name: /simulation time/i });
+    const before = await timeSlider.getAttribute('aria-valuetext');
+    await page.waitForTimeout(600);
+    expect(await timeSlider.getAttribute('aria-valuetext')).toBe(before);
+  });
+
+  test('play advances the clock, pause stops it', async ({ page }) => {
+    await page.getByRole('button', { name: /^play$/i }).click();
+    await expect(page.getByRole('button', { name: /^pause$/i })).toBeVisible();
+
+    const timeSlider = page.getByRole('slider', { name: /simulation time/i });
+    await expect
+      .poll(async () => timeSlider.getAttribute('aria-valuetext'), { timeout: 5000 })
+      .not.toMatch(/^0\.0 of/);
+
+    await page.getByRole('button', { name: /^pause$/i }).click();
+    const paused = await timeSlider.getAttribute('aria-valuetext');
+    await page.waitForTimeout(500);
+    expect(await timeSlider.getAttribute('aria-valuetext')).toBe(paused);
+  });
+
+  test('the exaggeration slider changes the motion scale', async ({ page }) => {
+    const slider = page.getByRole('slider', { name: /motion exaggeration/i });
+    await expect(slider).toHaveAttribute('aria-valuetext', /20 times/);
+
+    await slider.focus();
+    await page.keyboard.press('ArrowRight');
+    await expect(slider).toHaveAttribute('aria-valuetext', /21 times/);
+    await expect(page.getByText(/drawn 21× larger/i)).toBeVisible();
+  });
+
+  test('says the numbers are not exaggerated even when the view is', async ({ page }) => {
+    await expect(page.getByText(/the numbers are the true values/i)).toBeVisible();
+  });
+
+  test('speed and loop are operable', async ({ page }) => {
+    await page.getByRole('radio', { name: '2×' }).click();
+    await expect(page.getByRole('radio', { name: '2×' })).toHaveAttribute('aria-checked', 'true');
+
+    const loop = page.getByRole('checkbox');
+    await loop.uncheck();
+    await expect(loop).not.toBeChecked();
+  });
+});
+
+test.describe('CSV export', () => {
+  test('downloads a file whose headline numbers match the screen', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
 
-    await expect(page.getByRole('button', { name: /^play$/i })).toBeDisabled();
-    await expect(page.getByText(/playback arrives in phase 3/i)).toBeVisible();
+    await expect
+      .poll(
+        async () => Number.parseFloat(await page.getByTestId('metric-peak-disp-value').innerText()),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
+
+    const shownPeak = (await page.getByTestId('metric-peak-disp-value').innerText()).trim();
+    const shownDrift = (await page.getByTestId('metric-max-drift-value').innerText()).trim();
+
+    const downloadPromise = page.waitForEvent('download');
+    await page.getByRole('button', { name: /export this run as a csv file/i }).click();
+    const download = await downloadPromise;
+
+    expect(download.suggestedFilename()).toMatch(/^quakestudio-.*\.csv$/);
+
+    const stream = await download.createReadStream();
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) chunks.push(chunk as Buffer);
+    const csv = Buffer.concat(chunks).toString('utf8');
+
+    // The brief: "exported CSV matches the on-screen numbers". The card renders
+    // value and unit in one element, so strip the unit before comparing.
+    const cardValue = (text: string) => text.replace(/[a-z%]+$/i, '').trim();
+    expect(csv).toContain(`# Peak displacement as shown on screen (mm),${cardValue(shownPeak)}`);
+    expect(csv).toContain(
+      `# Max interstory drift ratio as shown on screen (%),${cardValue(shownDrift)}`,
+    );
+
+    // And the full-precision figures must round to what is on screen.
+    const fullPeak = Number(/# Peak displacement \(mm\),([\d.]+)/.exec(csv)?.[1] ?? 'NaN');
+    expect(fullPeak.toFixed(1)).toBe(cardValue(shownPeak));
+
+    expect(csv).toContain('floor_1_disp_mm');
+    expect(csv).toMatch(/Not a structural safety assessment/i);
+  });
+});
+
+test.describe('honesty about results', () => {
+  test('playback is live and says the view is exaggerated, not the numbers', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+
+    await expect(page.getByRole('button', { name: /^play$/i })).toBeEnabled();
+    await expect(page.getByText(/the numbers are the true values/i)).toBeVisible();
   });
 
   test('the Phase 7 site controls are visible but unavailable', async ({ page }) => {

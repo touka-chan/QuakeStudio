@@ -7,6 +7,7 @@ import { ControlsPanel } from './ControlsPanel';
 import { FirstRunDialog } from './FirstRunDialog';
 import { MobileTabBar, type MobileTab } from './MobileTabBar';
 import { PlaybackBar } from './PlaybackBar';
+import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
 import { TopBar } from './TopBar';
 import { Viewport } from '@/components/viewport/Viewport';
@@ -81,6 +82,10 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
         </div>
 
         {!isDesktop ? <MobileTabBar value={tab} onChange={setTab} /> : null}
+
+        {/* The single playback clock. Mounted once, above everything that
+            reads time, so it keeps ticking whichever tab is visible. */}
+        <PlaybackClock />
 
         <FirstRunDialog />
       </div>
