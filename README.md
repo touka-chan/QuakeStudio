@@ -36,6 +36,31 @@ So the *relationships* are trustworthy — a braced frame really does sway less,
 taller building really does have a longer period — while the *absolute values*
 are not. See [`docs/assumptions.md`](docs/assumptions.md).
 
+## Working on this repo
+
+Everything commits straight to `main`:
+
+```bash
+git add -A
+git commit -m "Phase 3: real-time response and data output"
+git push
+```
+
+### ⚠️ Commit authorship
+
+The Phase 0–2 commits are authored as
+`QuakeStudio Team <team@quakestudio.local>` — a placeholder identity, not a
+real GitHub account. They are **not** linked to your GitHub profile and do not
+count toward your contributions graph. To fix that for future commits:
+
+```bash
+git config user.name "Your Name"
+git config user.email "you@example.com"
+```
+
+Rewriting the existing commits' authorship is possible with `git rebase` plus a
+force-push, so it is best done now rather than once there are more of them.
+
 ## Requirements
 
 - **Node.js ≥ 22.12** (Vite 8 needs it; 24.x recommended)
