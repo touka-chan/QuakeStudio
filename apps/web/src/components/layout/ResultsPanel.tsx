@@ -29,6 +29,11 @@ export function ResultsPanel() {
   const driftPct = result.maxDriftRatio * 100;
   const period = result.periodsS[0] ?? 0;
   const worstStory = result.driftRatio.indexOf(result.maxDriftRatio) + 1;
+  const engineError = useConfigStore((s) => s.error);
+
+  // The worker's first response has not landed yet — show a skeleton rather
+  // than a grid of zeros, which would read as a real (and alarming) result.
+  const isLoading = status === 'computing' && result.time.length === 0;
 
   return (
     <ScrollArea className="h-full">
@@ -42,11 +47,16 @@ export function ResultsPanel() {
           ) : null}
         </header>
 
-        <p className="rounded-app border border-dashed border-accent-yellow/50 bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
-          <span className="font-medium text-accent-yellow-text">Preview numbers.</span> The
-          simulation engine arrives in Phase 2 — these are mock values shaped like the real output
-          so the layout can be reviewed.
-        </p>
+        {engineError ? (
+          <p
+            role="alert"
+            className="rounded-app border border-danger/40 bg-danger/10 px-3 py-2 text-xs text-danger"
+          >
+            {engineError}
+          </p>
+        ) : null}
+
+        {isLoading ? <ResultsSkeleton /> : null}
 
         {/* ---- Metric cards ---- */}
         <div className="grid grid-cols-3 gap-2">
@@ -56,6 +66,7 @@ export function ResultsPanel() {
             unit="mm"
             detail={`Floor ${topFloor}, relative to ground`}
             help="The furthest any floor moved sideways, measured from the ground beneath it."
+            testId="metric-peak-disp"
           />
           <MetricCard
             label="Max story drift"
@@ -64,6 +75,7 @@ export function ResultsPanel() {
             detail={`Story ${worstStory}`}
             tone="caution"
             help="The biggest gap between one floor and the floor below it, as a percentage of floor height."
+            testId="metric-max-drift"
           />
           <MetricCard
             label="Natural period"
@@ -71,6 +83,7 @@ export function ResultsPanel() {
             unit="s"
             detail="1st mode"
             help="How long the building takes to sway back and forth once, at its natural rhythm."
+            testId="metric-period"
           />
         </div>
 
@@ -86,5 +99,25 @@ export function ResultsPanel() {
         </p>
       </div>
     </ScrollArea>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/** Shown while the worker's first result is in flight. */
+function ResultsSkeleton() {
+  return (
+    <div className="space-y-3" aria-hidden="true">
+      <div className="grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((i) => (
+          <div
+            key={i}
+            className="h-24 animate-pulse rounded-card border border-line bg-surface-2"
+          />
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-card border border-line bg-surface-2" />
+      <div className="h-72 animate-pulse rounded-card border border-line bg-surface-2" />
+    </div>
   );
 }

@@ -91,9 +91,8 @@ test.describe('building a model', () => {
     // The template name appears in BOTH the select trigger and the viewport
     // chip, so scope to the chip when asserting the 3D state.
     const chip = page.getByRole('main').getByText(/story concrete · moment frame/);
-
-    const metric = page.getByRole('complementary', { name: /simulation results/i });
-    const peakBefore = await metric.locator('.font-mono-nums').first().textContent();
+    const peakValue = page.getByTestId('metric-peak-disp-value');
+    const peakBefore = await peakValue.innerText();
 
     await page.getByRole('combobox', { name: /building template/i }).click();
     await page.getByRole('option', { name: /15-story concrete high-rise/i }).click();
@@ -103,9 +102,8 @@ test.describe('building a model', () => {
     await page.getByRole('option', { name: /3-story concrete/i }).click();
     await expect(chip).toHaveText(/3-story/);
 
-    // Mock numbers, but they must actually respond to the input.
-    const peakAfter = await metric.locator('.font-mono-nums').first().textContent();
-    expect(peakAfter).not.toEqual(peakBefore);
+    // A 15-storey tower and a 3-storey block are not the same building.
+    await expect(peakValue).not.toHaveText(peakBefore);
   });
 
   test('changing the floors slider changes the building', async ({ page }) => {
@@ -223,13 +221,87 @@ test.describe('first-run dialog', () => {
   });
 });
 
-test.describe('honesty about mock data', () => {
-  test('the results panel says the numbers are a preview', async ({ page }) => {
+test.describe('the simulation engine', () => {
+  const peakValue = (page: import('@playwright/test').Page) =>
+    page.getByTestId('metric-peak-disp-value').innerText();
+  const periodValue = (page: import('@playwright/test').Page) =>
+    page.getByTestId('metric-period-value').innerText();
+
+  /** Wait for the worker's first result rather than racing it. */
+  const waitForResult = async (page: import('@playwright/test').Page) => {
+    await expect
+      .poll(async () => Number.parseFloat(await peakValue(page)), { timeout: 10_000 })
+      .toBeGreaterThan(0);
+  };
+
+  test('produces real results, not a loading skeleton', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    await expect(page.getByText(/preview numbers/i)).toBeVisible();
+
+    const panel = page.getByRole('complementary', { name: /simulation results/i });
+    // The "Preview numbers" notice is gone now that the engine is real.
+    await expect(panel.getByText(/preview numbers/i)).toHaveCount(0);
+
+    await waitForResult(page);
   });
 
+  test('reacts to an input change', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await waitForResult(page);
+
+    const before = await peakValue(page);
+
+    await page.getByRole('combobox', { name: /building template/i }).click();
+    await page.getByRole('option', { name: /15-story concrete high-rise/i }).click();
+
+    await expect(page.getByTestId('metric-peak-disp-value')).not.toHaveText(before);
+  });
+
+  test('a braced frame has a shorter period than a moment frame', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await waitForResult(page);
+
+    const moment = Number.parseFloat(await periodValue(page));
+
+    await page.getByRole('radio', { name: 'Braced frame' }).click();
+
+    // Bracing doubles the stiffness, so the period falls by sqrt(2) ≈ 0.71.
+    await expect
+      .poll(async () => Number.parseFloat(await periodValue(page)), { timeout: 5000 })
+      .toBeLessThan(moment);
+  });
+
+  test('a taller building has a longer period', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await waitForResult(page);
+
+    const before = Number.parseFloat(await periodValue(page));
+
+    await page.getByRole('combobox', { name: /building template/i }).click();
+    await page.getByRole('option', { name: /15-story concrete high-rise/i }).click();
+
+    await expect
+      .poll(async () => Number.parseFloat(await periodValue(page)), { timeout: 5000 })
+      .toBeGreaterThan(before);
+  });
+
+  test('never claims a safety verdict', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await waitForResult(page);
+
+    const panel = page.getByRole('complementary', { name: /simulation results/i });
+    // exact: true — "Peak displacement" is also the start of a chart heading.
+    await expect(panel.getByText('Peak displacement', { exact: true })).toBeVisible();
+    const text = await panel.innerText();
+    expect(text).not.toMatch(/\bsafe\b|\bunsafe\b|collapse|damage|failure/i);
+  });
+});
+
+test.describe('honesty about results', () => {
   test('playback is disabled and labelled as future work', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');

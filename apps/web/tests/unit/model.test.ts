@@ -1,9 +1,15 @@
+/* ==========================================================================
+   Data model, templates and the drift scale.
+   --------------------------------------------------------------------------
+   The engine itself is covered in matrix / buildingModel / solver tests.
+   ========================================================================== */
+
 import { describe, expect, it } from 'vitest';
 
 import { DEFAULT_BUILDING } from '@/config/engineeringAssumptions';
 import { BUILDING_TEMPLATES, DEFAULT_BUILDING_CONFIG } from '@/config/templates';
-import { generateMockResult } from '@/mock/mockResult';
 import { DRIFT_BANDS, driftBand } from '@/lib/driftScale';
+import { simulate } from '@/engine/solver';
 import {
   buildingConfigSchema,
   runRecordSchema,
@@ -11,10 +17,6 @@ import {
   validateMotion,
   type GroundMotionConfig,
 } from '@/types';
-
-/* ==========================================================================
-   Phase 1 — data model, templates and the mock generator.
-   ========================================================================== */
 
 describe('building templates', () => {
   it('all validate against the schema', () => {
@@ -91,7 +93,7 @@ describe('run record schema', () => {
       durationS: 20,
       dt: 0.01,
     } satisfies GroundMotionConfig;
-    const result = generateMockResult(building, motion);
+    const result = simulate(building, motion);
 
     const record = {
       id: 'run-1',
@@ -140,92 +142,3 @@ describe('drift scale', () => {
 });
 
 /* ========================================================================== */
-
-describe('mock result generator (Phase 1 placeholder)', () => {
-  const building = DEFAULT_BUILDING_CONFIG;
-  const motion = {
-    preset: 'harmonic',
-    pgaG: 0.3,
-    frequencyHz: 1.4,
-    durationS: 20,
-    dt: 0.01,
-  } as const;
-
-  it('returns one displacement series per floor', () => {
-    const result = generateMockResult(building, motion);
-    expect(result.floorDisp).toHaveLength(building.floors);
-    expect(result.peakDisp).toHaveLength(building.floors);
-    expect(result.driftRatio).toHaveLength(building.floors);
-  });
-
-  it('produces arrays of consistent length', () => {
-    const result = generateMockResult(building, motion);
-    const expected = result.time.length;
-    expect(result.floorDisp.every((s) => s.length === expected)).toBe(true);
-    expect(result.groundAccel).toHaveLength(expected);
-  });
-
-  it('is deterministic: the same input gives the same output', () => {
-    const a = generateMockResult(building, motion);
-    const b = generateMockResult(building, motion);
-    expect(a).toEqual(b);
-  });
-
-  it('peak displacement equals the largest magnitude in the series', () => {
-    const result = generateMockResult(building, motion);
-    for (const [index, series] of result.floorDisp.entries()) {
-      const actual = Math.max(...series.map(Math.abs));
-      expect(result.peakDisp[index]).toBeCloseTo(actual, 10);
-    }
-  });
-
-  it('maxDisp is the largest peak in the building', () => {
-    const result = generateMockResult(building, motion);
-    expect(result.maxDisp).toBeCloseTo(Math.max(...result.peakDisp), 10);
-  });
-
-  it('maxDriftRatio is the largest drift ratio', () => {
-    const result = generateMockResult(building, motion);
-    expect(result.maxDriftRatio).toBeCloseTo(Math.max(...result.driftRatio), 10);
-  });
-
-  it('drift ratio equals peak displacement over floor height', () => {
-    const result = generateMockResult(building, motion);
-    for (const [index, drift] of result.driftRatio.entries()) {
-      expect(drift).toBeCloseTo(result.peakDisp[index]! / building.floorHeightM, 10);
-    }
-  });
-
-  it('reports periods in ascending order', () => {
-    const result = generateMockResult(building, motion);
-    expect(result.periodsS).toHaveLength(3);
-    for (let i = 1; i < result.periodsS.length; i++) {
-      expect(result.periodsS[i]!).toBeLessThan(result.periodsS[i - 1]!);
-    }
-  });
-
-  it('a stronger earthquake produces more movement', () => {
-    const gentle = generateMockResult(building, { ...motion, pgaG: 0.1 });
-    const strong = generateMockResult(building, { ...motion, pgaG: 0.5 });
-    expect(strong.maxDisp).toBeGreaterThan(gentle.maxDisp);
-  });
-
-  it('a braced frame sways less than a moment frame', () => {
-    const moment = generateMockResult(building, motion);
-    const braced = generateMockResult({ ...building, frameType: 'braced' }, motion);
-    expect(braced.maxDisp).toBeLessThan(moment.maxDisp);
-  });
-
-  it('handles the single-floor edge case', () => {
-    const result = generateMockResult({ ...building, floors: 1 }, motion);
-    expect(result.floorDisp).toHaveLength(1);
-    expect(result.driftRatio).toHaveLength(1);
-    expect(Number.isFinite(result.maxDisp)).toBe(true);
-  });
-
-  it('handles the maximum floor count', () => {
-    const result = generateMockResult({ ...building, floors: 20 }, motion);
-    expect(result.floorDisp).toHaveLength(20);
-    expect(Number.isFinite(result.maxDisp)).toBe(true);
-  });
-});

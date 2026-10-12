@@ -9,27 +9,32 @@ building, shake it, and watch how it sways.
 
 ## Status
 
-**Phase 1 — UI shell & static prototype.** Complete. The three-zone workspace
-runs end to end on mock data. **The numbers on screen are not yet real** — the
-simulation engine is Phase 2, and the results panel says so.
+**Phase 2 — Simulation engine.** Complete. The numbers on screen now come from
+a real Newmark-β solver running in a Web Worker. **They are still not
+validated** — every coefficient is a placeholder, and Phase 5 compares this
+engine against an independent Python implementation.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: tooling, tokens, assumptions config | ✅ |
-| 1 | UI shell & static prototype (mock data) | ✅ |
-| 2 | Simulation engine + Web Worker | ⏳ |
+| 1 | UI shell & static prototype | ✅ |
+| 2 | Simulation engine + Web Worker | ✅ |
 | 3 | Real-time response & data output | ⏳ |
 | 4 | Parameter comparison & persistence | ⏳ |
 | 5 | Verification, accessibility, polish | ⏳ |
 | 6 | Usability testing | ⏳ |
 | 7 | _Optional_ — site factors, pending client + adviser approval | ⏳ |
 
-## ⚠️ The current numbers are mock data
+## ⚠️ Read this before trusting a number
 
-`src/mock/mockResult.ts` produces plausible-looking values so the interface can
-be reviewed. It is a damped sinusoid, **not physics**. Phase 2 replaces it with
-the real solver. The results panel carries a permanent "Preview numbers" notice
-so nobody can mistake mock output for a result.
+The model is real structural dynamics — mass, stiffness, damping, Newmark
+integration, and a Cholesky-factored solve. But **every coefficient is a
+placeholder** (`src/config/engineeringAssumptions.ts`), and the model has not
+yet been checked against an independent implementation.
+
+So the *relationships* are trustworthy — a braced frame really does sway less, a
+taller building really does have a longer period — while the *absolute values*
+are not. See [`docs/assumptions.md`](docs/assumptions.md).
 
 ## Requirements
 
@@ -85,6 +90,22 @@ Controls to know about:
 Disabled on purpose, each labelled with the phase that delivers it: playback
 (Phase 3), comparison (Phase 4), save / export CSV / assumptions (Phases 3–5),
 and Site & ground (Phase 7, pending engineering approval).
+
+## The engine
+
+`src/engine/` implements a linear-elastic shear building:
+
+```
+M·ü + C·u̇ + K·u = −M·1·a_g(t)
+```
+
+integrated with Newmark-β (β = ¼, γ = ½ — unconditionally stable and
+non-dissipative) at a fixed `dt = 0.01 s`. It runs in a Web Worker, debounced
+at 150 ms, and drops stale responses so the numbers on screen always match the
+controls you can see.
+
+See [`src/engine/README.md`](apps/web/src/engine/README.md) for the invariants
+and why each method was chosen.
 
 ## Repository layout
 

@@ -133,10 +133,18 @@ describe('app shell', () => {
     expect(screen.getByText(/not a structural safety assessment/i)).toBeInTheDocument();
   });
 
-  it('labels the mock data so it cannot be mistaken for a real result', () => {
+  it('no longer advertises the numbers as a mock preview', () => {
     render(<AppShell forceDesktopLayout />);
-    expect(screen.getByText(/preview numbers/i)).toBeInTheDocument();
-    expect(screen.getByText(/simulation engine arrives in phase 2/i)).toBeInTheDocument();
+    // The engine shipped in Phase 2, so the "Preview numbers" notice is gone.
+    // If mock data ever returns, this catches the regression.
+    expect(screen.queryByText(/preview numbers/i)).not.toBeInTheDocument();
+  });
+
+  it('shows a loading state until the first result arrives', () => {
+    render(<AppShell forceDesktopLayout />);
+    const panel = screen.getByRole('complementary', { name: /simulation results/i });
+    // No Worker in jsdom, so the skeleton is what a cold load looks like.
+    expect(within(panel).getByText(/updating/i)).toBeInTheDocument();
   });
 
   it('keeps the whole workspace reachable by keyboard', () => {

@@ -17,6 +17,7 @@ export function MetricCard({
   detail,
   help,
   tone = 'default',
+  testId,
 }: {
   label: string;
   value: string;
@@ -24,6 +25,7 @@ export function MetricCard({
   detail?: string;
   help?: string;
   tone?: 'default' | 'positive' | 'caution';
+  testId?: string;
 }) {
   return (
     <div
@@ -31,6 +33,7 @@ export function MetricCard({
         'rounded-card border border-line bg-surface p-3',
         tone === 'caution' && 'border-accent-yellow/50',
       )}
+      data-testid={testId}
     >
       <div className="flex items-start gap-1">
         <p className="text-xs leading-tight font-medium tracking-wide text-muted-foreground uppercase">
@@ -48,6 +51,7 @@ export function MetricCard({
           'font-mono-nums mt-1.5 text-2xl leading-none font-semibold tabular-nums',
           tone === 'caution' ? 'text-accent-yellow-text' : 'text-foreground',
         )}
+        data-testid={testId ? `${testId}-value` : undefined}
       >
         {value}
         {unit ? (

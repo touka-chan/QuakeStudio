@@ -29,6 +29,7 @@ there and the app follows.
 | 6.1 | Integration timestep `dt` | 0.01 s | ☐ | Spec-fixed; must satisfy `dt ≤ T₁/20` |
 | 7.1 | Rayleigh damping calibration | Modes 1 and 2 | ☐ | Standard choice; confirm |
 | 8.1 | Solver vs Python reference tolerance | ≤ 5% | ☐ | **Confirm before Phase 5** |
+| 9.1 | Drift colour band thresholds | 0.10 %, 0.20 %, 0.35 %, 0.50 % | ☐ | **Display bands only — see §7a** |
 
 ---
 
@@ -138,6 +139,30 @@ time, the first three natural periods, and a full CSV export.
 Not shown, by design: damage, failure, collapse, safety factors, or any
 verdict. Red is reserved for errors in the interface — never for "a bad
 result" — so that the tone stays calm and scientific rather than alarming.
+
+---
+
+## 7a. Drift colour bands — a Phase 2 observation
+
+The five-band drift scale currently splits at 0.10 %, 0.20 %, 0.35 % and 0.50 %
+(`src/lib/driftScale.ts`). Those thresholds were chosen when there were no real
+results to look at.
+
+Now that the engine runs, a default 5-storey concrete building at 0.3 g
+produces **drifts above 0.50 %**, which puts every story in the top band and
+makes the scale useless for the common case.
+
+This is a design question, not a physics one, so it is flagged rather than
+silently retuned:
+
+- The bands should probably be **logarithmic**, or rescaled to whatever range
+  the model actually produces across the template set.
+- They must keep using **non-judgemental wording** ("very small" → "very
+  large"). Whatever values are chosen, the legend must never imply a verdict.
+- The top band must be open-ended so an extreme case still renders.
+
+Please advise on thresholds that are meaningful to read, and confirm the
+wording.
 
 ---
 

@@ -6,22 +6,29 @@ import {
   DEFAULT_MOTION_CONFIG,
   type BuildingTemplate,
 } from '@/config/templates';
-import { generateMockResult } from '@/mock/mockResult';
+import { SolverClient } from '@/engine/client';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
 
 /* =========================================================================
    Config store — the single source of truth for "what building, what shaking"
    -------------------------------------------------------------------------
-   Phase 1 recomputes mock results synchronously on every change. Phase 2
-   replaces the two `recompute` call sites with a debounced request into the
-   Web Worker. Every other part of the UI subscribes to the same fields either
-   way, so nothing else has to change.
+   Every change to the building or the motion triggers a re-solve in the
+   Web Worker, debounced at 150 ms. Results arrive asynchronously; `status`
+   tells the UI whether to show "Updating…".
 
-   IMPORTANT: while Phase 1 is live, `result` comes from `generateMockResult`,
-   which is not physics. See the warning at the top of that file.
+   The stale-response problem is handled in SolverClient by request id, so the
+   numbers on screen always match the controls the user can see — even when
+   they drag a slider faster than the solver can respond.
    ========================================================================= */
 
 export type ComputeStatus = 'idle' | 'computing';
+
+export type EngineInfo = {
+  /** Wall-clock time of the last solve, in ms. Shown as a diagnostic. */
+  solveMs: number;
+  /** True when the worker is unavailable and we fell back to the main thread. */
+  usedFallback: boolean;
+};
 
 type ConfigState = {
   building: BuildingConfig;
@@ -29,8 +36,9 @@ type ConfigState = {
   templateId: string;
   result: SimulationResult;
   status: ComputeStatus;
-  /** Floor highlighted in the 3D view and the charts. `null` = top floor. */
   activeFloor: number | null;
+  error: string | null;
+  engineInfo: EngineInfo;
 
   setBuilding: (patch: Partial<BuildingConfig>) => void;
   setMotion: (patch: Partial<GroundMotionConfig>) => void;
@@ -38,18 +46,51 @@ type ConfigState = {
   setActiveFloor: (floor: number | null) => void;
 };
 
-function recompute(building: BuildingConfig, motion: GroundMotionConfig): SimulationResult {
-  // Phase 1: synchronous mock. Phase 2: postMessage to the worker.
-  return generateMockResult(building, motion);
+/** One client for the app's lifetime. */
+const solver = new SolverClient(
+  (result) => {
+    useConfigStore.setState({ result, status: 'idle', error: null });
+  },
+  (message) => {
+    useConfigStore.setState({ status: 'idle', error: message });
+  },
+);
+
+/** Kick off a solve for the current inputs. */
+function resolve(building: BuildingConfig, motion: GroundMotionConfig, immediate = false) {
+  useConfigStore.setState({ status: 'computing' });
+  if (immediate) solver.requestImmediate(building, motion);
+  else solver.request(building, motion);
 }
+
+/**
+ * Placeholder shown until the worker's first response lands.
+ *
+ * Declared before the store: a const in the temporal dead zone would throw on
+ * the store's very first evaluation.
+ */
+const EMPTY_RESULT: SimulationResult = {
+  time: [],
+  floorDisp: [],
+  peakDisp: [],
+  maxDisp: 0,
+  driftRatio: [],
+  maxDriftRatio: 0,
+  periodsS: [],
+  groundAccel: [],
+};
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
   building: DEFAULT_BUILDING_CONFIG,
   motion: DEFAULT_MOTION_CONFIG,
   templateId: DEFAULT_BUILDING_CONFIG.id,
-  result: recompute(DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG),
-  status: 'idle',
+  // Replaced by the worker's first response immediately on load; this empty
+  // result means the panels render their skeleton rather than a stale value.
+  result: EMPTY_RESULT,
+  status: 'computing',
   activeFloor: null,
+  error: null,
+  engineInfo: { solveMs: 0, usedFallback: false },
 
   setBuilding: (patch) => {
     const building = { ...get().building, ...patch };
@@ -57,14 +98,14 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       building,
       // Editing any field by hand means we are no longer on a named template.
       templateId: 'custom',
-      status: 'computing',
-      result: recompute(building, get().motion),
     });
+    resolve(building, get().motion);
   },
 
   setMotion: (patch) => {
     const motion = { ...get().motion, ...patch };
-    set({ motion, status: 'computing', result: recompute(get().building, motion) });
+    set({ motion });
+    resolve(get().building, motion);
   },
 
   applyTemplate: (templateId) => {
@@ -77,19 +118,13 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       ...found.building,
       dampingRatio: undefined,
     };
-    set({
-      templateId,
-      building,
-      result: recompute(building, get().motion),
-      activeFloor: null,
-      status: 'idle',
-    });
+    set({ templateId, building, activeFloor: null });
+    resolve(building, get().motion);
   },
 
   setActiveFloor: (activeFloor) => set({ activeFloor }),
 }));
 
-/** Stable selector: avoids re-rendering every consumer on unrelated changes. */
-export function selectResult(s: ConfigState): SimulationResult {
-  return s.result;
-}
+// Solve once as soon as the module loads, so the first paint already has real
+// numbers rather than an empty state.
+resolve(DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG, true);
