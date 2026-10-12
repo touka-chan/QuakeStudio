@@ -1,0 +1,42 @@
+{
+  "name": "quakestudio",
+  "version": "0.1.0",
+  "private": true,
+  "description": "QuakeStudio — educational web-based earthquake response simulator for students.",
+  "license": "MIT",
+  "type": "module",
+  "workspaces": [
+    "apps/web"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace apps/web",
+    "build": "npm run build --workspace apps/web",
+    "preview": "npm run preview --workspace apps/web",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspace apps/web",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "npm run e2e --workspace apps/web",
+    "e2e:install": "npm run e2e:install --workspace apps/web"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.2",
+    "eslint": "^10.12.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.7",
+    "globals": "^16.5.0",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.4"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}

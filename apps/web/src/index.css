@@ -1,0 +1,119 @@
+@import 'tailwindcss';
+@import './styles/tokens.css';
+
+/* Dark mode is driven by a `.dark` class on <html>, set before first paint
+   by the inline script in index.html. */
+@custom-variant dark (&:is(.dark *));
+
+/* Expose the design tokens as Tailwind utilities, e.g. `bg-surface`,
+   `text-muted-foreground`, `border-line`. Keeps Tailwind idiomatic while
+   tokens.css stays the single source of truth for the actual colour values.
+
+   The first block mirrors shadcn/ui's expected variable names so generated
+   components look right out of the box; the second adds QuakeStudio's own. */
+@theme inline {
+  /* -- shadcn-compatible aliases -- */
+  --color-background: var(--bg);
+  --color-foreground: var(--text);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--text);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--text);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-fg);
+  --color-secondary: var(--surface-2);
+  --color-secondary-foreground: var(--text);
+  --color-muted: var(--surface-2);
+  --color-muted-foreground: var(--text-muted);
+  --color-muted-strong: var(--text-muted-strong);
+  --color-accent: var(--surface-2);
+  --color-accent-foreground: var(--text);
+  --color-destructive: var(--danger);
+  --color-ring: var(--primary);
+  --color-input: var(--border);
+  --color-border: var(--border);
+
+  /* -- QuakeStudio specifics -- */
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--border);
+  --color-accent-yellow: var(--accent-yellow);
+  --color-accent-yellow-text: var(--accent-yellow-text);
+  --color-info: var(--info-blue);
+  --color-warning: var(--warning);
+  --color-warning-bg: var(--warning-bg);
+  --color-warning-text: var(--warning-text);
+  --color-danger: var(--danger);
+  --color-viewport: var(--viewport-bg);
+
+  /* Data-viz series */
+  --color-series-a: var(--series-a);
+  --color-series-b: var(--series-b);
+  --color-series-c: var(--series-c);
+
+  /* Drift scale */
+  --color-drift-1: var(--drift-1);
+  --color-drift-2: var(--drift-2);
+  --color-drift-3: var(--drift-3);
+  --color-drift-4: var(--drift-4);
+  --color-drift-5: var(--drift-5);
+
+  /* Typography */
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
+
+  /* Shape */
+  --radius-app: var(--radius);
+  --radius-card: var(--radius-card);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--text-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Numbers line up in tables and metric readouts. */
+  .tabular,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+  }
+
+  /* Respect the OS "reduce motion" setting. Phase 1 uses this to start the
+     playback paused and lower the default speed. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer utilities {
+  .font-mono-nums {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+  }
+}

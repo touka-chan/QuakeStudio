@@ -1,0 +1,167 @@
+/* =========================================================================
+   QuakeStudio design tokens
+   -------------------------------------------------------------------------
+   Source of truth for the whole palette. Values are verbatim from the
+   client design direction (green + yellow + blue, inspired by earthquake
+   magnitude/intensity maps).
+
+   RULES
+   - Edit colours HERE ONLY. The shadcn/ui alias block below maps its own
+     variable names onto these, so one edit updates the whole app.
+   - Never hard-code a hex value in a component. Use a token.
+   - Data-viz colours are fixed across both themes: hue carries meaning, so
+     it must not shift when the user switches theme.
+   ========================================================================= */
+
+:root {
+  /* ---- Neutrals & surfaces ---- */
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --text-muted: #64748b;
+  /* Muted text needs a darker shade when it sits on --surface-2 (input wells,
+     inset panels). The spec's #64748B scores 4.34:1 there — just under AA —
+     so #5B6B80 is used instead, which scores 4.97:1. See docs/assumptions.md. */
+  --text-muted-strong: #5b6b80;
+
+  /* ---- Brand & accents ---- */
+  --primary: #15803d; /* green — buttons, active, playback */
+  --primary-fg: #ffffff;
+  --accent-yellow: #ca8a04; /* ground shaking, highlights */
+  --accent-yellow-text: #854d0e; /* readable text on yellow fills */
+  --info-blue: #0072b2; /* links, info, Config A */
+  --warning: #b45309; /* disclaimer */
+  --danger: #b91c1c; /* errors ONLY — not for "bad results" */
+
+  /* Text colour for use ON --warning-bg. The spec's --warning (#B45309) scores
+     4.51:1 there — technically AA but with no margin at 13px. --accent-yellow-text
+     scores 6.15:1 and is the token the spec defines for readable text on yellow. */
+  --warning-text: var(--accent-yellow-text);
+
+  /* ---- Backgrounds for the warning surfaces (spec §5) ---- */
+  --warning-bg: #fef3c7;
+  --warning-surface: #3a2a08;
+
+  /* ---- 3D viewport ---- */
+  --viewport-bg: #e8eef5;
+  --ground-slab: #cbd5e1;
+
+  /* ---- Shaking-intensity scale (story drift, low -> high) -------------
+     Magnitude-map style. Top faces are a light shared tint. Side faces are
+     a ~20% darker shade of each band colour. Fixed in both themes so the
+     hue order never changes. ---- */
+  --drift-1: #bfdbfe; /* blue    */
+  --drift-2: #86efac; /* green   */
+  --drift-3: #fde047; /* yellow  */
+  --drift-4: #fb923c; /* orange  */
+  --drift-5: #ea580c; /* deep orange */
+  --drift-top: #dbeafe;
+
+  --drift-1-side: #99b0cb;
+  --drift-2-side: #6bbf8a;
+  --drift-3-side: #cab339;
+  --drift-4-side: #c97430;
+  --drift-5-side: #c2490a;
+
+  /* ---- Data-viz series (identical in both themes) ---- */
+  --series-a: #0072b2; /* Config A / blue        */
+  --series-b: #e69f00; /* Config B / amber       */
+  --series-c: #009e73; /* optional third series  */
+  --series-ground: #94a3b8; /* ground motion, dashed */
+  --series-cursor: var(--primary); /* playback cursor */
+
+  /* ---- 3D scene extras ---- */
+  --grid-line: #94a3b8;
+  --undeformed: #94a3b8; /* dashed outline of the resting shape */
+  --shaking-arrow: #ca8a04;
+  --shaking-arrow-label: #854d0e;
+  --selection: var(--primary);
+
+  /* ---- Typography ---- */
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono Variable', ui-monospace, 'SFMono-Regular', monospace;
+
+  --text-xs: 0.75rem; /* 12px — captions */
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem; /* 14px — UI base */
+  --text-lg: 1rem;
+  --text-xl: 1.25rem; /* 20px — headings */
+  --text-2xl: 1.5rem; /* 24px — headings */
+
+  /* ---- Spacing (8-point scale) ---- */
+  --space-1: 0.25rem; /* 4  */
+  --space-2: 0.5rem; /* 8  */
+  --space-3: 0.75rem; /* 12 */
+  --space-4: 1rem; /* 16 */
+  --space-6: 1.5rem; /* 24 */
+  --space-8: 2rem; /* 32 */
+
+  /* ---- Shape & depth ---- */
+  --radius: 8px;
+  --radius-card: 12px;
+  --border-width: 1px;
+}
+
+.dark {
+  --bg: #0b1220;
+  --surface: #111a2b;
+  --surface-2: #162238;
+  --border: #1e293b;
+  --text: #e6edf7;
+  --text-muted: #94a3b8;
+
+  --primary: #4ade80;
+  --primary-fg: #052e16;
+  --accent-yellow: #facc15;
+  --accent-yellow-text: #fde047;
+  --info-blue: #56b4e9;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --warning-text: var(--accent-yellow-text);
+
+  /* The spec lists the dark warning background as #3A2A08. At AA contrast
+     --warning (#FBBF24) needs near-black text on it, so we use the token's
+     own foreground rather than the spec's "text" colour. */
+  --warning-bg: #3a2a08;
+  --warning-surface: #052e16;
+
+  --viewport-bg: #0a101c;
+  --ground-slab: #1f2a3d;
+
+  --grid-line: #64748b;
+
+  /* Data-viz series keep their light-theme hue (see header note), except
+     Config A which needs a lighter blue to stay visible on the dark
+     surface. */
+  --series-a: #56b4e9;
+
+  --shaking-arrow: #facc15;
+  --shaking-arrow-label: #fde047;
+}
+
+/* =========================================================================
+   shadcn/ui compatibility layer
+   -------------------------------------------------------------------------
+   shadcn components look for --background / --card / --muted and friends.
+   These are ALIASES onto the tokens above — deliberately not a second copy
+   of the palette. Change --surface once and every shadcn card follows.
+   ========================================================================= */
+:root {
+  --background: var(--bg);
+  --foreground: var(--text);
+  --card: var(--surface);
+  --card-foreground: var(--text);
+  --popover: var(--surface);
+  --popover-foreground: var(--text);
+  --muted: var(--surface-2);
+  --muted-foreground: var(--text-muted);
+  --secondary: var(--surface-2);
+  --secondary-foreground: var(--text);
+  --accent: var(--surface-2);
+  --accent-foreground: var(--text);
+  --destructive: var(--danger);
+  --ring: var(--primary);
+  --input: var(--border);
+}

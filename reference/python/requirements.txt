@@ -1,0 +1,4 @@
+# Pinned loosely on purpose — Phase 5 should record exact versions used for
+# the validation run, so the report is reproducible.
+numpy>=2.0
+scipy>=1.13

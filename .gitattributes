@@ -1,0 +1,18 @@
+# Normalise line endings: keep LF in the repository, check out per platform.
+# Without this, Windows checkouts rewrite every file to CRLF and the team sees
+# phantom whole-file diffs after any line-ending-sensitive change.
+* text=auto eol=lf
+
+# Binary files that must never be line-ending converted
+*.jpg binary
+*.jpeg binary
+*.png binary
+*.gif binary
+*.webp binary
+*.woff binary
+*.woff2 binary
+*.ico binary
+*.pdf binary
+
+# Lockfiles stay LF; npm writes them that way.
+package-lock.json text eol=lf
