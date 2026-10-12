@@ -1,10 +1,12 @@
-import { Bounds } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { Canvas } from '@react-three/fiber';
-import { useMemo } from 'react';
 
+import { buildingHeight } from '@/lib/camera';
+import { describeBuilding } from '@/lib/describeBuilding';
 import { useCssVar } from '@/lib/useCssVar';
 import { useConfigStore } from '@/store/configStore';
 import { BuildingMesh } from './BuildingMesh';
+import { CameraFrame } from './CameraFrame';
 import { GroundSlab } from './GroundSlab';
 import { ShakeArrow } from './ShakeArrow';
 
@@ -13,24 +15,17 @@ import { ShakeArrow } from './ShakeArrow';
    -------------------------------------------------------------------------
    The camera frames the whole building without the user having to zoom out and
    re-orient. A hard-coded camera distance works for one building and is wrong
-   for every other one, so drei's <Bounds> fits the actual bounding box — from a
-   4-floor house to a 20-floor tower alike — and re-fits whenever the shape
-   changes.
+   for every other one, so the framing is computed from the building's actual
+   dimensions — from a 4-floor house to a 20-floor tower alike — and re-fits
+   whenever the shape changes.
 
-   The bounds are keyed on the building's dimensions, so dragging a slider
-   re-frames. It does NOT re-fit on every render, so the user keeps their orbit
-   angle while adjusting values.
+   It re-fits on dimensions only, not on every render, so the user keeps their
+   orbit angle while dragging a slider.
    ========================================================================= */
 
 export function Viewport() {
   const building = useConfigStore((s) => s.building);
   const viewportBg = useCssVar('--viewport-bg');
-
-  // Re-fit only when the building's overall proportions change.
-  const boundsKey = useMemo(
-    () => `${building.floors}:${building.widthM}:${building.depthM}:${building.floorHeightM}`,
-    [building.floors, building.widthM, building.depthM, building.floorHeightM],
-  );
 
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ backgroundColor: viewportBg }}>
@@ -44,9 +39,29 @@ export function Viewport() {
         <directionalLight position={[24, 34, 18]} intensity={1.4} />
         <directionalLight position={[-16, 12, -12]} intensity={0.3} />
 
-        <Bounds fit clip observe margin={1.35} key={boundsKey}>
-          <SceneContent />
-        </Bounds>
+        {/* `makeDefault` so <CameraFrame> can set the orbit target along with
+            the camera position. Without these controls the chip "Drag to orbit
+            · scroll to zoom" was simply untrue — the scene could not be orbited
+            at all. */}
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          minDistance={12}
+          maxDistance={260}
+          maxPolarAngle={Math.PI / 2.05}
+        />
+
+        <CameraFrame
+          width={building.widthM}
+          height={buildingHeight(building)}
+          depth={building.depthM}
+          directionX={0.62}
+          directionY={0.48}
+          directionZ={0.72}
+        />
+
+        <SceneContent />
       </Canvas>
 
       <ViewportHints />
@@ -94,9 +109,7 @@ function ViewportHints() {
 
       {/* Top-left stack: which building, and the floor-selection control. */}
       <div className="absolute top-3 left-3 flex flex-col items-start gap-2">
-        <Chip>
-          {building.floors}-story {building.material} · {building.frameType} frame
-        </Chip>
+        <Chip>{describeBuilding(building)}</Chip>
         <button
           type="button"
           onClick={() => setActiveFloor(null)}

@@ -7,15 +7,20 @@ import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/typ
    small file means both sides are checked against the same types, and a
    mismatch is a compile error rather than a silent runtime bug.
 
-   The worker exists for one reason: a 20-floor, 60-second run is 6,000
-   timesteps, and doing that on the main thread would freeze the sliders the
-   student is dragging.
+   REQUESTS ARE BATCHES. Comparison mode needs two buildings under ONE ground
+   motion, and that has to be a single request: two independent requests would
+   race, and whichever lost would leave one side showing stale numbers.
+
+   Batching also does less work — the ground-motion series is generated once
+   and shared, which matters when the same shaking drives both sides.
    ========================================================================= */
 
 export type SolveRequest = {
   /** Correlates a response with its request; the UI drops stale ones. */
   readonly id: number;
-  readonly building: BuildingConfig;
+  /** One building in single mode, two (A and B) in comparison mode. */
+  readonly buildings: readonly BuildingConfig[];
+  /** Shared by every building in the batch, so comparisons are like-for-like. */
   readonly motion: GroundMotionConfig;
 };
 
@@ -23,8 +28,9 @@ export type SolveResponse =
   | {
       readonly id: number;
       readonly ok: true;
-      readonly result: SimulationResult;
-      /** Wall-clock milliseconds spent solving, for the UI's diagnostics. */
+      /** Same order as `buildings`. */
+      readonly results: SimulationResult[];
+      /** Wall-clock milliseconds for the whole batch. */
       readonly solveMs: number;
     }
   | {
@@ -32,11 +38,3 @@ export type SolveResponse =
       readonly ok: false;
       readonly error: string;
     };
-
-/** Diagnostics for the first N natural periods, shown as "info" in the UI. */
-export type ModelSummary = {
-  readonly storyStiffnessNm: number;
-  readonly floorMassKg: number;
-  readonly dampingRatio: number;
-  readonly periodsS: number[];
-};

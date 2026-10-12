@@ -9,10 +9,11 @@ building, shake it, and watch how it sways.
 
 ## Status
 
-**Phase 3 — Real-time response & data output.** Complete. The building sways,
-the chart cursor tracks it, and a run exports to CSV. **Still not validated**
-— every coefficient is a placeholder, and Phase 5 compares this engine against
-an independent Python implementation.
+**Phase 4 — Parameter comparison & persistence.** Complete. Run two
+configurations under one earthquake, compare them side by side or as a ghost
+overlay, and save runs in the browser to reload or export later. **Still not
+validated** — every coefficient is a placeholder, and Phase 5 compares this
+engine against an independent Python implementation.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -20,7 +21,7 @@ an independent Python implementation.
 | 1 | UI shell & static prototype | ✅ |
 | 2 | Simulation engine + Web Worker | ✅ |
 | 3 | Real-time response & data output | ✅ |
-| 4 | Parameter comparison & persistence | ⏳ |
+| 4 | Parameter comparison & persistence | ✅ |
 | 5 | Verification, accessibility, polish | ⏳ |
 | 6 | Usability testing | ⏳ |
 | 7 | _Optional_ — site factors, pending client + adviser approval | ⏳ |
@@ -42,7 +43,7 @@ Everything commits straight to `main`:
 
 ```bash
 git add -A
-git commit -m "Phase 3: real-time response and data output"
+git commit -m "Phase 4: parameter comparison and persistence"
 git push
 ```
 
@@ -106,15 +107,56 @@ Build / Simulate / Results tabs, one at a time.
 Controls to know about:
 
 - **Template picker** — six starting points, each with a one-line description.
-  Editing any field afterwards switches the label to "Custom".
+  Editing any field afterwards switches the label to "Custom". It is replaced by
+  an **A / B switcher** while comparison is on.
 - **Glossary** — every jargon term has a ⓘ that explains it in one sentence.
 - **Motion exaggeration** (×20) — real displacement is millimetres, which is
   invisible at this scale. The slider magnifies the 3D view only; the numbers
   stay true.
 
-Disabled on purpose, each labelled with the phase that delivers it: playback
-(Phase 3), comparison (Phase 4), save / export CSV / assumptions (Phases 3–5),
-and Site & ground (Phase 7, pending engineering approval).
+Disabled on purpose, each labelled with the phase that delivers it: the
+assumptions page (Phase 5) and Site & ground (Phase 7, pending engineering
+approval).
+
+## Comparison
+
+`Compare with another building` adds a second configuration and runs **both**
+under the identical earthquake. That last part is the whole point of the
+feature, so the results table states the shared PGA and duration in a caption
+and the 3D view colours each side in a fixed hue — blue for A, amber for B, in
+both light and dark themes, because in a comparison the colour *is* the identity
+of a series.
+
+Two presentations, switched at the top of the viewport:
+
+- **Side by side** — easiest to read when the buildings are very different.
+- **Ghost overlay** — B translucent over A; best for spotting that two
+  differently-shaped buildings happen to sway almost the same amount.
+
+The change column gives the difference as a percentage of A, with an arrow as
+well as a sign so the direction does not depend on colour. Nothing in the
+comparison says which building is better — that is a verdict this tool is not
+entitled to.
+
+Both sides are solved in a **single** worker request. Two separate requests
+would race and leave one side showing numbers from different inputs.
+
+## Saving and sharing runs
+
+`Save run` stores the current model, its motion, and its full result in the
+browser — IndexedDB where available, localStorage otherwise. The dialog says
+which backend it is using, because the fallback has to thin very long runs to
+fit; a thinned run keeps its peaks and periods exactly but cannot replay the
+animation frame for frame, and the UI says so rather than hiding it.
+
+Runs can be **exported to one JSON file** and **imported** on another machine.
+Imports are validated before anything is written: a file from a newer version, a
+truncated file, or simply the wrong file is refused with a readable message,
+and if only some runs in a file are valid the good ones import and the rest are
+named.
+
+See [`src/storage/README.md`](apps/web/src/storage/README.md) for the
+`RunStorage` interface, the fallback's limits, and the two IndexedDB footguns.
 
 ## The engine
 

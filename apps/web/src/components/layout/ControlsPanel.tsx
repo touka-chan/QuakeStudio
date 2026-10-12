@@ -3,6 +3,9 @@ import { EarthquakeControls } from '@/components/controls/EarthquakeControls';
 import { TemplatePicker } from '@/components/controls/TemplatePicker';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useCompareStore } from '@/store/compareStore';
+import { useConfigStore } from '@/store/configStore';
+import { describeBuilding } from '@/lib/describeBuilding';
 
 /* =========================================================================
    Controls panel — the left zone.
@@ -16,19 +19,34 @@ import { Separator } from '@/components/ui/separator';
    ========================================================================= */
 
 export function ControlsPanel() {
+  const compareEnabled = useCompareStore((s) => s.enabled);
+  const editing = useCompareStore((s) => s.editing);
+  const setEditing = useCompareStore((s) => s.setEditing);
+  const building = useConfigStore((s) => s.building);
+  const compareBuilding = useConfigStore((s) => s.compareBuilding);
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-6 p-4">
-        <TemplatePicker />
+        {compareEnabled ? (
+          <CompareSwitcher
+            editing={editing}
+            onChange={setEditing}
+            nameA={describeBuilding(building)}
+            nameB={describeBuilding(compareBuilding)}
+          />
+        ) : (
+          <TemplatePicker />
+        )}
 
         <Separator />
 
         <ControlGroup
           step="Step 1"
-          title="Building"
+          title={compareEnabled ? `Building ${editing}` : 'Building'}
           description="Shape and materials of the building."
         >
-          <BuildingControls />
+          <BuildingControls side={compareEnabled ? editing : 'A'} />
         </ControlGroup>
 
         <Separator />
@@ -60,6 +78,69 @@ export function ControlsPanel() {
 }
 
 /* ------------------------------------------------------------------------- */
+
+/**
+ * A / B switch, shown instead of the template picker while comparing.
+ *
+ * Deliberately plain: two labelled buttons in the series colours that the
+ * chart and table also use, so "A" always looks the same everywhere.
+ */
+function CompareSwitcher({
+  editing,
+  onChange,
+  nameA,
+  nameB,
+}: {
+  editing: 'A' | 'B';
+  onChange: (side: 'A' | 'B') => void;
+  nameA: string;
+  nameB: string;
+}) {
+  const sides = [
+    { id: 'A' as const, name: nameA, color: 'var(--series-a)' },
+    { id: 'B' as const, name: nameB, color: 'var(--series-b)' },
+  ];
+
+  return (
+    <div>
+      <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        Editing
+      </p>
+      <div role="radiogroup" aria-label="Which building to edit" className="flex gap-1">
+        {sides.map((side) => {
+          const selected = side.id === editing;
+          return (
+            <button
+              key={side.id}
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              // The coloured A/B badge is decorative, so without this a screen
+              // reader would announce only the building name and give no clue
+              // which side of the comparison is being edited.
+              aria-label={`Building ${side.id}: ${side.name}`}
+              onClick={() => onChange(side.id)}
+              className={`flex flex-1 items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
+                selected ? 'border-line bg-surface-2' : 'border-transparent'
+              }`}
+            >
+              <span
+                className="grid size-5 shrink-0 place-items-center rounded text-xs font-semibold text-white"
+                style={{ backgroundColor: side.color }}
+                aria-hidden="true"
+              >
+                {side.id}
+              </span>
+              <span className="min-w-0">
+                <span className="block text-xs font-medium">{side.name}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 function ControlGroup({
   step,

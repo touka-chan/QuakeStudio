@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Download, Info, PanelLeftClose, PanelLeftOpen, Sun, Moon } from 'lucide-react';
+import { Download, Info, PanelLeftClose, PanelLeftOpen, Save, Sun, Moon } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -30,9 +30,11 @@ import { DisclaimerBadge } from './DisclaimerBadge';
 export function TopBar({
   onTogglePanel,
   panelOpen,
+  onOpenSaves,
 }: {
   onTogglePanel: () => void;
   panelOpen: boolean;
+  onOpenSaves: () => void;
 }) {
   const building = useConfigStore((s) => s.building);
   const motion = useConfigStore((s) => s.motion);
@@ -67,11 +69,15 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
-            <span className="hidden md:block">
-              <ComingSoonButton icon={Download} label="Save run" />
-            </span>
+            <Button variant="outline" size="sm" onClick={onOpenSaves} disabled={result.time.length === 0}>
+              <Save aria-hidden="true" />
+              <span className="hidden md:inline">Save run</span>
+              <span className="md:hidden">Save</span>
+            </Button>
           </TooltipTrigger>
-          <TooltipContent className="text-xs">Arrives in Phase 4</TooltipContent>
+          <TooltipContent className="max-w-xs text-xs">
+            Saved in this browser. Export from the dialog to move runs elsewhere.
+          </TooltipContent>
         </Tooltip>
 
         <Tooltip>

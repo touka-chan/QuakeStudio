@@ -22,11 +22,11 @@ ctx.addEventListener('message', (event: MessageEvent<SolveRequest>) => {
   const started = performance.now();
 
   try {
-    const result = simulate(request.building, request.motion);
+    const results = request.buildings.map((building) => simulate(building, request.motion));
     const response: SolveResponse = {
       id: request.id,
       ok: true,
-      result,
+      results,
       solveMs: performance.now() - started,
     };
     ctx.postMessage(response);

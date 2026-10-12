@@ -30,6 +30,9 @@ there and the app follows.
 | 7.1 | Rayleigh damping calibration | Modes 1 and 2 | ☐ | Standard choice; confirm |
 | 8.1 | Solver vs Python reference tolerance | ≤ 5% | ☐ | **Confirm before Phase 5** |
 | 9.1 | Drift colour band thresholds | 0.10 %, 0.20 %, 0.35 %, 0.50 % | ☐ | **Display bands only — see §7a** |
+| 10.1 | A/B series colours | `#0072B2` / `#E69F00` | ☐ | Client spec; deuteranopia check outstanding — §8a |
+| 11.1 | Comparison change column | `% change from A` | ☐ | Product decision — §8a |
+| 12.1 | localStorage fallback may thin history | thinned, peaks exact | ☐ | **Acceptable? — §8a** |
 
 ---
 
@@ -206,6 +209,85 @@ Dark theme needed no changes — both pairs already cleared AA comfortably.
 - **TypeScript is pinned to 5.9.x.** `typescript-eslint` does not yet support
   TypeScript 7, and working lint tooling matters more for a student-maintained
   codebase than a newer compiler.
+
+---
+
+## 8a. Phase 4 decisions that touch how numbers are presented
+
+Comparison mode and saved runs do not change the physics, but they change how
+results are *read*, so they are recorded here rather than in the code history.
+
+### The comparison's only shared quantity is the earthquake
+
+Both buildings are solved in a single worker request from one `GroundMotionConfig`.
+There is no per-building motion override, by design.
+
+This is worth an adviser's confirmation because it is a claim the UI makes out
+loud: the results table prints the PGA and duration in a caption so a reader can
+see both sides were shaken identically. If the intended future behaviour is to
+compare buildings under *different* site conditions, that is a change to this
+invariant, not a UI change — and it would make the caption misleading.
+
+### The comparison expresses change as a percentage of A
+
+The change column is `(B − A) / |A| × 100`. Percentage, not absolute difference,
+because the rows mix units — millimetres, seconds, percent drift — and an
+absolute difference between a displacement and a period would be meaningless.
+
+Two deliberate restraints:
+
+- Rows where a percentage is meaningless (floors, material, frame type) show `—`
+  rather than `0 %`. "The material changed from concrete to steel" is not a
+  "0 % change" in material.
+- Differences under 0.5 % read `same` rather than a spurious `+0 %`.
+
+### The A/B colours are fixed across themes
+
+Blue `#0072B2` for A and amber `#E69F00` for B in both light and dark. This
+follows the same reasoning as the drift scale: hue is carrying identity, so it
+must not shift with the theme. The contrast test covers both themes.
+
+**Open question for the adviser:** are these two colours distinguishable enough
+for the most common form of colour vision deficiency, deuteranopia? They were
+taken from the client spec and chosen because they are the classic
+blue/orange pair precisely because it survives red-green deficiency. Worth a
+confirmation rather than an assumption.
+
+### A saved run stores the result, but loading re-runs the engine
+
+Loading a run restores its **configuration** and then re-solves, rather than
+displaying the stored result array. Two reasons: the numbers on screen always
+correspond to the engine that is actually running, and a record saved by an
+older app version cannot show a stale result computed by different assumptions.
+
+The consequence is that a saved run's history is not a bit-exact record of what
+was on screen. It is a record of the *inputs*. The stored result exists for
+reproducibility checking and for the CSV export.
+
+### The localStorage fallback thins long runs
+
+A 20-storey, 60-second run is ~120,000 displacement values — past the ~5 MB
+quota after a few saves. Rather than fail with a raw quota error, the fallback
+resamples the time series. Peaks, drift ratios and periods are carried over
+**exactly**, because they are maxima over the whole record and resampling would
+change them.
+
+A thinned run cannot replay the animation frame for frame. The UI says so at the
+moment of saving. **Please confirm this is acceptable for the client's intended
+use**, or confirm that IndexedDB availability is a reasonable requirement to
+state in the README.
+
+### JSON round trips have two documented quirks
+
+Both are harmless and both are locked down by `tests/unit/storage.test.ts`:
+
+- `undefined` does not survive serialisation, so an unset `dampingRatio` is
+  absent after a round trip.
+- JSON has no negative zero, so `-0` reloads as `0`. They compare equal
+  numerically and format identically.
+
+Neither affects any displayed number, but a student diffing two exported files
+would otherwise be puzzled.
 
 ---
 

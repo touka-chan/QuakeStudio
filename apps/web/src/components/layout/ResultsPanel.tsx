@@ -2,11 +2,14 @@ import { Columns2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { ComparisonChart } from '@/components/charts/ComparisonChart';
+import { ComparisonTable } from '@/components/charts/ComparisonTable';
 import { DisplacementChart } from '@/components/charts/DisplacementChart';
 import { MetricCard } from '@/components/charts/MetricCard';
 import { PeakByFloorChart } from '@/components/charts/PeakByFloorChart';
 import { formatMm, formatPct } from '@/lib/utils';
-import { useConfigStore } from '@/store/configStore';
+import { useCompareStore, defaultCompareBuilding } from '@/store/compareStore';
+import { useConfigStore, resolveNow } from '@/store/configStore';
 
 /* =========================================================================
    Results panel — the right zone.
@@ -23,6 +26,23 @@ export function ResultsPanel() {
   const result = useConfigStore((s) => s.result);
   const building = useConfigStore((s) => s.building);
   const status = useConfigStore((s) => s.status);
+
+  const compareEnabled = useCompareStore((s) => s.enabled);
+  const enable = useCompareStore((s) => s.enable);
+  const disable = useCompareStore((s) => s.disable);
+
+  const toggleCompare = () => {
+    if (compareEnabled) {
+      disable();
+      resolveNow();
+      return;
+    }
+    // Give B a genuinely different starting point, so the comparison shows
+    // something rather than two identical buildings.
+    useConfigStore.getState().setCompareBuilding(defaultCompareBuilding());
+    enable();
+    resolveNow();
+  };
 
   const topFloor = building.floors;
   const peakAtTop = result.peakDisp[topFloor - 1] ?? 0;
@@ -90,13 +110,20 @@ export function ResultsPanel() {
         <DisplacementChart />
         <PeakByFloorChart />
 
-        <Button className="h-11 w-full" disabled>
-          <Columns2 aria-hidden="true" />
-          Compare with another building
-        </Button>
-        <p className="-mt-2 text-center text-xs text-muted-foreground">
-          Comparison arrives in Phase 4 — run two configurations under the same shaking.
-        </p>
+        <ComparisonTable />
+        <ComparisonChart />
+
+        <div className="space-y-2">
+          <Button className="h-11 w-full" variant={compareEnabled ? 'outline' : 'default'} onClick={toggleCompare}>
+            <Columns2 aria-hidden="true" />
+            {compareEnabled ? 'Stop comparing' : 'Compare with another building'}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            {compareEnabled
+              ? 'Both buildings felt the same earthquake. Edit building B on the left.'
+              : 'Adds a second configuration and runs both under one earthquake.'}
+          </p>
+        </div>
       </div>
     </ScrollArea>
   );

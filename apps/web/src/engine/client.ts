@@ -8,8 +8,8 @@ import type { SolveRequest, SolveResponse } from './protocol';
 
    Responsibilities, and deliberately nothing more:
      • own the Worker lifecycle
-     • debounce rapid input changes (dragging a slider fires dozens of
-       updates per second; the brief asks for ~150 ms)
+     • debounce rapid input changes (dragging a slider fires dozens of updates
+       per second; the brief asks for ~150 ms)
      • drop stale responses so an old result can never overwrite a newer one
 
    Determinism note: responses are matched by a monotonic request id and stale
@@ -19,7 +19,7 @@ import type { SolveRequest, SolveResponse } from './protocol';
 
 const DEBOUNCE_MS = 150;
 
-export type SolveHandler = (result: SimulationResult) => void;
+export type SolveHandler = (results: SimulationResult[]) => void;
 export type ErrorHandler = (message: string) => void;
 
 export class SolverClient {
@@ -29,12 +29,11 @@ export class SolverClient {
   private latestSentId = 0;
   private timer: ReturnType<typeof setTimeout> | null = null;
 
-  private building: BuildingConfig | null = null;
+  private buildings: readonly BuildingConfig[] = [];
   private motion: GroundMotionConfig | null = null;
 
   // Declared as fields rather than constructor parameter properties: the
-  // project compiles with `erasableSyntaxOnly`, which forbids them so the
-  // TypeScript toolchain stays compatible with Node's type stripping.
+  // project compiles with `erasableSyntaxOnly`, which forbids them.
   private readonly onResult: SolveHandler;
   private readonly onError: ErrorHandler;
 
@@ -76,7 +75,7 @@ export class SolverClient {
     if (response.id !== this.latestSentId) return;
 
     if (response.ok) {
-      this.onResult(response.result);
+      this.onResult(response.results);
     } else {
       this.onError(response.error);
     }
@@ -94,9 +93,14 @@ export class SolverClient {
 
   /* --------------------------------------------------------------- requests */
 
-  /** Request a solve for the given inputs, debounced. */
-  request(building: BuildingConfig, motion: GroundMotionConfig): void {
-    this.building = building;
+  /**
+   * Solve a batch of buildings under one ground motion, debounced.
+   *
+   * Pass two buildings to get comparison mode: they share the motion, so any
+   * difference in the response comes from the buildings alone.
+   */
+  request(buildings: readonly BuildingConfig[], motion: GroundMotionConfig): void {
+    this.buildings = buildings;
     this.motion = motion;
 
     if (this.timer) clearTimeout(this.timer);
@@ -104,8 +108,8 @@ export class SolverClient {
   }
 
   /** Bypass the debounce — used on first load, where there is nothing to wait for. */
-  requestImmediate(building: BuildingConfig, motion: GroundMotionConfig): void {
-    this.building = building;
+  requestImmediate(buildings: readonly BuildingConfig[], motion: GroundMotionConfig): void {
+    this.buildings = buildings;
     this.motion = motion;
     if (this.timer) {
       clearTimeout(this.timer);
@@ -116,14 +120,14 @@ export class SolverClient {
 
   private sendNow(): void {
     this.timer = null;
-    if (!this.building || !this.motion) return;
+    if (!this.motion || this.buildings.length === 0) return;
 
     const worker = this.ensureWorker();
     if (!worker) return;
 
     const request: SolveRequest = {
       id: this.nextId++,
-      building: this.building,
+      buildings: this.buildings,
       motion: this.motion,
     };
     this.latestSentId = request.id;

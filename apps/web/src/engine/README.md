@@ -11,7 +11,7 @@ never blocks the UI.
 | `buildingModel.ts` | Builds `M`, `K`, `C` from a `BuildingConfig`; derives story stiffness from the target period; reports natural periods. |
 | `groundMotion.ts` | Generates `a_g(t)` for the three presets. Deterministic — same seed, same shake. |
 | `solver.ts` | Newmark-β (β = ¼, γ = ½). Returns a `SimulationResult`. |
-| `protocol.ts` | The typed message contract between UI and worker. |
+| `protocol.ts` | The typed message contract between UI and worker. Requests are **batches**. |
 | `worker.ts` | The worker entry point. |
 | `client.ts` | Owns the worker, debounces at 150 ms, discards stale responses. |
 
@@ -26,6 +26,18 @@ never blocks the UI.
 4. **`floorDisp` is indexed `[floor][time]`.** The model steps through time at
    each floor and transposes on the way out. Charts and the 3D view both read
    this one array.
+5. **One request solves the whole comparison.** `SolveRequest.buildings` is an
+   array — one entry in single mode, two in comparison mode — and the response
+   is in the same order. See below.
+
+## Why requests are batches
+
+Comparison mode needs two buildings under **one** ground motion, and that has to
+be a single request. Two independent requests would race, and whichever lost
+would leave one side showing numbers from different inputs.
+
+Batching also does less work: the ground-motion series is generated once and
+shared, which matters when the same shaking drives both sides.
 
 ## Why these choices
 

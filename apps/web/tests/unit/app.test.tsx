@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { act, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -7,8 +7,10 @@ import { AppShell } from '@/components/layout/AppShell';
 import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
+import { useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
+import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
    Phase 1 — UI shell tests
@@ -289,10 +291,100 @@ describe('results panel', () => {
     expect(legend?.textContent).not.toMatch(/safe|unsafe|danger|fail|collapse/i);
   });
 
-  it('disables comparison and says which phase brings it', () => {
+  it('offers comparison, and B starts as a different building', async () => {
+    const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
-    expect(screen.getByRole('button', { name: /compare with another building/i })).toBeDisabled();
-    expect(screen.getByText(/comparison arrives in phase 4/i)).toBeInTheDocument();
+
+    const toggle = screen.getByRole('button', { name: /compare with another building/i });
+    expect(toggle).toBeEnabled();
+
+    const before = useConfigStore.getState().building.floors;
+    await user.click(toggle);
+
+    expect(useCompareStore.getState().enabled).toBe(true);
+    // A duplicate would make the comparison pointless.
+    expect(useConfigStore.getState().compareBuilding.floors).not.toBe(before);
+    expect(useConfigStore.getState().compareBuilding.name).toMatch(/variant/i);
+  });
+
+  it('uses ONE earthquake for both sides', () => {
+    render(<AppShell forceDesktopLayout />);
+    act(() => useCompareStore.getState().enable());
+
+    const { building, compareBuilding, motion } = useConfigStore.getState();
+    // There is a single `motion` in the store, so the shaking cannot differ
+    // between A and B — that is the entire point of the comparison.
+    expect(compareBuilding).toBeDefined();
+    expect(motion.pgaG).toBeGreaterThan(0);
+    expect(building.id).not.toBe(compareBuilding.id);
+  });
+
+  /**
+   Switch comparison on with two known results.
+   *
+   * jsdom has no Worker, so `result` is empty and every change column would
+   * read "—". Hand-built results with fixed numbers let the change column be
+   * checked for something real.
+   */
+  function enableComparison(bScale = 1) {
+    const make = (scale: number): SimulationResult => ({
+      time: [0, 0.1],
+      floorDisp: [[0, 0.01 * scale]],
+      peakDisp: [0.05 * scale],
+      maxDisp: 0.05 * scale,
+      driftRatio: [0.004 * scale],
+      maxDriftRatio: 0.004 * scale,
+      periodsS: [0.5 * scale],
+      groundAccel: [0, 1],
+    });
+
+    act(() => {
+      useCompareStore.getState().enable();
+      useConfigStore.setState({ result: make(1), resultB: make(bScale) });
+    });
+  }
+
+  it('shows the A/B table with a percentage change', () => {
+    render(<AppShell forceDesktopLayout />);
+    // B sways 50% more than A.
+    enableComparison(1.5);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Peak displacement')).toBeInTheDocument();
+    expect(within(table).getByText('Max story drift')).toBeInTheDocument();
+    expect(within(table).getByText('Natural period')).toBeInTheDocument();
+
+    // (1.5 - 1) / 1 = +50 %
+    expect(within(table).getAllByText(/\+50\s*%/).length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('▲').length).toBeGreaterThan(0);
+  });
+
+  it('shows "same" rather than a spurious percentage when the sides match', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableComparison(1);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByText('same').length).toBeGreaterThan(0);
+  });
+
+  it('marks a decrease with a down arrow, not just a minus sign', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableComparison(0.5);
+
+    const table = screen.getByRole('table');
+    // Direction carried by an arrow as well as the sign, so the meaning does
+    // not depend on reading a minus.
+    expect(within(table).getAllByText('▼').length).toBeGreaterThan(0);
+    // U+2212 MINUS SIGN, not a hyphen — it aligns with digits.
+    expect(within(table).getAllByText('\u221250 %').length).toBeGreaterThan(0);
+  });
+
+  it('never says which building is better', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableComparison();
+
+    const table = screen.getByRole('table');
+    expect(table.textContent ?? '').not.toMatch(/better|worse|safer|stronger|weaker/i);
   });
 });
 

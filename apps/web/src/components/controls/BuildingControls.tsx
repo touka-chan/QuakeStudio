@@ -25,9 +25,20 @@ const FRAME_HELP: Record<FrameTypeId, string> = {
   braced: 'Diagonal braces stiffen the frame, so it resists sideways movement much more strongly.',
 };
 
-export function BuildingControls() {
-  const building = useConfigStore((s) => s.building);
+/**
+ * Building controls for one side of the comparison.
+ *
+ * In single mode `side` is always 'A' and the controls write to building A.
+ * In comparison mode the controls write to whichever side the user is editing,
+ * so the same sliders drive both buildings without duplicating the UI.
+ */
+export function BuildingControls({ side = 'A' }: { side?: 'A' | 'B' }) {
+  const building = useConfigStore((s) => (side === 'B' ? s.compareBuilding : s.building));
   const setBuilding = useConfigStore((s) => s.setBuilding);
+  const setCompareBuilding = useConfigStore((s) => s.setCompareBuilding);
+
+  const apply = (patch: Partial<typeof building>) =>
+    side === 'B' ? setCompareBuilding(patch) : setBuilding(patch);
 
   const heightM = building.floors * building.floorHeightM;
 
@@ -39,7 +50,7 @@ export function BuildingControls() {
         min={GEOMETRY.minFloors}
         max={GEOMETRY.maxFloors}
         step={1}
-        onChange={(floors) => setBuilding({ floors })}
+        onChange={(floors) => apply({ floors })}
         display={String(building.floors)}
         help={`How many storeys the building has. Between ${GEOMETRY.minFloors} and ${GEOMETRY.maxFloors}.`}
       />
@@ -50,7 +61,7 @@ export function BuildingControls() {
         min={GEOMETRY.floorHeightM.min}
         max={GEOMETRY.floorHeightM.max}
         step={GEOMETRY.floorHeightM.step}
-        onChange={(floorHeightM) => setBuilding({ floorHeightM })}
+        onChange={(floorHeightM) => apply({ floorHeightM })}
         display={building.floorHeightM.toFixed(1)}
         unit="m"
         help="Height from one floor to the next. Taller floors make the building taller overall."
@@ -62,7 +73,7 @@ export function BuildingControls() {
         min={GEOMETRY.widthM.min}
         max={GEOMETRY.widthM.max}
         step={GEOMETRY.widthM.step}
-        onChange={(widthM) => setBuilding({ widthM })}
+        onChange={(widthM) => apply({ widthM })}
         display={building.widthM.toFixed(0)}
         unit="m"
         help="The front-to-back size shown in the 3D view."
@@ -74,7 +85,7 @@ export function BuildingControls() {
         min={GEOMETRY.depthM.min}
         max={GEOMETRY.depthM.max}
         step={GEOMETRY.depthM.step}
-        onChange={(depthM) => setBuilding({ depthM })}
+        onChange={(depthM) => apply({ depthM })}
         display={building.depthM.toFixed(0)}
         unit="m"
         help="How far the building extends away from you."
@@ -85,7 +96,7 @@ export function BuildingControls() {
         help="Sets how heavy the building is and how quickly it settles after shaking."
         options={MATERIAL_IDS.map((id) => ({ value: id, label: MATERIALS[id].label }))}
         value={building.material}
-        onChange={(material) => setBuilding({ material: material as MaterialId })}
+        onChange={(material) => apply({ material: material as MaterialId })}
       />
 
       <ChoiceGroup
@@ -95,7 +106,7 @@ export function BuildingControls() {
           label: id === 'moment' ? 'Moment frame' : 'Braced frame',
         }))}
         value={building.frameType}
-        onChange={(frameType) => setBuilding({ frameType: frameType as FrameTypeId })}
+        onChange={(frameType) => apply({ frameType: frameType as FrameTypeId })}
         optionHelp={FRAME_HELP}
       />
 

@@ -7,68 +7,24 @@ import {
   type BuildingTemplate,
 } from '@/config/templates';
 import { SolverClient } from '@/engine/client';
+import { useCompareStore } from '@/store/compareStore';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
 
 /* =========================================================================
-   Config store — the single source of truth for "what building, what shaking"
+   Config store — the single source of truth for what is being simulated
    -------------------------------------------------------------------------
-   Every change to the building or the motion triggers a re-solve in the
-   Web Worker, debounced at 150 ms. Results arrive asynchronously; `status`
-   tells the UI whether to show "Updating…".
+   Holds BOTH buildings and BOTH results. That is not tidiness for its own
+   sake: comparison mode requires the two sides to be solved from one request
+   under one ground motion. With separate requests, dragging a slider on A
+   would leave B showing numbers from a different input — exactly the kind of
+   quiet wrongness this tool must not have.
 
-   The stale-response problem is handled in SolverClient by request id, so the
-   numbers on screen always match the controls the user can see — even when
-   they drag a slider faster than the solver can respond.
+   `compareStore` deliberately keeps only view state and reads B from here.
    ========================================================================= */
 
 export type ComputeStatus = 'idle' | 'computing';
 
-export type EngineInfo = {
-  /** Wall-clock time of the last solve, in ms. Shown as a diagnostic. */
-  solveMs: number;
-  /** True when the worker is unavailable and we fell back to the main thread. */
-  usedFallback: boolean;
-};
-
-type ConfigState = {
-  building: BuildingConfig;
-  motion: GroundMotionConfig;
-  templateId: string;
-  result: SimulationResult;
-  status: ComputeStatus;
-  activeFloor: number | null;
-  error: string | null;
-  engineInfo: EngineInfo;
-
-  setBuilding: (patch: Partial<BuildingConfig>) => void;
-  setMotion: (patch: Partial<GroundMotionConfig>) => void;
-  applyTemplate: (templateId: string) => void;
-  setActiveFloor: (floor: number | null) => void;
-};
-
-/** One client for the app's lifetime. */
-const solver = new SolverClient(
-  (result) => {
-    useConfigStore.setState({ result, status: 'idle', error: null });
-  },
-  (message) => {
-    useConfigStore.setState({ status: 'idle', error: message });
-  },
-);
-
-/** Kick off a solve for the current inputs. */
-function resolve(building: BuildingConfig, motion: GroundMotionConfig, immediate = false) {
-  useConfigStore.setState({ status: 'computing' });
-  if (immediate) solver.requestImmediate(building, motion);
-  else solver.request(building, motion);
-}
-
-/**
- * Placeholder shown until the worker's first response lands.
- *
- * Declared before the store: a const in the temporal dead zone would throw on
- * the store's very first evaluation.
- */
+/** Placeholder shown until the worker's first response lands. */
 const EMPTY_RESULT: SimulationResult = {
   time: [],
   floorDisp: [],
@@ -80,17 +36,60 @@ const EMPTY_RESULT: SimulationResult = {
   groundAccel: [],
 };
 
+const solver = new SolverClient(
+  (results) => {
+    const compareEnabled = useCompareStore.getState().enabled;
+    const [a, b] = results;
+    useConfigStore.setState({
+      result: a ?? EMPTY_RESULT,
+      resultB: compareEnabled ? (b ?? null) : null,
+      status: 'idle',
+      error: null,
+    });
+  },
+  (message) => {
+    useConfigStore.setState({ status: 'idle', error: message });
+  },
+);
+
+/** Kick off a solve for the current inputs. */
+function resolve(building: BuildingConfig, compareBuilding: BuildingConfig | null, motion: GroundMotionConfig, immediate = false) {
+  useConfigStore.setState({ status: 'computing' });
+  const batch = compareBuilding ? [building, compareBuilding] : [building];
+  if (immediate) solver.requestImmediate(batch, motion);
+  else solver.request(batch, motion);
+}
+
+type ConfigState = {
+  /** Building A — the primary configuration. */
+  building: BuildingConfig;
+  /** Building B — only used when comparison is on. */
+  compareBuilding: BuildingConfig;
+  motion: GroundMotionConfig;
+  templateId: string;
+  result: SimulationResult;
+  resultB: SimulationResult | null;
+  status: ComputeStatus;
+  activeFloor: number | null;
+  error: string | null;
+
+  setBuilding: (patch: Partial<BuildingConfig>) => void;
+  setCompareBuilding: (patch: Partial<BuildingConfig>) => void;
+  setMotion: (patch: Partial<GroundMotionConfig>) => void;
+  applyTemplate: (templateId: string) => void;
+  setActiveFloor: (floor: number | null) => void;
+};
+
 export const useConfigStore = create<ConfigState>((set, get) => ({
   building: DEFAULT_BUILDING_CONFIG,
+  compareBuilding: { ...DEFAULT_BUILDING_CONFIG },
   motion: DEFAULT_MOTION_CONFIG,
   templateId: DEFAULT_BUILDING_CONFIG.id,
-  // Replaced by the worker's first response immediately on load; this empty
-  // result means the panels render their skeleton rather than a stale value.
   result: EMPTY_RESULT,
+  resultB: null,
   status: 'computing',
   activeFloor: null,
   error: null,
-  engineInfo: { solveMs: 0, usedFallback: false },
 
   setBuilding: (patch) => {
     const building = { ...get().building, ...patch };
@@ -99,13 +98,22 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       // Editing any field by hand means we are no longer on a named template.
       templateId: 'custom',
     });
-    resolve(building, get().motion);
+    resolve(building, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
+  },
+
+  setCompareBuilding: (patch) => {
+    const compareBuilding = { ...get().compareBuilding, ...patch };
+    set({ compareBuilding });
+    const compareEnabled = useCompareStore.getState().enabled;
+    resolve(get().building, compareEnabled ? compareBuilding : null, get().motion);
   },
 
   setMotion: (patch) => {
     const motion = { ...get().motion, ...patch };
     set({ motion });
-    resolve(get().building, motion);
+    // The earthquake is shared by both sides, so both are re-solved together.
+    const compareEnabled = useCompareStore.getState().enabled;
+    resolve(get().building, compareEnabled ? get().compareBuilding : null, motion);
   },
 
   applyTemplate: (templateId) => {
@@ -119,7 +127,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       dampingRatio: undefined,
     };
     set({ templateId, building, activeFloor: null });
-    resolve(building, get().motion);
+    resolve(building, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
   },
 
   setActiveFloor: (activeFloor) => set({ activeFloor }),
@@ -127,4 +135,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
 // Solve once as soon as the module loads, so the first paint already has real
 // numbers rather than an empty state.
-resolve(DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG, true);
+resolve(DEFAULT_BUILDING_CONFIG, null, DEFAULT_MOTION_CONFIG, true);
+
+/** Convenience for callers that need to re-solve after a compare-mode change. */
+export function resolveNow(): void {
+  const { building, compareBuilding, motion } = useConfigStore.getState();
+  resolve(building, useCompareStore.getState().enabled ? compareBuilding : null, motion, true);
+}
