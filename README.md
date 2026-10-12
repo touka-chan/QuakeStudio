@@ -9,20 +9,27 @@ building, shake it, and watch how it sways.
 
 ## Status
 
-**Phase 0 — Foundation.** Complete. The design system, engineering-assumption
-register, tooling, and test setup are in place. The app currently renders a
-design-system proof page, not the workspace.
+**Phase 1 — UI shell & static prototype.** Complete. The three-zone workspace
+runs end to end on mock data. **The numbers on screen are not yet real** — the
+simulation engine is Phase 2, and the results panel says so.
 
 | Phase | Scope | Status |
 |---|---|---|
 | 0 | Foundation: tooling, tokens, assumptions config | ✅ |
-| 1 | UI shell & static prototype (mock data) | ⏳ |
+| 1 | UI shell & static prototype (mock data) | ✅ |
 | 2 | Simulation engine + Web Worker | ⏳ |
 | 3 | Real-time response & data output | ⏳ |
 | 4 | Parameter comparison & persistence | ⏳ |
 | 5 | Verification, accessibility, polish | ⏳ |
 | 6 | Usability testing | ⏳ |
 | 7 | _Optional_ — site factors, pending client + adviser approval | ⏳ |
+
+## ⚠️ The current numbers are mock data
+
+`src/mock/mockResult.ts` produces plausible-looking values so the interface can
+be reviewed. It is a damped sinusoid, **not physics**. Phase 2 replaces it with
+the real solver. The results panel carries a permanent "Preview numbers" notice
+so nobody can mistake mock output for a result.
 
 ## Requirements
 
@@ -56,9 +63,28 @@ Run from the repository root.
 | `npm test` | Vitest unit + component tests |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests |
+| `npm run e2e` | Playwright end-to-end tests (18 specs) |
 
 `npm run e2e` fails until you have run `npm run e2e:install` at least once.
+
+## The workspace
+
+Desktop (≥1024px) is three zones: controls on the left, the 3D viewport and
+playback bar in the middle, results on the right. Below 1024px those become
+Build / Simulate / Results tabs, one at a time.
+
+Controls to know about:
+
+- **Template picker** — six starting points, each with a one-line description.
+  Editing any field afterwards switches the label to "Custom".
+- **Glossary** — every jargon term has a ⓘ that explains it in one sentence.
+- **Motion exaggeration** (×20) — real displacement is millimetres, which is
+  invisible at this scale. The slider magnifies the 3D view only; the numbers
+  stay true.
+
+Disabled on purpose, each labelled with the phase that delivers it: playback
+(Phase 3), comparison (Phase 4), save / export CSV / assumptions (Phases 3–5),
+and Site & ground (Phase 7, pending engineering approval).
 
 ## Repository layout
 
@@ -97,7 +123,14 @@ Two rules keep this maintainable, and both are enforced by tests:
    `// PLACEHOLDER – needs engineer review` comment.
 2. **No hard-coded colours** in components — use a token. `tokens.css` keeps one
    hex palette, and shadcn/ui's variable names alias onto it rather than
-   duplicating it.
+   duplicating it. `contrast.test.ts` checks every foreground/background pair
+   against WCAG AA, so a colour change that breaks contrast fails the build.
+
+### Reading design tokens in Three.js
+
+CSS variables do **not** work in WebGL — `color="var(--drift-2)"` renders
+black. Use `useCssVar` / `useCssVars` from `src/lib/useCssVar.ts`, which
+resolve a token to a concrete hex and re-resolve when the theme changes.
 
 ## Tech stack
 

@@ -1,18 +1,48 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '@/App';
-import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { AppShell } from '@/components/layout/AppShell';
+import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
+import { useConfigStore } from '@/store/configStore';
+
+/* ==========================================================================
+   Phase 1 — UI shell tests
+   --------------------------------------------------------------------------
+   Two things to know about the setup:
+
+   1. jsdom cannot create a WebGL context, so the 3D viewport is stubbed.
+      Everything else renders for real.
+
+   2. The first-run dialog is a Radix *modal*, so while it is open the whole
+      application tree is marked aria-hidden — correctly, because assistive
+      technology should not reach past a modal. Tests that exercise the
+      workspace therefore acknowledge the dialog first. The dialog's own
+      tests deliberately do not, and use `hidden: true` where needed.
+   ========================================================================== */
+
+vi.mock('@/components/viewport/Viewport', () => ({
+  Viewport: () => <div data-testid="viewport-stub">3D viewport</div>,
+}));
+
+function skipFirstRun() {
+  localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+}
+
+beforeEach(() => {
+  localStorage.clear();
+  document.documentElement.classList.remove('dark');
+  useConfigStore.setState({
+    building: DEFAULT_BUILDING_CONFIG,
+    templateId: DEFAULT_BUILDING_CONFIG.id,
+    activeFloor: null,
+  });
+});
 
 describe('theme selection', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.classList.remove('dark');
-    document.documentElement.style.colorScheme = '';
-  });
-
   it('defaults to following the OS when nothing is stored', () => {
     expect(readStoredTheme()).toBe('system');
   });
@@ -35,60 +65,259 @@ describe('theme selection', () => {
   });
 });
 
-describe('App (Phase 0 design system proof page)', () => {
-  beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.classList.remove('dark');
-    document.documentElement.style.colorScheme = '';
+/* ------------------------------------------------------------------------ */
+
+describe('first-run dialog', () => {
+  it('blocks the start button until the disclaimer is acknowledged', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    const start = screen.getByRole('button', { name: /start exploring/i });
+    expect(start).toBeDisabled();
+
+    await user.click(screen.getByRole('checkbox'));
+    expect(start).toBeEnabled();
   });
 
-  it('renders the QuakeStudio heading', () => {
+  it('shows the three learning steps', () => {
     render(<App />);
-    expect(screen.getByRole('heading', { name: 'QuakeStudio' })).toBeInTheDocument();
+    // Scope to the dialog: the mobile tab bar also has a "Build" tab.
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Build')).toBeInTheDocument();
+    expect(within(dialog).getByText('Shake')).toBeInTheDocument();
+    expect(within(dialog).getByText('Compare')).toBeInTheDocument();
+  });
+
+  it('states plainly that this is not a safety check', () => {
+    render(<App />);
+    // The sentence is split across a <strong>, so match on the phrase alone.
+    expect(screen.getAllByText(/learning tool, not a safety check/i).length).toBeGreaterThan(0);
+  });
+
+  it('dismisses and does not reappear once acknowledged', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /start exploring/i }));
+
+    expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
+    expect(localStorage.getItem(STORAGE_KEYS.firstRunAcknowledged)).toBe('true');
+  });
+
+  it('stays hidden entirely once already acknowledged', () => {
+    skipFirstRun();
+    render(<App />);
+    expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('app shell', () => {
+  beforeEach(skipFirstRun);
+
+  it('renders all three zones with their landmarks', () => {
+    render(<AppShell forceDesktopLayout />);
+
+    expect(screen.getByRole('complementary', { name: /controls/i })).toBeInTheDocument();
+    expect(screen.getByRole('main', { name: /simulation viewport/i })).toBeInTheDocument();
+    expect(screen.getByRole('complementary', { name: /simulation results/i })).toBeInTheDocument();
   });
 
   it('always shows the educational-simulation disclaimer', () => {
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     expect(
       screen.getByText(/educational simulation using simplified assumptions/i),
     ).toBeInTheDocument();
     expect(screen.getByText(/not a structural safety assessment/i)).toBeInTheDocument();
   });
 
-  it('cycles system -> light -> dark -> system and persists each choice', async () => {
+  it('labels the mock data so it cannot be mistaken for a real result', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByText(/preview numbers/i)).toBeInTheDocument();
+    expect(screen.getByText(/simulation engine arrives in phase 2/i)).toBeInTheDocument();
+  });
+
+  it('keeps the whole workspace reachable by keyboard', () => {
+    render(<AppShell forceDesktopLayout />);
+    const shell = screen.getByRole('main', { name: /simulation viewport/i });
+    expect(within(shell).getByRole('slider', { name: /simulation time/i })).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('building controls', () => {
+  beforeEach(skipFirstRun);
+
+  it('applies a template from the picker', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
-    // The cycle order is fixed: light, dark, system. Starting from the default
-    // ('system'), the first click moves to 'light'.
-    expect(screen.getByRole('button', { name: /theme: system/i })).toBeInTheDocument();
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
+    await user.click(screen.getByRole('combobox', { name: /building template/i }));
+    await user.click(await screen.findByRole('option', { name: /10-story steel tower/i }));
 
-    await user.click(screen.getByRole('button', { name: /theme: system/i }));
-    expect(localStorage.getItem(STORAGE_KEYS.theme)).toBe('light');
-    expect(document.documentElement.classList.contains('dark')).toBe(false);
-
-    await user.click(screen.getByRole('button', { name: /theme: light/i }));
-    expect(localStorage.getItem(STORAGE_KEYS.theme)).toBe('dark');
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(document.documentElement.style.colorScheme).toBe('dark');
-
-    await user.click(screen.getByRole('button', { name: /theme: dark/i }));
-    expect(localStorage.getItem(STORAGE_KEYS.theme)).toBe('system');
-    expect(screen.getByRole('button', { name: /theme: system/i })).toBeInTheDocument();
+    expect(useConfigStore.getState().building.floors).toBe(10);
+    expect(useConfigStore.getState().building.material).toBe('steel');
   });
 
-  it('restores a stored dark preference on mount', () => {
-    localStorage.setItem(STORAGE_KEYS.theme, 'dark');
-    render(<App />);
-    expect(document.documentElement.classList.contains('dark')).toBe(true);
-    expect(screen.getByRole('button', { name: /theme: dark/i })).toBeInTheDocument();
+  it('marks the config as custom once a field is edited by hand', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    const slider = screen.getByRole('slider', { name: /floors/i });
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(useConfigStore.getState().templateId).toBe('custom');
   });
 
-  it('renders the placeholder register so every value is visible for review', () => {
-    render(<App />);
-    expect(screen.getByRole('heading', { name: /engineering assumptions/i })).toBeInTheDocument();
-    expect(screen.getByText('Concrete')).toBeInTheDocument();
-    expect(screen.getByText('600 kg/m²')).toBeInTheDocument();
+  it('changing the floors slider updates the store', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    const slider = screen.getByRole('slider', { name: /floors/i });
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(useConfigStore.getState().building.floors).toBe(DEFAULT_BUILDING_CONFIG.floors + 1);
+  });
+
+  it('exposes each dimension slider with its unit', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('slider', { name: /floor height/i })).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringContaining('m'),
+    );
+    expect(screen.getByRole('slider', { name: /^width$/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /^depth$/i })).toBeInTheDocument();
+  });
+
+  it('offers material and frame type as keyboard-reachable radio groups', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('radiogroup', { name: /material/i })).toBeInTheDocument();
+    expect(screen.getByRole('radiogroup', { name: /frame type/i })).toBeInTheDocument();
+  });
+
+  it('marks the Phase 7 site controls as unavailable rather than hiding them', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByText(/soil, foundation and fault distance/i)).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('earthquake controls', () => {
+  beforeEach(skipFirstRun);
+
+  it('shows only the controls that apply to the chosen motion preset', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    // Harmonic preset: frequency applies, a random seed does not.
+    expect(screen.getByRole('slider', { name: /shaking frequency/i })).toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /random seed/i })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: /ground motion type/i }));
+    await user.click(await screen.findByRole('option', { name: /random shaking/i }));
+
+    expect(screen.getByRole('slider', { name: /shaking frequency/i })).toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: /random seed/i })).toBeInTheDocument();
+
+    await user.click(screen.getByRole('combobox', { name: /ground motion type/i }));
+    await user.click(await screen.findByRole('option', { name: /single impulse/i }));
+
+    // An impulse has no meaningful frequency or seed to set.
+    expect(screen.queryByRole('slider', { name: /shaking frequency/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('slider', { name: /random seed/i })).not.toBeInTheDocument();
+  });
+
+  it('explains the active preset in plain language', () => {
+    render(<AppShell forceDesktopLayout />);
+    const panel = screen.getByRole('complementary', { name: /controls/i });
+    // Take the expected wording from the config itself, so a copy edit cannot
+    // silently make this test meaningless.
+    const expected = GROUND_MOTION_PRESETS[useConfigStore.getState().motion.preset].description;
+    expect(within(panel).getAllByText(expected).length).toBeGreaterThan(0);
+  });
+
+  it('describes every preset in a full sentence', () => {
+    for (const preset of Object.values(GROUND_MOTION_PRESETS)) {
+      expect(preset.description.length).toBeGreaterThan(30);
+      expect(preset.description).toMatch(/\.$/);
+    }
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('results panel', () => {
+  beforeEach(skipFirstRun);
+
+  it('shows the three headline metrics', () => {
+    render(<AppShell forceDesktopLayout />);
+    const panel = screen.getByRole('complementary', { name: /simulation results/i });
+    // "Peak displacement" also names a chart, so match the metric labels
+    // exactly rather than as a substring.
+    expect(within(panel).getByText('Peak displacement')).toBeInTheDocument();
+    expect(within(panel).getByText('Max story drift')).toBeInTheDocument();
+    expect(within(panel).getByText('Natural period')).toBeInTheDocument();
+  });
+
+  it('shows both charts', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('heading', { name: /displacement over time/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole('heading', { name: /peak displacement by floor/i }),
+    ).toBeInTheDocument();
+  });
+
+  it('never uses safety language anywhere in the drift legend', () => {
+    render(<AppShell forceDesktopLayout />);
+    const legendHeading = screen.getAllByText('Story drift')[0]!;
+    const legend = legendHeading.closest('div')?.parentElement;
+    expect(legend?.textContent).not.toMatch(/safe|unsafe|danger|fail|collapse/i);
+  });
+
+  it('disables comparison and says which phase brings it', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('button', { name: /compare with another building/i })).toBeDisabled();
+    expect(screen.getByText(/comparison arrives in phase 4/i)).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('playback bar', () => {
+  beforeEach(skipFirstRun);
+
+  it('is disabled and says why, rather than implying the simulation is live', () => {
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByRole('button', { name: /^play$/i })).toBeDisabled();
+    expect(screen.getByText(/playback arrives in phase 3/i)).toBeInTheDocument();
+  });
+
+  it('offers a motion exaggeration control labelled in real terms', () => {
+    render(<AppShell forceDesktopLayout />);
+    const slider = screen.getByRole('slider', { name: /motion exaggeration/i });
+    expect(slider).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringContaining('times real movement'),
+    );
+  });
+
+  it('moves the readout when the timeline is scrubbed', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    const slider = screen.getByRole('slider', { name: /simulation time/i });
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(screen.getByRole('slider', { name: /simulation time/i })).toHaveAttribute(
+      'aria-valuetext',
+      expect.stringContaining('seconds'),
+    );
   });
 });

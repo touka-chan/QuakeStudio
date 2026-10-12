@@ -52,6 +52,17 @@ export default tseslint.config(
     },
   },
 
+  // ---- shadcn/ui generated primitives -----------------------------------
+  // These are vendored from the shadcn registry and committed as-is. They
+  // legitimately export variants alongside components, and they are not ours
+  // to restyle to satisfy a lint rule.
+  {
+    files: ['apps/web/src/components/ui/**/*.{ts,tsx}'],
+    rules: {
+      'react-refresh/only-export-components': 'off',
+    },
+  },
+
   // ---- Config files -----------------------------------------------------
   {
     files: ['*.{js,mjs,cjs}'],

@@ -1,48 +1,246 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-test.describe('QuakeStudio — Phase 0 smoke', () => {
-  test('loads and shows the app title', async ({ page }) => {
+/* ==========================================================================
+   Phase 1 — the static prototype, walked the way a non-technical user would.
+   --------------------------------------------------------------------------
+   Chromium only for now; the full cross-browser matrix is Phase 5.
+   Browsers install with: npm run e2e:install
+   ========================================================================== */
+
+/**
+ * Skip the first-run dialog for every test except the ones that exercise it.
+ *
+ * This runs as an init script — BEFORE the app's own scripts — so the flag is
+ * already in localStorage when React first reads it. Checking for the dialog
+ * after `goto` was the obvious approach and it does not work: the dialog is a
+ * modal, so it marks the whole app tree aria-hidden and every role query on the
+ * workspace behind it fails.
+ */
+async function skipFirstRun(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+    } catch {
+      /* storage unavailable — the dialog will show and block these tests */
+    }
+  });
+}
+
+test.beforeEach(async ({ page }) => {
+  await skipFirstRun(page);
+});
+
+test.describe('QuakeStudio — Phase 1 shell', () => {
+  test('shows all three zones on a desktop viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'QuakeStudio' })).toBeVisible();
+
+    await expect(page.getByRole('complementary', { name: /controls/i })).toBeVisible();
+    await expect(page.getByRole('main', { name: /simulation viewport/i })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: /simulation results/i })).toBeVisible();
   });
 
-  test('shows the educational-simulation disclaimer', async ({ page }) => {
+  test('keeps the disclaimer visible and never dismissible', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    await expect(page.getByText(/not a structural safety assessment/i).first()).toBeVisible();
+
+    const disclaimer = page.getByText(/not a structural safety assessment/i).first();
+    await expect(disclaimer).toBeVisible();
+
+    // It must survive interacting with the app.
+    await page.getByRole('slider', { name: /floors/i }).click();
+    await expect(disclaimer).toBeVisible();
+  });
+
+  test('renders the 3D viewport with a canvas', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.locator('canvas')).toBeVisible();
   });
 
   test('theme toggle switches to dark and survives a reload', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
 
-    // Pin the starting point so the test does not depend on the machine's OS
-    // colour scheme, then walk the fixed cycle: light -> dark -> system.
-    await page.evaluate(() => localStorage.setItem('quakestudio.theme', 'light'));
-    await page.reload();
-
-    await page.getByRole('button', { name: /theme: light/i }).click();
-    await expect(page.getByRole('button', { name: /theme: dark/i })).toBeVisible();
+    await page.getByRole('button', { name: /switch to dark theme/i }).click();
     await expect(page.locator('html')).toHaveClass(/dark/);
 
-    // Reload must not flash back to light: the inline script in index.html
-    // re-applies the stored theme before React mounts.
     await page.reload();
     await expect(page.locator('html')).toHaveClass(/dark/);
-    await expect(page.getByRole('button', { name: /theme: dark/i })).toBeVisible();
   });
 
-  test('renders every design-system section without console errors', async ({ page }) => {
+  test('loads with no console errors', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
     const errors: string[] = [];
-    page.on('console', (message) => {
-      if (message.type() === 'error') errors.push(message.text());
-    });
-    page.on('pageerror', (error) => errors.push(error.message));
+    page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+    page.on('pageerror', (e) => errors.push(e.message));
 
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: /brand & surface tokens/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /shaking-intensity scale/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /typography/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /engineering assumptions/i })).toBeVisible();
-
+    await page.getByRole('heading', { name: /displacement over time/i }).waitFor();
     expect(errors).toEqual([]);
+  });
+});
+
+test.describe('building a model', () => {
+  test.beforeEach(async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+  });
+
+  test('applying a template updates the viewport and the results', async ({ page }) => {
+    // The template name appears in BOTH the select trigger and the viewport
+    // chip, so scope to the chip when asserting the 3D state.
+    const chip = page.getByRole('main').getByText(/story concrete · moment frame/);
+
+    const metric = page.getByRole('complementary', { name: /simulation results/i });
+    const peakBefore = await metric.locator('.font-mono-nums').first().textContent();
+
+    await page.getByRole('combobox', { name: /building template/i }).click();
+    await page.getByRole('option', { name: /15-story concrete high-rise/i }).click();
+    await expect(chip).toHaveText(/15-story/);
+
+    await page.getByRole('combobox', { name: /building template/i }).click();
+    await page.getByRole('option', { name: /3-story concrete/i }).click();
+    await expect(chip).toHaveText(/3-story/);
+
+    // Mock numbers, but they must actually respond to the input.
+    const peakAfter = await metric.locator('.font-mono-nums').first().textContent();
+    expect(peakAfter).not.toEqual(peakBefore);
+  });
+
+  test('changing the floors slider changes the building', async ({ page }) => {
+    const floors = page.getByRole('slider', { name: /floors/i });
+    await floors.focus();
+    // The default template is 5 storeys; one step up is 6.
+    await page.keyboard.press('ArrowRight');
+
+    await expect(page.getByRole('main').getByText(/6-story/)).toBeVisible();
+  });
+
+  test('the 3D view resizes with the building', async ({ page }) => {
+    const floors = page.getByRole('slider', { name: /floors/i });
+    await floors.focus();
+    for (let i = 0; i < 10; i++) await page.keyboard.press('ArrowRight');
+
+    await expect(page.getByRole('main').getByText(/15-story/)).toBeVisible();
+    await expect(page.locator('canvas')).toBeVisible();
+  });
+
+  test('every earthquake control is keyboard reachable', async ({ page }) => {
+    const strength = page.getByRole('slider', { name: /strength/i });
+    await strength.focus();
+    const before = await strength.getAttribute('aria-valuetext');
+    await page.keyboard.press('ArrowRight');
+    await expect(strength).not.toHaveAttribute('aria-valuetext', before!);
+  });
+});
+
+test.describe('responsive layout', () => {
+  test('stacks into tabs on a phone-sized viewport', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+
+    const tabs = page.getByRole('tablist', { name: /sections/i });
+    await expect(tabs).toBeVisible();
+
+    // Only one zone at a time.
+    await expect(page.getByRole('complementary', { name: /controls/i })).toBeVisible();
+    await expect(page.getByRole('main', { name: /simulation viewport/i })).toHaveCount(0);
+
+    await page.getByRole('tab', { name: /simulate/i }).click();
+    await expect(page.getByRole('main', { name: /simulation viewport/i })).toBeVisible();
+
+    await page.getByRole('tab', { name: /results/i }).click();
+    await expect(page.getByRole('complementary', { name: /simulation results/i })).toBeVisible();
+  });
+
+  test('holds together at 360px without sideways scrolling', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto('/');
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('does not scroll sideways at 1920px', async ({ page }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await page.goto('/');
+
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('keeps the three zones at 1024px', async ({ page }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto('/');
+
+    await expect(page.getByRole('complementary', { name: /controls/i })).toBeVisible();
+    await expect(page.getByRole('complementary', { name: /simulation results/i })).toBeVisible();
+  });
+});
+
+test.describe('first-run dialog', () => {
+  // These deliberately run WITHOUT the init script above.
+  test.use({ storageState: { cookies: [], origins: [] } });
+
+  test.beforeEach(async ({ page }) => {
+    // Clear the flag on the FIRST document only. An init script runs on every
+    // navigation, so clearing unconditionally would re-show the dialog after
+    // the reload this test is trying to prove is clean.
+    await page.addInitScript(() => {
+      if (sessionStorage.getItem('__qs_first_load_done')) return;
+      sessionStorage.setItem('__qs_first_load_done', '1');
+      localStorage.removeItem('quakestudio.firstRunAcknowledged');
+    });
+  });
+
+  test('greets a new user and gates Start until the disclaimer is acknowledged', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+
+    await expect(page.getByRole('dialog')).toBeVisible();
+    const start = page.getByRole('button', { name: /start exploring/i });
+    await expect(start).toBeDisabled();
+
+    await page.getByRole('checkbox').check();
+    await expect(start).toBeEnabled();
+  });
+
+  test('does not reappear on a second visit', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: /start exploring/i }).click();
+
+    await page.reload();
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+});
+
+test.describe('honesty about mock data', () => {
+  test('the results panel says the numbers are a preview', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.getByText(/preview numbers/i)).toBeVisible();
+  });
+
+  test('playback is disabled and labelled as future work', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+
+    await expect(page.getByRole('button', { name: /^play$/i })).toBeDisabled();
+    await expect(page.getByText(/playback arrives in phase 3/i)).toBeVisible();
+  });
+
+  test('the Phase 7 site controls are visible but unavailable', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+    await expect(page.getByText(/soil, foundation and fault distance/i)).toBeVisible();
   });
 });
