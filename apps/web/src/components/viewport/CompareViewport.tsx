@@ -55,50 +55,50 @@ export function CompareViewport() {
   return (
     <div className="relative h-full w-full overflow-hidden" style={{ backgroundColor: viewportBg }}>
       <Canvas
-          camera={{ position: [13, 24, 54], fov: 45, near: 0.1, far: 500 }}
-          dpr={[1, 2]}
-          gl={{ antialias: true }}
-          aria-label="3D view comparing two buildings under the same earthquake."
-        >
-          <hemisphereLight args={['#ffffff', '#94a3b8', 1.15]} />
-          <directionalLight position={[24, 34, 18]} intensity={1.4} />
-          <directionalLight position={[-16, 12, -12]} intensity={0.3} />
+        camera={{ position: [13, 24, 54], fov: 45, near: 0.1, far: 500 }}
+        dpr={[1, 2]}
+        gl={{ antialias: true }}
+        aria-label="3D view comparing two buildings under the same earthquake."
+      >
+        <hemisphereLight args={['#ffffff', '#94a3b8', 1.15]} />
+        <directionalLight position={[24, 34, 18]} intensity={1.4} />
+        <directionalLight position={[-16, 12, -12]} intensity={0.3} />
 
-          {/* `makeDefault` so <CameraFrame> can set the orbit target along with
+        {/* `makeDefault` so <CameraFrame> can set the orbit target along with
               the camera position. */}
-          <OrbitControls
-            makeDefault
-            enableDamping
-            dampingFactor={0.08}
-            minDistance={12}
-            maxDistance={260}
-            maxPolarAngle={Math.PI / 2.05}
-          />
+        <OrbitControls
+          makeDefault
+          enableDamping
+          dampingFactor={0.08}
+          minDistance={12}
+          maxDistance={260}
+          maxPolarAngle={Math.PI / 2.05}
+        />
 
-          {/* Nearly head-on, so the X separation in SideBySide reads as
+        {/* Nearly head-on, so the X separation in SideBySide reads as
               left/right on screen. A three-quarter camera put the far building
               in front of the near one — exactly the comparison this view exists
               to make easy — and put them at different distances from the lens,
               so the shorter building looked smaller than it was. */}
-          <CameraFrame
-            width={frameWidth}
-            height={frameHeight}
-            depth={frameDepth}
-            directionX={0.2}
-            directionY={0.38}
-            directionZ={0.9}
-            margin={1.25}
-          />
+        <CameraFrame
+          width={frameWidth}
+          height={frameHeight}
+          depth={frameDepth}
+          directionX={0.2}
+          directionY={0.38}
+          directionZ={0.9}
+          margin={1.25}
+        />
 
-          {ghost ? <GhostOverlay /> : <SideBySide clearance={clearance} />}
+        {ghost ? <GhostOverlay /> : <SideBySide clearance={clearance} />}
 
-          <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
+        <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
 
-          {/* Outside the framing on purpose: the slab is deliberately
+        {/* Outside the framing on purpose: the slab is deliberately
               oversized, and fitting to it would push the camera so far back
               that a 10-storey tower became a thin line. */}
-          <GroundSlab />
-        </Canvas>
+        <GroundSlab />
+      </Canvas>
 
       <ViewToggle view={view} onChange={setView} />
     </div>

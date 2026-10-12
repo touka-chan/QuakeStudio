@@ -59,7 +59,14 @@ export function ComparisonTable() {
 
   const rows: Row[] = [
     row('Floors', String(topA), String(topB), null, topA, topB),
-    row('Height', `${(topA * buildingA.floorHeightM).toFixed(1)} m`, `${(topB * buildingB.floorHeightM).toFixed(1)} m`, null, topA * buildingA.floorHeightM, topB * buildingB.floorHeightM),
+    row(
+      'Height',
+      `${(topA * buildingA.floorHeightM).toFixed(1)} m`,
+      `${(topB * buildingB.floorHeightM).toFixed(1)} m`,
+      null,
+      topA * buildingA.floorHeightM,
+      topB * buildingB.floorHeightM,
+    ),
     row('Material', buildingA.material, buildingB.material, null, 0, 0),
     row('Frame type', buildingA.frameType, buildingB.frameType, null, 0, 0),
     row(
@@ -97,7 +104,10 @@ export function ComparisonTable() {
   ];
 
   return (
-    <section className="rounded-card border border-line bg-surface p-4" aria-labelledby="compare-heading">
+    <section
+      className="rounded-card border border-line bg-surface p-4"
+      aria-labelledby="compare-heading"
+    >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="compare-heading" className="text-base font-semibold">
           Results
@@ -147,9 +157,9 @@ export function ComparisonTable() {
       </div>
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Both buildings felt the identical earthquake — strength {useConfigStore.getState().motion.pgaG} g
-        for {useConfigStore.getState().motion.durationS} s. Any difference comes from the
-        buildings, not the shaking.
+        Both buildings felt the identical earthquake — strength{' '}
+        {useConfigStore.getState().motion.pgaG} g for {useConfigStore.getState().motion.durationS}{' '}
+        s. Any difference comes from the buildings, not the shaking.
       </p>
     </section>
   );

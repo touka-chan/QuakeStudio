@@ -174,7 +174,9 @@ test.describe('comparison mode', () => {
 
     await page.getByRole('button', { name: /stop comparing/i }).click();
 
-    await expect(page.getByRole('button', { name: /compare with another building/i })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /compare with another building/i }),
+    ).toBeVisible();
     await expect(page.getByRole('radiogroup', { name: /comparison view/i })).toHaveCount(0);
     await expect(page.locator('canvas')).toBeVisible();
   });
@@ -237,7 +239,10 @@ test.describe('saving runs', () => {
     // Loading restores exactly what was saved — not a default, and not the
     // live session state.
     await page.getByRole('button', { name: /save run/i }).click();
-    await page.getByRole('dialog').getByRole('button', { name: /^load$/i }).click();
+    await page
+      .getByRole('dialog')
+      .getByRole('button', { name: /^load$/i })
+      .click();
 
     await expect(page.getByRole('slider', { name: /floors/i })).toHaveAttribute(
       'aria-valuenow',

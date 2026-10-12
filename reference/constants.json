@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "exportedFrom": "apps/web/src/config/engineeringAssumptions.ts",
+  "gravityMs2": 9.80665,
+  "materials": {
+    "concrete": {
+      "label": "Concrete",
+      "massPerAreaKgM2": 600,
+      "dampingRatio": 0.05,
+      "periodCt": 0.072,
+      "periodExponentX": 0.8
+    },
+    "steel": {
+      "label": "Steel",
+      "massPerAreaKgM2": 400,
+      "dampingRatio": 0.02,
+      "periodCt": 0.072,
+      "periodExponentX": 0.8
+    },
+    "composite": {
+      "label": "Composite",
+      "massPerAreaKgM2": 500,
+      "dampingRatio": 0.03,
+      "periodCt": 0.072,
+      "periodExponentX": 0.8
+    },
+    "wood": {
+      "label": "Wood",
+      "massPerAreaKgM2": 250,
+      "dampingRatio": 0.05,
+      "periodCt": 0.072,
+      "periodExponentX": 0.8
+    }
+  },
+  "frameTypes": {
+    "moment": {
+      "label": "Moment frame",
+      "stiffnessFactor": 1
+    },
+    "braced": {
+      "label": "Braced frame",
+      "stiffnessFactor": 2
+    }
+  },
+  "solver": {
+    "dtS": 0.01,
+    "newmarkBeta": 0.25,
+    "newmarkGamma": 0.5,
+    "rayleighModes": [1, 2],
+    "reportedModes": 3,
+    "initialDisplacementM": 0,
+    "validationTolerancePct": 5
+  },
+  "groundMotion": {
+    "defaultSeed": 20240501,
+    "sampleDtS": 0.01,
+    "taperDurationS": 0.5,
+    "randomBandHz": {
+      "low": 0.2,
+      "high": 4
+    },
+    "impulseDurationS": 0.15,
+    "gToMs2": 9.80665
+  },
+  "geometry": {
+    "minFloors": 1,
+    "maxFloors": 20
+  },
+  "defaults": {
+    "building": {
+      "id": "default-5-story-concrete",
+      "name": "5-story concrete frame",
+      "floors": 5,
+      "floorHeightM": 3,
+      "widthM": 14,
+      "depthM": 10,
+      "material": "concrete",
+      "frameType": "moment"
+    },
+    "groundMotion": {
+      "preset": "harmonic",
+      "pgaG": 0.3,
+      "frequencyHz": 1.4,
+      "durationS": 20,
+      "dt": 0.01,
+      "seed": 20240501
+    }
+  },
+  "viewport": {
+    "defaultExaggeration": 20
+  }
+}

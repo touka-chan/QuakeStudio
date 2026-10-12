@@ -69,7 +69,12 @@ export function TopBar({
       <div className="ml-auto flex items-center gap-2">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm" onClick={onOpenSaves} disabled={result.time.length === 0}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onOpenSaves}
+              disabled={result.time.length === 0}
+            >
               <Save aria-hidden="true" />
               <span className="hidden md:inline">Save run</span>
               <span className="md:hidden">Save</span>

@@ -68,14 +68,26 @@ export function ComparisonChart() {
               tickFormatter={(v: number) => v.toFixed(0)}
               stroke={textMuted}
               fontSize={11}
-              label={{ value: 's', position: 'insideBottomRight', offset: -2, fill: textMuted, fontSize: 11 }}
+              label={{
+                value: 's',
+                position: 'insideBottomRight',
+                offset: -2,
+                fill: textMuted,
+                fontSize: 11,
+              }}
             />
             <YAxis
               tickFormatter={(v: number) => v.toFixed(0)}
               stroke={textMuted}
               fontSize={11}
               width={44}
-              label={{ value: 'mm', angle: -90, position: 'insideLeft', fill: textMuted, fontSize: 11 }}
+              label={{
+                value: 'mm',
+                angle: -90,
+                position: 'insideLeft',
+                fill: textMuted,
+                fontSize: 11,
+              }}
             />
 
             <RechartsTooltip
@@ -136,12 +148,7 @@ export function ComparisonChart() {
  * assuming index equality — an assumption that would silently plot garbage if
  * the durations ever diverged.
  */
-function overlaySeries(
-  a: SimulationResult,
-  b: SimulationResult,
-  topA: number,
-  topB: number,
-) {
+function overlaySeries(a: SimulationResult, b: SimulationResult, topA: number, topB: number) {
   const seriesA = a.floorDisp[topA - 1] ?? [];
   const seriesB = b.floorDisp[topB - 1] ?? [];
   const total = Math.max(a.time.length, b.time.length);

@@ -63,9 +63,7 @@ export function parseRunJson(json: string): RunRecord[] {
   try {
     data = JSON.parse(json);
   } catch {
-    throw new RunImportError(
-      'That file is not valid JSON, so it cannot be a QuakeStudio export.',
-    );
+    throw new RunImportError('That file is not valid JSON, so it cannot be a QuakeStudio export.');
   }
 
   if (typeof data !== 'object' || data === null) {
@@ -148,9 +146,7 @@ export class PartialImportError extends RunImportError {
 }
 
 /** Narrowing helper so callers can recover the good records. */
-export function isPartialImport(
-  error: unknown,
-): error is PartialImportError {
+export function isPartialImport(error: unknown): error is PartialImportError {
   return error instanceof PartialImportError;
 }
 

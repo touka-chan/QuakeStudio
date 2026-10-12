@@ -1,0 +1,225 @@
+{
+  "$comment": [
+    "Validation matrix. Every case is solved by BOTH the TypeScript engine and",
+    "the Python reference solver, then compared.",
+    "",
+    "The spread is deliberate: it is not enough to check that two",
+    "implementations agree on the default model. The interesting cases are the",
+    "edges — one floor (Rayleigh damping can only hit one mode), twenty floors,",
+    "a material override for damping, and all three ground-motion presets.",
+    "",
+    "Cases are checked into the repo rather than generated, so the validation is",
+    "reproducible and a reviewer can see exactly what was compared."
+  ],
+  "cases": [
+    {
+      "id": "default-5-concrete-moment-harmonic",
+      "why": "The default model. If this disagrees, everything else is suspect.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-3-composite-moment-harmonic",
+      "why": "Shortest building in the main sweep.",
+      "building": {
+        "floors": 3,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "composite",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-10-steel-braced-harmonic",
+      "why": "Braced frame: the stiffness multiplier must apply after period calibration.",
+      "building": {
+        "floors": 10,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "steel",
+        "frameType": "braced"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-15-wood-moment-harmonic",
+      "why": "Lightest material — the largest acceleration response.",
+      "building": {
+        "floors": 15,
+        "floorHeightM": 3.2,
+        "widthM": 16,
+        "depthM": 12,
+        "material": "wood",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-20-concrete-moment-harmonic",
+      "why": "The tallest building the UI allows. Longest solve, densest eigenproblem.",
+      "building": {
+        "floors": 20,
+        "floorHeightM": 3.5,
+        "widthM": 18,
+        "depthM": 14,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-1-concrete-moment-harmonic",
+      "why": "EDGE: a single floor has one mode, so Rayleigh damping cannot be calibrated to modes 1 and 2. The mass-proportional fallback must match.",
+      "building": {
+        "floors": 1,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-2-concrete-moment-harmonic",
+      "why": "EDGE: the smallest case with two modes, so the Rayleigh branch switches exactly here.",
+      "building": {
+        "floors": 2,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-8-concrete-damping-override",
+      "why": "EDGE: a user-set damping ratio must replace the material default, not add to it.",
+      "building": {
+        "floors": 8,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "dampingRatio": 0.02
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "floors-6-concrete-moment-random",
+      "why": "EDGE: the seeded pseudo-random generator must produce the identical series in both languages.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "random", "pgaG": 0.3, "durationS": 20 }
+    },
+    {
+      "id": "floors-6-concrete-moment-impulse",
+      "why": "EDGE: a short pulse. Free vibration after it decays, so any damping difference shows up in the tail.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "impulse", "pgaG": 0.3, "durationS": 20 }
+    },
+    {
+      "id": "floors-10-concrete-moment-near-resonance",
+      "why": "EDGE: shaking close to the building's own frequency. Largest displacements, so the largest absolute error — the hardest case to agree on.",
+      "building": {
+        "floors": 10,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.45, "frequencyHz": 1.59, "durationS": 30 }
+    },
+    {
+      "id": "floors-4-steel-braced-impulse",
+      "why": "Stiff frame under an impulse: short period, so the timestep is most likely to be too coarse.",
+      "building": {
+        "floors": 4,
+        "floorHeightM": 3,
+        "widthM": 20,
+        "depthM": 16,
+        "material": "steel",
+        "frameType": "braced"
+      },
+      "motion": { "preset": "impulse", "pgaG": 0.5, "durationS": 15 }
+    },
+    {
+      "id": "floors-12-composite-braced-random",
+      "why": "Mid-height braced composite under band-limited random motion.",
+      "building": {
+        "floors": 12,
+        "floorHeightM": 3.1,
+        "widthM": 15,
+        "depthM": 11,
+        "material": "composite",
+        "frameType": "braced"
+      },
+      "motion": { "preset": "random", "pgaG": 0.25, "frequencyHz": 1.0, "durationS": 20 }
+    },
+    {
+      "id": "floors-7-wood-moment-impulse",
+      "why": "Light and flexible — the combination with the largest drift ratios.",
+      "building": {
+        "floors": 7,
+        "floorHeightM": 2.8,
+        "widthM": 12,
+        "depthM": 9,
+        "material": "wood",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "impulse", "pgaG": 0.35, "durationS": 20 }
+    },
+    {
+      "id": "floors-5-composite-moment-random",
+      "why": "Another random-motion case, different geometry, to catch anything seed- or shape-specific.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3.4,
+        "widthM": 13,
+        "depthM": 13,
+        "material": "composite",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "random", "pgaG": 0.3, "frequencyHz": 2.2, "durationS": 25 }
+    },
+    {
+      "id": "floors-9-steel-moment-harmonic-short",
+      "why": "Short record (10 s). Checks the taper at the end of the record is handled the same way.",
+      "building": {
+        "floors": 9,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "steel",
+        "frameType": "moment"
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 10 }
+    }
+  ]
+}

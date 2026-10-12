@@ -114,7 +114,11 @@ export function ResultsPanel() {
         <ComparisonChart />
 
         <div className="space-y-2">
-          <Button className="h-11 w-full" variant={compareEnabled ? 'outline' : 'default'} onClick={toggleCompare}>
+          <Button
+            className="h-11 w-full"
+            variant={compareEnabled ? 'outline' : 'default'}
+            onClick={toggleCompare}
+          >
             <Columns2 aria-hidden="true" />
             {compareEnabled ? 'Stop comparing' : 'Compare with another building'}
           </Button>

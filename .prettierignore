@@ -6,3 +6,6 @@ playwright-report
 test-results
 package-lock.json
 *.md
+# Python has no Prettier parser. The reference solver is formatted by hand,
+# following PEP 8 and a 100-character line limit.
+reference/python/

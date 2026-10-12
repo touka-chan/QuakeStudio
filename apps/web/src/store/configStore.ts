@@ -53,7 +53,12 @@ const solver = new SolverClient(
 );
 
 /** Kick off a solve for the current inputs. */
-function resolve(building: BuildingConfig, compareBuilding: BuildingConfig | null, motion: GroundMotionConfig, immediate = false) {
+function resolve(
+  building: BuildingConfig,
+  compareBuilding: BuildingConfig | null,
+  motion: GroundMotionConfig,
+  immediate = false,
+) {
   useConfigStore.setState({ status: 'computing' });
   const batch = compareBuilding ? [building, compareBuilding] : [building];
   if (immediate) solver.requestImmediate(batch, motion);
@@ -98,7 +103,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       // Editing any field by hand means we are no longer on a named template.
       templateId: 'custom',
     });
-    resolve(building, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
+    resolve(
+      building,
+      useCompareStore.getState().enabled ? get().compareBuilding : null,
+      get().motion,
+    );
   },
 
   setCompareBuilding: (patch) => {
@@ -127,7 +136,11 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       dampingRatio: undefined,
     };
     set({ templateId, building, activeFloor: null });
-    resolve(building, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
+    resolve(
+      building,
+      useCompareStore.getState().enabled ? get().compareBuilding : null,
+      get().motion,
+    );
   },
 
   setActiveFloor: (activeFloor) => set({ activeFloor }),

@@ -105,9 +105,7 @@ export function SaveLoadDialog({
 
     setBusy(true);
     try {
-      await storage.saveRun(
-        createRunRecord({ building, motion, result, appVersion: APP_VERSION }),
-      );
+      await storage.saveRun(createRunRecord({ building, motion, result, appVersion: APP_VERSION }));
 
       // In comparison mode, save B alongside A so the pair reloads together.
       if (useCompareStore.getState().enabled && resultB) {
@@ -200,7 +198,7 @@ export function SaveLoadDialog({
           leave a screen-reader user with no way to tell them apart. Escape and
           clicking the backdrop still close.
         */}
-        <DialogContent className="max-w-2xl" showCloseButton={false}>
+      <DialogContent className="max-w-2xl" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle>Saved runs</DialogTitle>
           <DialogDescription>
@@ -351,4 +349,3 @@ function statusFor(error: unknown): Status {
 function describe(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
-

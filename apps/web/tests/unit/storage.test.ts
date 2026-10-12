@@ -2,12 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { simulate } from '@/engine/solver';
-import {
-  EXPORT_FORMAT,
-  isPartialImport,
-  parseRunJson,
-  RunImportError,
-} from '@/lib/runJson';
+import { EXPORT_FORMAT, isPartialImport, parseRunJson, RunImportError } from '@/lib/runJson';
 import { LocalRunStorage, thinRecord } from '@/storage/localRunStorage';
 import { createRunRecord, toSummary } from '@/storage/types';
 import { APP_VERSION, type RunRecord } from '@/types';

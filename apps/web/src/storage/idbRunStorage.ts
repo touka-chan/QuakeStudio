@@ -95,9 +95,7 @@ export class IndexedDbRunStorage implements RunStorage {
       request<StoredRun[]>(store.getAll() as IDBRequest<StoredRun[]>),
     );
 
-    return all
-      .map(toSummary)
-      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    return all.map(toSummary).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   }
 
   async loadRun(id: string): Promise<RunRecord | null> {

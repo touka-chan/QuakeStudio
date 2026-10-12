@@ -57,8 +57,7 @@ function basisFrom(forward: [number, number, number]): Basis {
   const f = normalize(forward);
   // right = forward × worldUp. Degenerate looking straight up or down, so fall
   // back to the Z axis as the reference.
-  const worldUp: [number, number, number] =
-    Math.abs(f[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0];
+  const worldUp: [number, number, number] = Math.abs(f[1]) > 0.999 ? [0, 0, 1] : [0, 1, 0];
 
   const raw: [number, number, number] = [
     f[1] * worldUp[2] - f[2] * worldUp[1],

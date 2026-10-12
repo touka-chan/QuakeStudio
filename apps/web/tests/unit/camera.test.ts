@@ -79,7 +79,7 @@ function insideFrustum(
 
   if (depth <= 0) return false; // behind the camera
 
-  const tanV = Math.tan(((fovDeg * Math.PI) / 180) / 2);
+  const tanV = Math.tan((fovDeg * Math.PI) / 180 / 2);
   const tanH = tanV * aspect;
 
   return Math.abs(xView) <= tanH * depth && Math.abs(yView) <= tanV * depth;
@@ -139,8 +139,7 @@ describe('frameBox', () => {
     const short = frameBox({ width: 14, height: 10, depth: 10 }, ASPECT, FOV, [0, 0.5, 1]);
     const tall = frameBox({ width: 14, height: 60, depth: 10 }, ASPECT, FOV, [0, 0.5, 1]);
 
-    const distanceOf = (f: { position: [number, number, number] }) =>
-      Math.hypot(...f.position);
+    const distanceOf = (f: { position: [number, number, number] }) => Math.hypot(...f.position);
 
     expect(distanceOf(tall)).toBeGreaterThan(distanceOf(short));
   });
