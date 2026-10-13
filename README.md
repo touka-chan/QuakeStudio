@@ -9,11 +9,14 @@ building, shake it, and watch how it sways.
 
 ## Status
 
-**Phase 4 — Parameter comparison & persistence.** Complete. Run two
-configurations under one earthquake, compare them side by side or as a ghost
-overlay, and save runs in the browser to reload or export later. **Still not
-validated** — every coefficient is a placeholder, and Phase 5 compares this
-engine against an independent Python implementation.
+**Phase 5 — Verification, accessibility and performance.** Complete. The engine
+is cross-validated against an independent Python implementation, the app passes
+an axe-core audit with zero violations, and initial JavaScript dropped from
+536 KB to 175 KB gzipped.
+
+**Still not validated engineering.** The cross-check proves the code implements
+the model in `engineeringAssumptions.ts` as specified. It does not prove the
+model is right — every coefficient remains a placeholder awaiting review.
 
 | Phase | Scope | Status |
 |---|---|---|
@@ -22,7 +25,7 @@ engine against an independent Python implementation.
 | 2 | Simulation engine + Web Worker | ✅ |
 | 3 | Real-time response & data output | ✅ |
 | 4 | Parameter comparison & persistence | ✅ |
-| 5 | Verification, accessibility, polish | ⏳ |
+| 5 | Verification, accessibility, polish | ✅ |
 | 6 | Usability testing | ⏳ |
 | 7 | _Optional_ — site factors, pending client + adviser approval | ⏳ |
 
@@ -94,9 +97,20 @@ Run from the repository root.
 | `npm test` | Vitest unit + component tests |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests (18 specs) |
+| `npm run e2e` | Playwright end-to-end tests (54 specs) |
+| `npm run validate` | Cross-check the engine against the Python reference |
 
 `npm run e2e` fails until you have run `npm run e2e:install` at least once.
+
+`npm run validate` needs Python with NumPy and SciPy:
+
+```bash
+pip install -r reference/python/requirements.txt
+```
+
+It regenerates [`docs/validation-report.md`](docs/validation-report.md) from
+measured numbers, and **exits non-zero** if the two implementations disagree
+beyond tolerance — so it can gate CI.
 
 ## The workspace
 
@@ -230,6 +244,11 @@ QuakeStudio/
 | Every engineering constant | [`apps/web/src/config/engineeringAssumptions.ts`](apps/web/src/config/engineeringAssumptions.ts) |
 | Every colour, font, spacing value | [`apps/web/src/styles/tokens.css`](apps/web/src/styles/tokens.css) |
 | Open questions for the adviser | [`docs/assumptions.md`](docs/assumptions.md) |
+| Does the engine do what the config says? | [`docs/validation-report.md`](docs/validation-report.md) |
+| How the engine was cross-checked | [`reference/README.md`](reference/README.md) |
+| Accessibility findings and gaps | [`docs/accessibility-audit.md`](docs/accessibility-audit.md) |
+| Bundle sizes, budgets and what was deferred | [`docs/performance.md`](docs/performance.md) |
+| Copy rules and the wording review | [`docs/copy-review.md`](docs/copy-review.md) |
 
 Two rules keep this maintainable, and both are enforced by tests:
 

@@ -70,7 +70,7 @@ export function AssumptionsDialog() {
   };
 
   return (
-    <DialogContent className="max-w-3xl">
+    <DialogContent className="flex max-h-[85vh] max-w-3xl flex-col">
       <DialogHeader>
         <DialogTitle>About &amp; assumptions</DialogTitle>
         <DialogDescription>
@@ -78,7 +78,7 @@ export function AssumptionsDialog() {
         </DialogDescription>
       </DialogHeader>
 
-      <Tabs defaultValue="about">
+      <Tabs defaultValue="about" className="flex min-h-0 flex-1 flex-col">
         <TabsList>
           <TabsTrigger value="about">About</TabsTrigger>
           <TabsTrigger value="assumptions">
@@ -93,8 +93,8 @@ export function AssumptionsDialog() {
           <TabsTrigger value="glossary">Glossary</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="about">
-          <ScrollArea className="max-h-[55vh] pr-3">
+        <TabsContent value="about" className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full pr-3">
             <div className="space-y-4 text-sm">
               <p className="rounded-app border border-accent-yellow/40 bg-warning-bg px-3 py-2.5 text-warning-text">
                 {DISCLAIMER_LONG}
@@ -171,16 +171,16 @@ export function AssumptionsDialog() {
           </ScrollArea>
         </TabsContent>
 
-        <TabsContent value="assumptions">
+        <TabsContent value="assumptions" className="min-h-0 flex-1 overflow-hidden">
           <AssumptionsTab />
         </TabsContent>
 
-        <TabsContent value="glossary">
+        <TabsContent value="glossary" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <GlossaryTab />
         </TabsContent>
       </Tabs>
 
-      <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <Button variant="outline" size="sm" onClick={() => void copyForReview()}>
           <ClipboardCopy aria-hidden="true" />
           {copied ? 'Copied — paste into the review' : 'Copy assumptions for review'}
@@ -203,7 +203,7 @@ export function AssumptionsDialog() {
 
 function AssumptionsTab() {
   return (
-    <ScrollArea className="max-h-[55vh] pr-3">
+    <ScrollArea className="h-full pr-3">
       <div className="space-y-4">
         <p className="text-sm text-muted-foreground">
           Read straight from{' '}
@@ -294,8 +294,8 @@ function GlossaryTab() {
   }, [query]);
 
   return (
-    <div className="space-y-3">
-      <div className="relative">
+    <div className="flex min-h-0 flex-1 flex-col gap-3">
+      <div className="relative shrink-0">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground"
@@ -310,7 +310,7 @@ function GlossaryTab() {
         />
       </div>
 
-      <ScrollArea className="max-h-[45vh] pr-3">
+      <ScrollArea className="min-h-0 flex-1 pr-3">
         {entries.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             Nothing matches “{query}”.

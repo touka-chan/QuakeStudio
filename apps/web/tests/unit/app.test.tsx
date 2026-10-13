@@ -427,7 +427,7 @@ describe('playback bar', () => {
   it('states that the numbers are unexaggerated even when the view is not', () => {
     render(<AppShell forceDesktopLayout />);
     expect(screen.getByText(/drawn 20× larger/i)).toBeInTheDocument();
-    expect(screen.getByText(/the numbers are the true values/i)).toBeInTheDocument();
+    expect(screen.getByText(/the numbers themselves are not exaggerated/i)).toBeInTheDocument();
   });
 
   it('moves the readout when the timeline is scrubbed', async () => {

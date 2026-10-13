@@ -60,7 +60,7 @@ function shouldShowFirstRun(): boolean {
   }
 }
 
-export function FirstRunDialog() {
+export function FirstRunDialog({ onOpenAssumptions }: { onOpenAssumptions: () => void }) {
   const [open, setOpen] = useState(shouldShowFirstRun);
   const [acknowledged, setAcknowledged] = useState(false);
 
@@ -127,7 +127,21 @@ export function FirstRunDialog() {
         </label>
 
         <DialogFooter>
-          <Button variant="ghost" disabled>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              /*
+               * Close this first, then open the assumptions. Both are modal, and
+               * two stacked modals trap focus twice over.
+               *
+               * The acknowledgement is deliberately NOT recorded here: reading
+               * the assumptions is not the same as agreeing to them, and the
+               * gate must mean something.
+               */
+              setOpen(false);
+              onOpenAssumptions();
+            }}
+          >
             Read the assumptions
           </Button>
           <Button onClick={start} disabled={!acknowledged}>
@@ -135,7 +149,9 @@ export function FirstRunDialog() {
           </Button>
         </DialogFooter>
         <p className="text-center text-xs text-muted-foreground">
-          The assumptions page opens in Phase 5. See <code>docs/assumptions.md</code> meanwhile.
+          Every coefficient in this tool is a placeholder waiting for review by a structural
+          engineer. The <span className="font-medium">Assumptions</span> button in the top bar lists
+          them all.
         </p>
       </DialogContent>
     </Dialog>

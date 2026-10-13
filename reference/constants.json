@@ -46,7 +46,10 @@
     "dtS": 0.01,
     "newmarkBeta": 0.25,
     "newmarkGamma": 0.5,
-    "rayleighModes": [1, 2],
+    "rayleighModes": [
+      1,
+      2
+    ],
     "reportedModes": 3,
     "initialDisplacementM": 0,
     "validationTolerancePct": 5

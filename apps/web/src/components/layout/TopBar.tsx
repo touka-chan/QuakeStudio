@@ -30,9 +30,19 @@ import { DisclaimerBadge } from './DisclaimerBadge';
 export function TopBar({
   onTogglePanel,
   panelOpen,
+  assumptionsOpen,
+  onAssumptionsOpenChange,
 }: {
   onTogglePanel: () => void;
   panelOpen: boolean;
+  /**
+   * The About & Assumptions dialog is owned by the shell rather than here,
+   * because the first-run dialog also opens it. The TRIGGER stays in this
+   * component — Radix needs it inside the `<Dialog>` to restore focus on
+   * close.
+   */
+  assumptionsOpen: boolean;
+  onAssumptionsOpenChange: (open: boolean) => void;
 }) {
   /*
    * The dialogs live HERE, beside their trigger buttons, rather than in the
@@ -45,7 +55,6 @@ export function TopBar({
    * that, and it keeps the button and the dialog that it opens together.
    */
   const [saveOpen, setSaveOpen] = useState(false);
-  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const building = useConfigStore((s) => s.building);
   const motion = useConfigStore((s) => s.motion);
   const result = useConfigStore((s) => s.result);
@@ -120,7 +129,7 @@ export function TopBar({
           {exported ? `Exported ${exported}` : ''}
         </span>
 
-        <Dialog open={assumptionsOpen} onOpenChange={setAssumptionsOpen}>
+        <Dialog open={assumptionsOpen} onOpenChange={onAssumptionsOpenChange}>
           <Tooltip>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>

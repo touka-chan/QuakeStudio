@@ -349,7 +349,7 @@ test.describe('playback', () => {
   });
 
   test('says the numbers are not exaggerated even when the view is', async ({ page }) => {
-    await expect(page.getByText(/the numbers are the true values/i)).toBeVisible();
+    await expect(page.getByText(/the numbers themselves are not exaggerated/i)).toBeVisible();
   });
 
   test('speed and loop are operable', async ({ page }) => {
@@ -411,7 +411,7 @@ test.describe('honesty about results', () => {
     await page.goto('/');
 
     await expect(page.getByRole('button', { name: /^play$/i })).toBeEnabled();
-    await expect(page.getByText(/the numbers are the true values/i)).toBeVisible();
+    await expect(page.getByText(/the numbers themselves are not exaggerated/i)).toBeVisible();
   });
 
   test('the Phase 7 site controls are visible but unavailable', async ({ page }) => {

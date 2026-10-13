@@ -127,6 +127,36 @@ describe('accessibility', () => {
     }
   });
 
+  it('the dialog tabs actually switch their content', async () => {
+    /*
+     * The audit above would pass just as happily against a dialog whose tabs
+     * did nothing — it inspects whatever is rendered. Asserting the switch
+     * separately is what makes the audit meaningful.
+     */
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    await user.click(screen.getByRole('button', { name: /assumptions/i }));
+    const dialog = await screen.findByRole('dialog');
+
+    // About
+    expect(within(dialog).getByText('What this is')).toBeInTheDocument();
+
+    // Assumptions
+    await user.click(within(dialog).getByRole('tab', { name: /assumptions/i }));
+    expect(within(dialog).getByRole('heading', { name: 'Materials' })).toBeInTheDocument();
+    expect(within(dialog).queryByText('What this is')).not.toBeInTheDocument();
+
+    // Glossary
+    await user.click(within(dialog).getByRole('tab', { name: /glossary/i }));
+    expect(within(dialog).getByRole('searchbox', { name: /search glossary/i })).toBeInTheDocument();
+    expect(within(dialog).queryByText('What this is')).not.toBeInTheDocument();
+
+    // ...and back again, so the control is not one-way.
+    await user.click(within(dialog).getByRole('tab', { name: /about/i }));
+    expect(within(dialog).getByText('What this is')).toBeInTheDocument();
+  });
+
   it('comparison mode has no violations', async () => {
     // Seeded BEFORE rendering. Rendering twice leaves two shells in the
     // document, which axe correctly reports as duplicate landmarks.

@@ -12,10 +12,12 @@ import { useConfigStore, resolveNow } from '@/store/configStore';
 /* =========================================================================
    Results panel — the right zone.
    -------------------------------------------------------------------------
-   Metric cards, then the two charts, then the compare call-to-action.
+   Metric cards, then the charts, then the compare call-to-action.
 
-   These numbers come from MOCK data in Phase 1. The panel says so, once, near
-   the top — a student should never mistake placeholder output for a result.
+   The metric cards render immediately and the charts stream in behind a
+   placeholder — see `charts/LazyCharts.tsx`. The headline numbers therefore
+   never wait on a chart library, which is why the split is here rather than
+   around the whole panel.
    ========================================================================= */
 
 const M2S_TO_MM = 1000;

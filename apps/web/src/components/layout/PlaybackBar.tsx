@@ -140,8 +140,8 @@ export function PlaybackBar() {
       </label>
 
       <p className="w-full text-xs text-muted-foreground">
-        Motion is drawn {exaggeration}× larger so millimetres are visible — the numbers are the true
-        values.
+        Motion is drawn {exaggeration}× larger so millimetres are visible. The numbers themselves
+        are not exaggerated — but they are still the model's output, not a validated result.
         {reducedMotion ? ' Reduced-motion is on, so playback starts paused at half speed.' : ''}
       </p>
     </div>

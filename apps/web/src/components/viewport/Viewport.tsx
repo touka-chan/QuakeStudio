@@ -42,7 +42,15 @@ export function Viewport() {
       <Canvas
         camera={{ position: [26, 20, 30], fov: 45, near: 0.1, far: 500 }}
         dpr={[1, 2]}
-        gl={{ antialias: true }}
+        gl={{
+          antialias: true,
+          // Transparent clear colour, so the container's --viewport-bg shows
+          // through. Without this the canvas paints opaque WHITE for the
+          // frame or two before the scene renders - which reads as a flash
+          // of the wrong theme every time the viewport mounts or remounts
+          // (switching comparison mode does exactly that).
+          alpha: true,
+        }}
         // role="img" is required, not decorative: without a role the
         // aria-label below is prohibited and silently dropped.
         role="img"
