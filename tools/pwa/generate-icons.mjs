@@ -33,12 +33,13 @@
  */
 
 import { deflateSync } from 'node:zlib';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OUT_DIR = join(REPO_ROOT, 'apps', 'web', 'public');
+const ANDROID_RES = join(REPO_ROOT, 'apps', 'web', 'android', 'app', 'src', 'main', 'res');
 
 /** Supersampling factor. 4 is enough to smooth edges that stay still at 512px. */
 const SS = 4;
@@ -343,8 +344,15 @@ function encodePng(size, rgba) {
  * `safeScale` shrinks the artwork toward the centre. Maskable icons need this:
  * Android crops a maskable icon to whatever shape the launcher uses, and
  * anything outside the central 80% can be cut off entirely.
+ *
+ * `transparent` omits the background entirely, which is what an Android
+ * adaptive-icon foreground layer must be — the background is a separate layer
+ * underneath, supplied by `ic_launcher_background.xml`.
+ *
+ * `shape` picks the legacy-icon silhouette: a rounded square, a circle for the
+ * `_round` variant, or a full bleed square.
  */
-function renderIcon(size, { rounded = true, safeScale = 1 } = {}) {
+function renderIcon(size, { shape = 'rounded', safeScale = 1, transparent = false } = {}) {
   // The canvas is `size` device pixels times the supersampling factor. Getting
   // this wrong in either direction produces an icon that is mostly empty or
   // mostly clipped, and both look plausible in a file listing.
@@ -352,10 +360,14 @@ function renderIcon(size, { rounded = true, safeScale = 1 } = {}) {
   const canvas = new Canvas(px);
 
   // Background, filling the whole canvas.
-  if (rounded) {
-    canvas.fillRoundedRect(0, 0, px, px, px * 0.22, BRAND);
-  } else {
-    canvas.fillRect(0, 0, px, px, BRAND);
+  if (!transparent) {
+    if (shape === 'circle') {
+      canvas.fillCircle(px / 2, px / 2, px / 2, BRAND);
+    } else if (shape === 'rounded') {
+      canvas.fillRoundedRect(0, 0, px, px, px * 0.22, BRAND);
+    } else {
+      canvas.fillRect(0, 0, px, px, BRAND);
+    }
   }
 
   // Map artwork coordinates (0..1) into canvas pixels. With safeScale = 1 the
@@ -416,7 +428,7 @@ const TARGETS = [
     size: 512,
     purpose: 'maskable',
     safeScale: 0.72,
-    rounded: false,
+    shape: 'square',
   },
   { file: 'favicon-32.png', size: 32, purpose: 'any' },
 ];
@@ -425,7 +437,7 @@ mkdirSync(OUT_DIR, { recursive: true });
 
 for (const target of TARGETS) {
   const { size, data } = renderIcon(target.size, {
-    rounded: target.rounded !== false,
+    shape: target.shape ?? 'rounded',
     safeScale: target.safeScale ?? 1,
   });
   const png = encodePng(size, data);
@@ -436,3 +448,92 @@ for (const target of TARGETS) {
 }
 
 console.log(`\nWrote ${TARGETS.length} icons to apps/web/public/`);
+
+/* ---------------------------------------------------- Android launcher icons */
+
+/*
+ * Capacitor ships the Capacitor logo in every density, so an APK built without
+ * this step shows a green robot on the home screen. These replace all of it.
+ *
+ * Android adaptive icons are TWO layers: a background colour and a foreground
+ * with the artwork inset to the 72/108 safe zone. The launcher applies its own
+ * mask on top, so the foreground must be transparent and must NOT carry its own
+ * rounded corners — doing either produces a double-rounded icon with the
+ * background showing through the corners.
+ *
+ * The `_round` and plain variants are the pre-Android-8 legacy icons, which are
+ * displayed as-is and therefore DO carry their own background and shape.
+ */
+
+/** Legacy icon size per density. */
+const LEGACY_SIZES = {
+  'mipmap-mdpi': 48,
+  'mipmap-hdpi': 72,
+  'mipmap-xhdpi': 96,
+  'mipmap-xxhdpi': 144,
+  'mipmap-xxxhdpi': 192,
+};
+
+/**
+ * Adaptive-icon foreground size per density.
+ *
+ * 108dp canvas at each density's scale factor — Android sizes the foreground
+ * layer to the full canvas and crops the outer 18dp on each side.
+ */
+const FOREGROUND_SIZES = {
+  'mipmap-mdpi': 108,
+  'mipmap-hdpi': 162,
+  'mipmap-xhdpi': 216,
+  'mipmap-xxhdpi': 324,
+  'mipmap-xxxhdpi': 432,
+};
+
+/** The artwork occupies the inner 72 of 108dp. */
+const ANDROID_SAFE_SCALE = 72 / 108;
+
+if (existsSync(ANDROID_RES)) {
+  for (const [density, size] of Object.entries(FOREGROUND_SIZES)) {
+    const dir = join(ANDROID_RES, density);
+    if (!existsSync(dir)) continue;
+
+    const { size: w, data } = renderIcon(size, {
+      transparent: true,
+      safeScale: ANDROID_SAFE_SCALE,
+    });
+    writeFileSync(join(dir, 'ic_launcher_foreground.png'), encodePng(w, data));
+  }
+
+  for (const [density, size] of Object.entries(LEGACY_SIZES)) {
+    const dir = join(ANDROID_RES, density);
+    if (!existsSync(dir)) continue;
+
+    for (const [file, shape] of [
+      ['ic_launcher.png', 'rounded'],
+      ['ic_launcher_round.png', 'circle'],
+    ]) {
+      const { size: w, data } = renderIcon(size, { shape });
+      writeFileSync(join(dir, file), encodePng(w, data));
+    }
+  }
+
+  /*
+   * The adaptive background layer. Capacitor ships this as #FFFFFF; without
+   * changing it the white foreground artwork is invisible on Android 8+.
+   */
+  writeFileSync(
+    join(ANDROID_RES, 'values', 'ic_launcher_background.xml'),
+    `<?xml version="1.0" encoding="utf-8"?>
+<!-- Generated by tools/pwa/generate-icons.mjs - change the brand colour there,
+     not here, or the next regeneration will overwrite it. -->
+<resources>
+    <color name="ic_launcher_background">#${BRAND.map((c) => c.toString(16).padStart(2, '0'))
+      .join('')
+      .toUpperCase()}</color>
+</resources>
+`,
+  );
+
+  console.log(`Wrote Android launcher icons to ${ANDROID_RES}`);
+} else {
+  console.log('\nNo android/ directory yet — run `npx cap add android` to create launcher icons.');
+}

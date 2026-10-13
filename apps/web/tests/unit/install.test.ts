@@ -1,6 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { decideInstall, isStandalone } from '@/pwa/install';
+import { isNativeApp, registerServiceWorker } from '@/pwa/registerServiceWorker';
 
 /* ==========================================================================
    Which install affordance this browser deserves.
@@ -58,5 +59,68 @@ describe('isStandalone', () => {
   it('is false in an ordinary browser tab', () => {
     // jsdom reports no display-mode, so this is the "opened from a link" case.
     expect(isStandalone()).toBe(false);
+  });
+});
+
+/* ==========================================================================
+   Where the service worker is allowed to register.
+
+   Three places, three different answers, and getting any of them wrong
+   produces a failure that looks like something else entirely.
+   ========================================================================== */
+
+describe('service worker registration', () => {
+  it('is skipped in dev, where /sw.js does not exist', async () => {
+    /*
+     * Vitest runs with import.meta.env.PROD false, so this exercises the real
+     * guard rather than a simulated one.
+     *
+     * In dev the dev server answers `/sw.js` with the SPA fallback —
+     * index.html, served as text/html — and the browser rejects it with
+     * "The script has an unsupported MIME type ('text/html')". That error on
+     * every dev reload is how a console warning becomes invisible.
+     */
+    expect(import.meta.env.PROD).toBe(false);
+    await expect(registerServiceWorker()).resolves.toBeNull();
+  });
+
+  it('never calls register, even when one is available', async () => {
+    /*
+     * jsdom does not implement navigator.serviceWorker at all, so a stub is
+     * installed. Without it this test would pass for the wrong reason — the
+     * guard could be returning early because the API is missing, rather than
+     * because we are in dev.
+     */
+    const register = vi.fn();
+    const original = Object.getOwnPropertyDescriptor(globalThis.navigator, 'serviceWorker');
+    Object.defineProperty(globalThis.navigator, 'serviceWorker', {
+      value: { register },
+      configurable: true,
+    });
+
+    try {
+      await registerServiceWorker();
+      expect(register).not.toHaveBeenCalled();
+    } finally {
+      if (original) {
+        Object.defineProperty(globalThis.navigator, 'serviceWorker', original);
+      } else {
+        delete (globalThis.navigator as unknown as Record<string, unknown>).serviceWorker;
+      }
+    }
+  });
+
+  it('detects the native Android wrapper', () => {
+    expect(isNativeApp()).toBe(false);
+
+    // Capacitor injects `window.Capacitor` into the WebView. Its presence is
+    // the only signal available, and it is what stops a worker from serving a
+    // stale precache after a new APK is installed.
+    (globalThis as Record<string, unknown>).Capacitor = { isNativePlatform: () => true };
+    try {
+      expect(isNativeApp()).toBe(true);
+    } finally {
+      delete (globalThis as Record<string, unknown>).Capacitor;
+    }
   });
 });

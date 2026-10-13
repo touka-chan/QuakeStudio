@@ -20,14 +20,15 @@ export default defineConfig({
        */
       registerType: 'autoUpdate',
       /*
-       * Generated at BUILD time, not injected into the page.
+       * Registered by src/main.tsx, not injected here.
        *
-       * `injectRegister: 'auto'` emits a small registration script that only
-       * runs in production. In development the worker would serve stale bundles
-       * over HMR, which is the single most common way a service worker makes a
-       * dev server appear broken.
+       * The plugin's injected snippet is unconditional, and inside the Android
+       * APK a service worker is actively harmful: it keeps serving the old
+       * precache after a new APK ships, so the app appears to ignore the
+       * update. Registering by hand lets us skip it there — see
+       * src/pwa/registerServiceWorker.ts.
        */
-      injectRegister: 'auto',
+      injectRegister: false,
       manifest: false, // hand-written in public/, so it is readable and reviewable
       includeAssets: ['favicon-32.png', 'apple-touch-icon.png'],
       workbox: {

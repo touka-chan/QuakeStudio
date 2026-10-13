@@ -69,6 +69,37 @@ from what the engine actually runs.
 
 ---
 
+## The Android app (.apk)
+
+Beyond the browser install, QuakeStudio builds as a **real Android package**:
+
+```bash
+npm run android:build   # -> apps/web/android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+**~4.8 MB, signed, and self-contained** — every asset is bundled inside it, so
+it works on a phone in aeroplane mode with no server and no network. Copy the
+file to a phone, open it, allow "install from unknown sources", done.
+
+This is the build for a lab with a captive network, or for handing a student a
+single file. It shares one codebase with the web app, so a fix lands on both.
+
+Two things worth knowing before changing anything, both in
+[`docs/android.md`](docs/android.md):
+
+- **The service worker is switched off inside the APK.** Its precache is keyed
+  to the APK that installed it, so a new APK would keep serving the previous
+  build and the app would appear to ignore the update.
+- **Gradle needs JDK 21.** A JDK 17 fails with `invalid source release: 21`; a
+  JDK 26 fails with a jlink error that never mentions the JDK. The build script
+  picks the lowest JDK it finds that works.
+
+```bash
+npm run android:build:release   # unsigned; needs a real keystore to distribute
+```
+
+---
+
 ## Installing it as an app
 
 QuakeStudio is an installable **Progressive Web App** on **Android and desktop
@@ -396,12 +427,14 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **356 tests** |
+| `npm test` | Vitest unit + component tests — **359 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
 | `npm run e2e` | Playwright end-to-end tests — **59 specs** |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
-| `npm run pwa:icons` | Regenerate the app icons |
+| `npm run pwa:icons` | Regenerate the web AND Android launcher icons |
+| `npm run android:build` | Build the sideloadable Android APK |
+| `npm run android:build:release` | Unsigned release APK (needs a keystore) |
 | `npm run validate` | Cross-check the engine against the Python reference |
 | `npm run usability:cross-check` | Cross-check the SUS scorer against Python |
 
@@ -434,6 +467,7 @@ QuakeStudio/
 │     ├─ store/                       # Zustand stores
 │     ├─ styles/tokens.css            # ← design tokens, single source of truth
 │     ├─ types/                       # shared types + Zod schemas
+│     ├─ android/                     # Capacitor native project (generated)
 │     └─ lib/
 ├─ reference/
 │  ├─ python/                         # NumPy/SciPy reference solver
@@ -441,6 +475,7 @@ QuakeStudio/
 │  └─ constants.json                  # generated, shared with the Python side
 ├─ tools/usability/                   # SUS analysis + scorer cross-check
 ├─ tools/pwa/generate-icons.mjs        # app icons, drawn in code, no dependencies
+├─ tools/android/build-apk.mjs         # finds a working JDK, then builds the APK
 ├─ docs/
 │  ├─ assumptions.md                  # ← what the engineering adviser reviews
 │  ├─ validation-report.md            # generated: TS vs Python (Phase 5)
@@ -464,6 +499,7 @@ QuakeStudio/
 | How the engine was cross-checked | [`reference/README.md`](reference/README.md) |
 | Accessibility findings and gaps | [`docs/accessibility-audit.md`](docs/accessibility-audit.md) |
 | Bundle sizes, budgets, what was deferred | [`docs/performance.md`](docs/performance.md) |
+| Building the Android APK | [`docs/android.md`](docs/android.md) |
 | Copy rules and the wording review | [`docs/copy-review.md`](docs/copy-review.md) |
 | How to run the usability study | [`docs/usability-plan.md`](docs/usability-plan.md) |
 | Expert usability review | [`docs/heuristic-evaluation.md`](docs/heuristic-evaluation.md) |

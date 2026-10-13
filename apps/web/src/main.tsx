@@ -26,6 +26,7 @@ import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 import App from './App';
+import { registerServiceWorker } from './pwa/registerServiceWorker';
 
 const container = document.getElementById('root');
 if (!container) {
@@ -37,3 +38,11 @@ createRoot(container).render(
     <App />
   </StrictMode>,
 );
+
+/*
+ * Offline support for the PWA. Registered here rather than injected by
+ * vite-plugin-pwa so it can be skipped inside the Android APK, where the assets
+ * are already bundled and a worker would only serve a stale precache after an
+ * update. See src/pwa/registerServiceWorker.ts.
+ */
+void registerServiceWorker();

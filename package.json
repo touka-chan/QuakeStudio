@@ -28,7 +28,10 @@
     "validate:python": "python reference/python/compare.py",
     "usability:cases": "tsx --tsconfig apps/web/tsconfig.app.json tools/usability/cross-check.ts > tools/usability/cases.json",
     "usability:cross-check": "npm run usability:cases && python tools/usability/cross-check.py tools/usability/cases.json",
-    "validate": "npm run validate:constants && npm run validate:ts && npm run validate:python"
+    "validate": "npm run validate:constants && npm run validate:ts && npm run validate:python",
+    "android:sync": "npm run android:sync --workspace apps/web",
+    "android:build": "node tools/android/build-apk.mjs --sync",
+    "android:build:release": "node tools/android/build-apk.mjs --release --sync"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
