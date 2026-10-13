@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Download, Info, PanelLeftClose, PanelLeftOpen, Save, Sun, Moon } from 'lucide-react';
 
+import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import { AssumptionsDialog } from './AssumptionsDialog';
+import { SaveLoadDialog } from './SaveLoadDialog';
+
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -20,22 +24,28 @@ import { DisclaimerBadge } from './DisclaimerBadge';
 /* =========================================================================
    Top bar
    -------------------------------------------------------------------------
-   Logo · persistent disclaimer · theme toggle.
-
-   Phase 1 ships the theme toggle for real (it works) and shows Save run,
-   Export CSV and Assumptions as clearly-marked coming-soon controls, so the
-   layout can be reviewed at full width without half the bar missing.
+   Logo · persistent disclaimer · save, export, assumptions · theme toggle.
    ========================================================================= */
 
 export function TopBar({
   onTogglePanel,
   panelOpen,
-  onOpenSaves,
 }: {
   onTogglePanel: () => void;
   panelOpen: boolean;
-  onOpenSaves: () => void;
 }) {
+  /*
+   * The dialogs live HERE, beside their trigger buttons, rather than in the
+   * shell.
+   *
+   * Radix restores focus to its `DialogTrigger` when a dialog closes. A dialog
+   * opened by external state — with no trigger registered — has nothing to
+   * restore to, so Escape drops focus onto `<body>` and a keyboard user has to
+   * tab from the top of the document all over again. Owning the trigger fixes
+   * that, and it keeps the button and the dialog that it opens together.
+   */
+  const [saveOpen, setSaveOpen] = useState(false);
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const building = useConfigStore((s) => s.building);
   const motion = useConfigStore((s) => s.motion);
   const result = useConfigStore((s) => s.result);
@@ -67,23 +77,24 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onOpenSaves}
-              disabled={result.time.length === 0}
-            >
-              <Save aria-hidden="true" />
-              <span className="hidden md:inline">Save run</span>
-              <span className="md:hidden">Save</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">
-            Saved in this browser. Export from the dialog to move runs elsewhere.
-          </TooltipContent>
-        </Tooltip>
+        <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm" disabled={result.time.length === 0}>
+                  <Save aria-hidden="true" />
+                  <span className="hidden md:inline">Save run</span>
+                  <span className="md:hidden">Save</span>
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-xs">
+              Saved in this browser. Export from the dialog to move runs elsewhere.
+            </TooltipContent>
+          </Tooltip>
+
+          <SaveLoadDialog open={saveOpen} onOpenChange={setSaveOpen} />
+        </Dialog>
 
         <Tooltip>
           <TooltipTrigger asChild>
@@ -109,17 +120,24 @@ export function TopBar({
           {exported ? `Exported ${exported}` : ''}
         </span>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="hidden md:block">
-              <ComingSoonButton icon={Info} label="Assumptions" />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">
-            Every assumption in the model, in the app. Arrives in Phase 5 — see
-            <code className="mx-1">docs/assumptions.md</code> meanwhile.
-          </TooltipContent>
-        </Tooltip>
+        <Dialog open={assumptionsOpen} onOpenChange={setAssumptionsOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button variant="outline" size="sm">
+                  <Info aria-hidden="true" />
+                  <span className="hidden md:inline">Assumptions</span>
+                  <span className="md:hidden">About</span>
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-xs">
+              What the model assumes, and what its results do not tell you.
+            </TooltipContent>
+          </Tooltip>
+
+          <AssumptionsDialog />
+        </Dialog>
 
         <Separator orientation="vertical" className="hidden h-6 md:block" />
 
@@ -137,23 +155,6 @@ export function TopBar({
         </Button>
       </div>
     </header>
-  );
-}
-
-/* ------------------------------------------------------------------------- */
-
-function ComingSoonButton({ icon: Icon, label }: { icon: typeof Download; label: string }) {
-  return (
-    <Button
-      variant="outline"
-      size="sm"
-      disabled
-      aria-label={`${label} — not available yet`}
-      className="pointer-events-none"
-    >
-      <Icon aria-hidden="true" />
-      {label}
-    </Button>
   );
 }
 

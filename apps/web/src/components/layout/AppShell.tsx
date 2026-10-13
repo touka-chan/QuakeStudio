@@ -9,7 +9,6 @@ import { MobileTabBar, type MobileTab } from './MobileTabBar';
 import { PlaybackBar } from './PlaybackBar';
 import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
-import { SaveLoadDialog } from './SaveLoadDialog';
 import { TopBar } from './TopBar';
 import { CompareViewport } from '@/components/viewport/CompareViewport';
 import { Viewport } from '@/components/viewport/Viewport';
@@ -33,18 +32,13 @@ import { useCompareStore } from '@/store/compareStore';
 export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean } = {}) {
   const [tab, setTab] = useState<MobileTab>('build');
   const [panelOpen, setPanelOpen] = useState(false);
-  const [saveOpen, setSaveOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);
   const compareEnabled = useCompareStore((s) => s.enabled);
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-        <TopBar
-          onTogglePanel={() => setPanelOpen((open) => !open)}
-          panelOpen={panelOpen}
-          onOpenSaves={() => setSaveOpen(true)}
-        />
+        <TopBar onTogglePanel={() => setPanelOpen((open) => !open)} panelOpen={panelOpen} />
 
         {/* Desktop: three zones side by side.
             Mobile: stacked, with exactly ONE zone visible at a time. They
@@ -97,7 +91,6 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
         <PlaybackClock />
 
         <FirstRunDialog />
-        <SaveLoadDialog open={saveOpen} onOpenChange={setSaveOpen} />
       </div>
     </TooltipProvider>
   );

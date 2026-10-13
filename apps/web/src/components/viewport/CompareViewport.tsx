@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 import { buildingHeight } from '@/lib/camera';
+import { describeBuilding } from '@/lib/describeBuilding';
 import { useCssVar } from '@/lib/useCssVar';
 import { sampleDisplacement } from '@/lib/time';
 import { useCompareStore } from '@/store/compareStore';
@@ -58,7 +59,12 @@ export function CompareViewport() {
         camera={{ position: [13, 24, 54], fov: 45, near: 0.1, far: 500 }}
         dpr={[1, 2]}
         gl={{ antialias: true }}
-        aria-label="3D view comparing two buildings under the same earthquake."
+        // See Viewport.tsx: an aria-label on a roleless element is
+        // prohibited, and assistive technology silently drops it.
+        role="img"
+        aria-label={`3D comparison of two buildings under the same earthquake.
+          A: ${describeBuilding(buildingA)}. B: ${describeBuilding(buildingB)}.
+          The measured numbers are in the comparison table.`}
       >
         <hemisphereLight args={['#ffffff', '#94a3b8', 1.15]} />
         <directionalLight position={[24, 34, 18]} intensity={1.4} />

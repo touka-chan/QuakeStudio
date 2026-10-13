@@ -21,6 +21,16 @@ import { ShakeArrow } from './ShakeArrow';
 
    It re-fits on dimensions only, not on every render, so the user keeps their
    orbit angle while dragging a slider.
+
+   ACCESSIBILITY NOTE. `role="img"` is not decoration. The canvas is opaque to
+   assistive technology, and an `aria-label` on a roleless <div> is ignored
+   outright — axe flags it as aria-prohibited-attr, and screen readers announce
+   nothing at all. Giving the element a role makes the description reachable.
+
+   The label says where the numbers are, because a description of a picture is
+   only useful if it tells a screen-reader user that the actual data is
+   elsewhere. Note also that orbiting is mouse-only: OrbitControls has no
+   keyboard handler here, which is recorded in docs/accessibility-audit.md.
    ========================================================================= */
 
 export function Viewport() {
@@ -33,7 +43,11 @@ export function Viewport() {
         camera={{ position: [26, 20, 30], fov: 45, near: 0.1, far: 500 }}
         dpr={[1, 2]}
         gl={{ antialias: true }}
-        aria-label="3D view of the building. Drag to orbit, scroll to zoom."
+        // role="img" is required, not decorative: without a role the
+        // aria-label below is prohibited and silently dropped.
+        role="img"
+        aria-label={`3D view of the ${describeBuilding(building)} swaying under the
+          earthquake. The measured numbers are in the results panel on the right.`}
       >
         <hemisphereLight args={['#ffffff', '#94a3b8', 1.15]} />
         <directionalLight position={[24, 34, 18]} intensity={1.4} />

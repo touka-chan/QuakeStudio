@@ -40,7 +40,14 @@ export function MetricCard({
           {label}
         </p>
         {help ? (
-          <span title={help} aria-label={help} className="text-muted-foreground">
+          /*
+           * role="img" is required for the aria-label to mean anything. An
+           * aria-label on a roleless <span> is prohibited: axe reports it as a
+           * serious violation and screen readers drop it. This element carries
+           * no text of its own — the icon is aria-hidden — so without the role
+           * it announces as nothing at all.
+           */
+          <span role="img" title={help} aria-label={help} className="text-muted-foreground">
             <Info aria-hidden="true" className="size-3" />
           </span>
         ) : null}

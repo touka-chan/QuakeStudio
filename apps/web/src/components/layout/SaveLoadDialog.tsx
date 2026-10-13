@@ -3,7 +3,6 @@ import { Download, Trash2, Upload } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -41,6 +40,17 @@ const M2S_TO_MM = 1000;
 
 type Status = { tone: 'ok' | 'warn' | 'error'; message: string } | null;
 
+/**
+ * Contents of the saved-runs dialog.
+ *
+ * Renders `DialogContent` only — the surrounding `Dialog` and
+ * `DialogTrigger` are supplied by `TopBar`, which owns the trigger button.
+ *
+ * That split is not cosmetic. Radix restores focus to its `DialogTrigger` when
+ * a dialog closes; with no trigger registered it has nothing to restore to,
+ * so pressing Escape drops focus onto `<body>`. A keyboard user then has to
+ * tab from the very top of the document again to get back where they were.
+ */
 export function SaveLoadDialog({
   open,
   onOpenChange,
@@ -191,134 +201,132 @@ export function SaveLoadDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <DialogContent className="max-w-2xl" showCloseButton={false}>
       {/*
           The corner X is turned off on purpose. This dialog's footer Close is
           the bigger touch target, and two buttons both announced as "Close"
           leave a screen-reader user with no way to tell them apart. Escape and
           clicking the backdrop still close.
         */}
-      <DialogContent className="max-w-2xl" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>Saved runs</DialogTitle>
-          <DialogDescription>
-            Runs are stored in this browser ({storage.backendName}). Export to move them to another
-            machine or share them.
-          </DialogDescription>
-        </DialogHeader>
+      <DialogHeader>
+        <DialogTitle>Saved runs</DialogTitle>
+        <DialogDescription>
+          Runs are stored in this browser ({storage.backendName}). Export to move them to another
+          machine or share them.
+        </DialogDescription>
+      </DialogHeader>
 
-        <Tabs defaultValue="runs">
-          <TabsList>
-            <TabsTrigger value="runs">Runs</TabsTrigger>
-            <TabsTrigger value="transfer">Transfer</TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="runs">
+        <TabsList>
+          <TabsTrigger value="runs">Runs</TabsTrigger>
+          <TabsTrigger value="transfer">Transfer</TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="runs" className="space-y-3">
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={saveCurrent} disabled={busy}>
-                Save current run
-              </Button>
-              <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
-                <Download aria-hidden="true" />
-                Export all
-              </Button>
-            </div>
+        <TabsContent value="runs" className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={saveCurrent} disabled={busy}>
+              Save current run
+            </Button>
+            <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
+              <Download aria-hidden="true" />
+              Export all
+            </Button>
+          </div>
 
-            {runs.length === 0 ? (
-              <p className="rounded-app border border-dashed border-line px-4 py-6 text-center text-sm text-muted-foreground">
-                Nothing saved yet. Build a model, run it, then save it here.
-              </p>
-            ) : (
-              <ScrollArea className="max-h-72">
-                <ul className="space-y-2 pr-3">
-                  {runs.map((run) => (
-                    <li
-                      key={run.id}
-                      className="flex items-center justify-between gap-3 rounded-app border border-line p-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-medium">{run.name}</p>
-                        <p className="font-mono-nums text-xs text-muted-foreground">
-                          {run.floors} floors · {formatMm(run.maxDisp * M2S_TO_MM)} mm ·{' '}
-                          {(run.maxDriftRatio * 100).toFixed(2)} % drift ·{' '}
-                          {new Date(run.createdAt).toLocaleString()}
-                        </p>
-                        {run.appVersion !== APP_VERSION ? (
-                          <p className="text-xs text-accent-yellow-text">
-                            Saved by version {run.appVersion}
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="flex shrink-0 gap-1">
-                        <Button size="sm" variant="outline" onClick={() => load(run.id)}>
-                          Load
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          onClick={() => remove(run.id)}
-                          aria-label={`Delete ${run.name}`}
-                        >
-                          <Trash2 aria-hidden="true" />
-                        </Button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              </ScrollArea>
-            )}
-          </TabsContent>
-
-          <TabsContent value="transfer" className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Export writes every saved run to one JSON file. Import reads that file back. Files are
-              checked before anything is saved.
+          {runs.length === 0 ? (
+            <p className="rounded-app border border-dashed border-line px-4 py-6 text-center text-sm text-muted-foreground">
+              Nothing saved yet. Build a model, run it, then save it here.
             </p>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
-                <Download aria-hidden="true" />
-                Export all runs
-              </Button>
-              <label className="inline-flex cursor-pointer items-center gap-2 rounded-app border border-line px-3 py-2 text-sm hover:bg-surface-2">
-                <Upload aria-hidden="true" className="size-4" />
-                Import from file
-                <input
-                  type="file"
-                  accept="application/json,.json"
-                  className="sr-only"
-                  disabled={busy}
-                  onChange={(event) => {
-                    void importFile(event.target.files?.[0]);
-                    event.target.value = '';
-                  }}
-                />
-              </label>
-            </div>
-          </TabsContent>
-        </Tabs>
+          ) : (
+            <ScrollArea className="max-h-72">
+              <ul className="space-y-2 pr-3">
+                {runs.map((run) => (
+                  <li
+                    key={run.id}
+                    className="flex items-center justify-between gap-3 rounded-app border border-line p-3"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{run.name}</p>
+                      <p className="font-mono-nums text-xs text-muted-foreground">
+                        {run.floors} floors · {formatMm(run.maxDisp * M2S_TO_MM)} mm ·{' '}
+                        {(run.maxDriftRatio * 100).toFixed(2)} % drift ·{' '}
+                        {new Date(run.createdAt).toLocaleString()}
+                      </p>
+                      {run.appVersion !== APP_VERSION ? (
+                        <p className="text-xs text-accent-yellow-text">
+                          Saved by version {run.appVersion}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="flex shrink-0 gap-1">
+                      <Button size="sm" variant="outline" onClick={() => load(run.id)}>
+                        Load
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => remove(run.id)}
+                        aria-label={`Delete ${run.name}`}
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </ScrollArea>
+          )}
+        </TabsContent>
 
-        {status ? (
-          <p
-            role="status"
-            className={`rounded-app px-3 py-2 text-sm ${
-              status.tone === 'error'
-                ? 'bg-danger/10 text-danger'
-                : status.tone === 'warn'
-                  ? 'bg-warning-bg text-warning-text'
-                  : 'bg-surface-2 text-muted-foreground'
-            }`}
-          >
-            {status.message}
+        <TabsContent value="transfer" className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Export writes every saved run to one JSON file. Import reads that file back. Files are
+            checked before anything is saved.
           </p>
-        ) : null}
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
+              <Download aria-hidden="true" />
+              Export all runs
+            </Button>
+            <label className="inline-flex cursor-pointer items-center gap-2 rounded-app border border-line px-3 py-2 text-sm hover:bg-surface-2">
+              <Upload aria-hidden="true" className="size-4" />
+              Import from file
+              <input
+                type="file"
+                accept="application/json,.json"
+                className="sr-only"
+                disabled={busy}
+                onChange={(event) => {
+                  void importFile(event.target.files?.[0]);
+                  event.target.value = '';
+                }}
+              />
+            </label>
+          </div>
+        </TabsContent>
+      </Tabs>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      {status ? (
+        <p
+          role="status"
+          className={`rounded-app px-3 py-2 text-sm ${
+            status.tone === 'error'
+              ? 'bg-danger/10 text-danger'
+              : status.tone === 'warn'
+                ? 'bg-warning-bg text-warning-text'
+                : 'bg-surface-2 text-muted-foreground'
+          }`}
+        >
+          {status.message}
+        </p>
+      ) : null}
+
+      <DialogFooter>
+        <Button variant="ghost" onClick={() => onOpenChange(false)}>
+          Close
+        </Button>
+      </DialogFooter>
+    </DialogContent>
   );
 }
 

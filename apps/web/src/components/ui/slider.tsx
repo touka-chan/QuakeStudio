@@ -3,37 +3,28 @@ import { cn } from '@/lib/utils';
 import { Slider as SliderPrimitive } from 'radix-ui';
 
 /**
- * Props that must reach the Thumb, not the Root.
+ * ARIA props that belong on the Thumb, never on the Root.
  *
- * Radix puts `role="slider"` on the Thumb. An aria-label passed to Root
- * therefore never becomes the thumb's accessible name, and a screen reader
- * announces an unlabelled slider. Forwarding these is not cosmetic — it is
- * the difference between a usable and an unusable control.
+ * Radix puts `role="slider"` on the Thumb, so the accessible name and the
+ * value live there. An aria-label passed to Root does not become the thumb's
+ * name — a screen reader announces an unlabelled slider.
+ *
+ * They are pulled OUT of the props spread onto Root for a second reason:
+ * `aria-valuetext` is only valid on an element that has a role, and Root has
+ * none. Leaving it there is a critical ARIA violation — axe flags it, and
+ * assistive technology may ignore it entirely.
  */
-function thumbA11yProps(props: React.ComponentProps<typeof SliderPrimitive.Root>) {
-  const {
-    'aria-label': ariaLabel,
-    'aria-labelledby': ariaLabelledBy,
-    'aria-valuetext': ariaValueText,
-    'aria-describedby': ariaDescribedBy,
-    id,
-  } = props;
-
-  return {
-    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
-    ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
-    ...(ariaValueText ? { 'aria-valuetext': ariaValueText } : {}),
-    ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
-    ...(id ? { id } : {}),
-  };
-}
-
 function Slider({
   className,
   defaultValue,
   value,
   min = 0,
   max = 100,
+  'aria-label': ariaLabel,
+  'aria-labelledby': ariaLabelledBy,
+  'aria-valuetext': ariaValueText,
+  'aria-describedby': ariaDescribedBy,
+  id,
   ...props
 }: React.ComponentProps<typeof SliderPrimitive.Root>) {
   const _values = React.useMemo(
@@ -41,7 +32,16 @@ function Slider({
     [value, defaultValue, min, max],
   );
 
-  const thumbProps = thumbA11yProps(props);
+  /* Only include a key when it was actually passed. Sending these to both Root
+   * and Thumb would put the same id on two elements, which is its own
+   * violation and makes the label resolve unpredictably. */
+  const thumbProps = {
+    ...(ariaLabel ? { 'aria-label': ariaLabel } : {}),
+    ...(ariaLabelledBy ? { 'aria-labelledby': ariaLabelledBy } : {}),
+    ...(ariaValueText ? { 'aria-valuetext': ariaValueText } : {}),
+    ...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {}),
+    ...(id ? { id } : {}),
+  };
 
   return (
     <SliderPrimitive.Root
