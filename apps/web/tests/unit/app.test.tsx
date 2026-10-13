@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -40,9 +40,15 @@ beforeEach(() => {
   document.documentElement.classList.remove('dark');
   useConfigStore.setState({
     building: DEFAULT_BUILDING_CONFIG,
+    compareBuilding: DEFAULT_BUILDING_CONFIG,
     templateId: DEFAULT_BUILDING_CONFIG.id,
     activeFloor: null,
   });
+  // Zustand stores are module-level singletons, so a test that switches
+  // comparison on leaks into the next one. Without this reset the comparison
+  // tests pass in isolation and fail in a file — which is the worst way for a
+  // test to be wrong.
+  useCompareStore.setState({ enabled: false, editing: 'B' });
 });
 
 describe('theme selection', () => {
@@ -291,6 +297,32 @@ describe('results panel', () => {
     expect(legend?.textContent).not.toMatch(/safe|unsafe|danger|fail|collapse/i);
   });
 
+  it('keeps saying which building is being edited', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    await user.click(screen.getByRole('button', { name: /compare with another building/i }));
+
+    // The A/B switcher lives inside the scroll area and scrolls out of view;
+    // the indicator above it must not. Found by the heuristic evaluation (H6).
+    const heading = () => screen.getByText(/^Editing$/i);
+    expect(heading()).toBeInTheDocument();
+
+    const panel = screen.getByRole('complementary', { name: /controls/i });
+    const header = () => within(panel).getByRole('status');
+
+    // Comparison starts on side B, which `diversifyB` has made a different
+    // building — so the header must name B and describe B, not A.
+    expect(header()).toHaveTextContent(/Editing\s*B/);
+    expect(header()).toHaveTextContent(/10-story steel/);
+
+    // And it follows the switch — a label that renders once and never updates
+    // would be worse than none at all, because it would be confidently wrong.
+    await user.click(screen.getByRole('radio', { name: /^Building A:/ }));
+    await waitFor(() => expect(header()).toHaveTextContent(/Editing\s*A/));
+    expect(header()).toHaveTextContent(/5-story concrete/);
+  });
+
   it('offers comparison, and B starts as a different building', async () => {
     const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
@@ -309,7 +341,14 @@ describe('results panel', () => {
 
   it('uses ONE earthquake for both sides', () => {
     render(<AppShell forceDesktopLayout />);
-    act(() => useCompareStore.getState().enable());
+    act(() => {
+      useCompareStore.getState().enable();
+      // `enable()` alone leaves B as a copy of A. `diversifyB()` is what the
+      // compare toggle calls in the app, and without it the "different id"
+      // assertion below only passed because an earlier test had leaked a
+      // modified B into the store.
+      useCompareStore.getState().diversifyB();
+    });
 
     const { building, compareBuilding, motion } = useConfigStore.getState();
     // There is a single `motion` in the store, so the shaking cannot differ
@@ -317,6 +356,13 @@ describe('results panel', () => {
     expect(compareBuilding).toBeDefined();
     expect(motion.pgaG).toBeGreaterThan(0);
     expect(building.id).not.toBe(compareBuilding.id);
+
+    // And it STAYS shared. Editing one side's structure must not fork the
+    // motion object; if it ever did, the two buildings would be compared
+    // under different earthquakes and the whole comparison would be void.
+    act(() => useConfigStore.getState().setCompareBuilding({ floors: 12 }));
+    expect(useConfigStore.getState().motion).toBe(motion);
+    expect(useConfigStore.getState().compareBuilding.floors).toBe(12);
   });
 
   /**

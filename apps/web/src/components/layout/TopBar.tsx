@@ -1,5 +1,14 @@
 import { useEffect, useState } from 'react';
-import { Download, Info, PanelLeftClose, PanelLeftOpen, Save, Sun, Moon } from 'lucide-react';
+import {
+  ClipboardList,
+  Download,
+  Info,
+  PanelLeftClose,
+  PanelLeftOpen,
+  Save,
+  Sun,
+  Moon,
+} from 'lucide-react';
 
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { AssumptionsDialog } from './AssumptionsDialog';
@@ -32,6 +41,7 @@ export function TopBar({
   panelOpen,
   assumptionsOpen,
   onAssumptionsOpenChange,
+  onOpenFeedback,
 }: {
   onTogglePanel: () => void;
   panelOpen: boolean;
@@ -43,6 +53,7 @@ export function TopBar({
    */
   assumptionsOpen: boolean;
   onAssumptionsOpenChange: (open: boolean) => void;
+  onOpenFeedback: () => void;
 }) {
   /*
    * The dialogs live HERE, beside their trigger buttons, rather than in the
@@ -147,6 +158,18 @@ export function TopBar({
 
           <AssumptionsDialog />
         </Dialog>
+
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button variant="ghost" size="sm" onClick={onOpenFeedback}>
+              <ClipboardList aria-hidden="true" />
+              <span className="hidden lg:inline">Feedback</span>
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-xs text-xs">
+            Ten usability questions. Answers stay in this browser until you export them.
+          </TooltipContent>
+        </Tooltip>
 
         <Separator orientation="vertical" className="hidden h-6 md:block" />
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { LazyFeedback } from '@/feedback/LazyFeedback';
 import { cn } from '@/lib/utils';
 import { useIsDesktop } from '@/lib/useMediaQuery';
 import { ControlsPanel } from './ControlsPanel';
@@ -31,6 +32,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
   const [tab, setTab] = useState<MobileTab>('build');
   const [panelOpen, setPanelOpen] = useState(false);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);
 
   return (
@@ -41,6 +43,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
           panelOpen={panelOpen}
           assumptionsOpen={assumptionsOpen}
           onAssumptionsOpenChange={setAssumptionsOpen}
+          onOpenFeedback={() => setFeedbackOpen(true)}
         />
 
         {/* Desktop: three zones side by side.
@@ -94,6 +97,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
         <PlaybackClock />
 
         <FirstRunDialog onOpenAssumptions={() => setAssumptionsOpen(true)} />
+        <LazyFeedback open={feedbackOpen} onOpenChange={setFeedbackOpen} />
       </div>
     </TooltipProvider>
   );

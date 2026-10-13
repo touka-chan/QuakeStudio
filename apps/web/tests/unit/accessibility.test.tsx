@@ -157,6 +157,28 @@ describe('accessibility', () => {
     expect(within(dialog).getByText('What this is')).toBeInTheDocument();
   });
 
+  it('the usability feedback dialog has no violations', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    await user.click(screen.getByRole('button', { name: /feedback/i }));
+    const dialog = await screen.findByRole('dialog');
+
+    const results = await audit(dialog);
+    expect(describeViolations(results)).toBe('');
+    expect(results.violations).toHaveLength(0);
+
+    // Every scale must be a labelled radio group. A ten-row grid of unnamed
+    // inputs is unusable with a screen reader, and axe cannot tell that the
+    // rows correspond to the questions above them.
+    const groups = within(dialog).getAllByRole('radiogroup');
+    expect(groups).toHaveLength(10);
+    for (const group of groups) {
+      expect(group).toHaveAccessibleName();
+      expect(within(group).getAllByRole('radio')).toHaveLength(5);
+    }
+  });
+
   it('comparison mode has no violations', async () => {
     // Seeded BEFORE rendering. Rendering twice leaves two shells in the
     // document, which axe correctly reports as duplicate landmarks.

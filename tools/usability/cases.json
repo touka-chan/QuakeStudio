@@ -1,0 +1,186 @@
+{
+  "instrument": "System Usability Scale — Brooke (1996), Bangor, Kortum & Miller (2008)",
+  "scoring": "odd items score value-1; even items score 5-value; sum x 2.5",
+  "cases": [
+    {
+      "id": "all-1",
+      "why": "Every answer at the bottom of the scale.",
+      "answers": {
+        "1": 1,
+        "2": 1,
+        "3": 1,
+        "4": 1,
+        "5": 1,
+        "6": 1,
+        "7": 1,
+        "8": 1,
+        "9": 1,
+        "10": 1
+      },
+      "tsScore": 50,
+      "raw": 20
+    },
+    {
+      "id": "all-5",
+      "why": "Every answer at the top of the scale.",
+      "answers": {
+        "1": 5,
+        "2": 5,
+        "3": 5,
+        "4": 5,
+        "5": 5,
+        "6": 5,
+        "7": 5,
+        "8": 5,
+        "9": 5,
+        "10": 5
+      },
+      "tsScore": 50,
+      "raw": 20
+    },
+    {
+      "id": "all-3",
+      "why": "Fully neutral. Must score exactly 50.",
+      "answers": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3,
+        "10": 3
+      },
+      "tsScore": 50,
+      "raw": 20
+    },
+    {
+      "id": "odd-high-even-low",
+      "why": "Odd items 5, even items 1 — the maximum, 100.",
+      "answers": {
+        "1": 5,
+        "2": 1,
+        "3": 5,
+        "4": 1,
+        "5": 5,
+        "6": 1,
+        "7": 5,
+        "8": 1,
+        "9": 5,
+        "10": 1
+      },
+      "tsScore": 100,
+      "raw": 40
+    },
+    {
+      "id": "odd-low-even-high",
+      "why": "Odd items 1, even items 5 — the minimum, 0.",
+      "answers": {
+        "1": 1,
+        "2": 5,
+        "3": 1,
+        "4": 5,
+        "5": 1,
+        "6": 5,
+        "7": 1,
+        "8": 5,
+        "9": 1,
+        "10": 5
+      },
+      "tsScore": 0,
+      "raw": 0
+    },
+    {
+      "id": "reversed-items-disagree",
+      "why": "The trap. Items 8 and 10 disagree with their parity peers, so a scorer that follows the WORDING rather than the item number scores this wrong.",
+      "answers": {
+        "1": 1,
+        "2": 5,
+        "3": 1,
+        "4": 5,
+        "5": 1,
+        "6": 5,
+        "7": 1,
+        "8": 5,
+        "9": 1,
+        "10": 5
+      },
+      "tsScore": 0,
+      "raw": 0
+    },
+    {
+      "id": "reversed-items-alone",
+      "why": "Only items 8 and 10 answered differently; isolates the two reversed items.",
+      "answers": {
+        "1": 3,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 5,
+        "9": 3,
+        "10": 1
+      },
+      "tsScore": 50,
+      "raw": 20
+    },
+    {
+      "id": "realistic-mixed",
+      "why": "A plausible set of answers, not uniform — closer to what a person produces.",
+      "answers": {
+        "1": 5,
+        "2": 2,
+        "3": 4,
+        "4": 2,
+        "5": 4,
+        "6": 3,
+        "7": 2,
+        "8": 4,
+        "9": 4,
+        "10": 3
+      },
+      "tsScore": 62.5,
+      "raw": 25
+    },
+    {
+      "id": "single-step-above-neutral",
+      "why": "Everything at 3 except item 1 at 4 — the smallest possible positive score.",
+      "answers": {
+        "1": 4,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3,
+        "10": 3
+      },
+      "tsScore": 52.5,
+      "raw": 21
+    },
+    {
+      "id": "single-step-below-neutral",
+      "why": "Everything at 3 except item 1 at 2 — the smallest possible negative score.",
+      "answers": {
+        "1": 2,
+        "2": 3,
+        "3": 3,
+        "4": 3,
+        "5": 3,
+        "6": 3,
+        "7": 3,
+        "8": 3,
+        "9": 3,
+        "10": 3
+      },
+      "tsScore": 47.5,
+      "raw": 19
+    }
+  ]
+}

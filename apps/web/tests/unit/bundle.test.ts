@@ -86,6 +86,22 @@ describe('bundle budget', () => {
     expect(deferred.some((name) => name.startsWith('Charts-'))).toBe(true);
   });
 
+  it('keeps the usability questionnaire out of the entry chunk', () => {
+    /*
+     * The Feedback dialog is a study instrument, not a feature anyone using
+     * the simulator for a seismic design exercise will open. Left in the entry
+     * bundle it added ~4 KB gzipped of form controls that every real visitor
+     * pays for and nobody spends.
+     *
+     * Small enough that the total-budget test above would not notice, which is
+     * exactly why this needs its own assertion — same failure mode as the two
+     * chunks above.
+     */
+    const deferred = deferredChunks().map((name) => name);
+
+    expect(deferred.some((name) => name.startsWith('FeedbackDialog-'))).toBe(true);
+  });
+
   it('emits the simulation worker as its own small chunk', () => {
     // The engine runs off the main thread; if it were inlined it would block
     // the UI, which is the whole reason it is a worker.

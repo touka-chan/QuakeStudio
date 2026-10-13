@@ -26,54 +26,88 @@ export function ControlsPanel() {
   const compareBuilding = useConfigStore((s) => s.compareBuilding);
 
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-6 p-4">
-        {compareEnabled ? (
-          <CompareSwitcher
-            editing={editing}
-            onChange={setEditing}
-            nameA={describeBuilding(building)}
-            nameB={describeBuilding(compareBuilding)}
-          />
-        ) : (
-          <TemplatePicker />
-        )}
+    <>
+      {/*
+        Outside the ScrollArea on purpose.
 
-        <Separator />
-
-        <ControlGroup
-          step="Step 1"
-          title={compareEnabled ? `Building ${editing}` : 'Building'}
-          description="Shape and materials of the building."
+        The A/B switcher scrolls away with the rest of the panel, and the
+        building group heading only says "Building B" while that group is in
+        view. A user who scrolls down to the earthquake settings, changes a
+        slider, and scrolls back up had no way to tell which building they had
+        just edited — and comparison mode exists precisely to compare two
+        buildings. Found by the heuristic evaluation
+        (docs/heuristic-evaluation.md, H6).
+      */}
+      {compareEnabled ? (
+        <div
+          className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2"
+          // Announces the switch, so a screen-reader user learns that the
+          // controls below now target the other building.
+          role="status"
+          aria-live="polite"
         >
-          <BuildingControls side={compareEnabled ? editing : 'A'} />
-        </ControlGroup>
+          <span className="text-xs tracking-wide text-muted-foreground uppercase">Editing</span>
+          <span
+            className="grid size-5 place-items-center rounded text-xs font-semibold text-white"
+            style={{ backgroundColor: editing === 'A' ? 'var(--series-a)' : 'var(--series-b)' }}
+          >
+            {editing}
+          </span>
+          <span className="min-w-0 truncate text-sm">
+            {editing === 'A' ? describeBuilding(building) : describeBuilding(compareBuilding)}
+          </span>
+        </div>
+      ) : null}
 
-        <Separator />
+      <ScrollArea className="h-full">
+        <div className="space-y-6 p-4">
+          {compareEnabled ? (
+            <CompareSwitcher
+              editing={editing}
+              onChange={setEditing}
+              nameA={describeBuilding(building)}
+              nameB={describeBuilding(compareBuilding)}
+            />
+          ) : (
+            <TemplatePicker />
+          )}
 
-        <ControlGroup
-          step="Step 2"
-          title="Earthquake"
-          description="How strong the ground shakes, and for how long."
-        >
-          <EarthquakeControls />
-        </ControlGroup>
+          <Separator />
 
-        <Separator />
+          <ControlGroup
+            step="Step 1"
+            title={compareEnabled ? `Building ${editing}` : 'Building'}
+            description="Shape and materials of the building."
+          >
+            <BuildingControls side={compareEnabled ? editing : 'A'} />
+          </ControlGroup>
 
-        <ControlGroup
-          step="Step 3"
-          title="Site & ground"
-          description="Soil, foundation and distance to the fault change how strongly a building feels the shaking. These need engineering approval before they can be included."
-          disabled
-        >
-          <p className="rounded-app border border-dashed border-line bg-surface-2 px-3 py-2.5 text-xs text-muted-foreground">
-            Soil, foundation and fault distance are planned for a later version. They need to be
-            reviewed by the engineering adviser first.
-          </p>
-        </ControlGroup>
-      </div>
-    </ScrollArea>
+          <Separator />
+
+          <ControlGroup
+            step="Step 2"
+            title="Earthquake"
+            description="How strong the ground shakes, and for how long."
+          >
+            <EarthquakeControls />
+          </ControlGroup>
+
+          <Separator />
+
+          <ControlGroup
+            step="Step 3"
+            title="Site & ground"
+            description="Soil, foundation and distance to the fault change how strongly a building feels the shaking. These need engineering approval before they can be included."
+            disabled
+          >
+            <p className="rounded-app border border-dashed border-line bg-surface-2 px-3 py-2.5 text-xs text-muted-foreground">
+              Soil, foundation and fault distance are planned for a later version. They need to be
+              reviewed by the engineering adviser first.
+            </p>
+          </ControlGroup>
+        </div>
+      </ScrollArea>
+    </>
   );
 }
 
@@ -103,8 +137,14 @@ function CompareSwitcher({
 
   return (
     <div>
+      {/*
+        "Switch", not "Editing". The sticky header above already says
+        "Editing B", and two labels reading the same word in one panel is
+        noise — worse, it makes the indicator's state ambiguous: a user cannot
+        tell which one is the live answer.
+      */}
       <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        Editing
+        Switch
       </p>
       <div role="radiogroup" aria-label="Which building to edit" className="flex gap-1">
         {sides.map((side) => {

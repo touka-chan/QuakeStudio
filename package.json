@@ -24,6 +24,8 @@
     "validate:constants": "tsx --tsconfig apps/web/tsconfig.app.json reference/export-constants.ts",
     "validate:ts": "tsx --tsconfig apps/web/tsconfig.app.json reference/run-ts-engine.ts",
     "validate:python": "python reference/python/compare.py",
+    "usability:cases": "tsx --tsconfig apps/web/tsconfig.app.json tools/usability/cross-check.ts > tools/usability/cases.json",
+    "usability:cross-check": "npm run usability:cases && python tools/usability/cross-check.py tools/usability/cases.json",
     "validate": "npm run validate:constants && npm run validate:ts && npm run validate:python"
   },
   "devDependencies": {
