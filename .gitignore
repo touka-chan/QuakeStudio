@@ -69,3 +69,6 @@ reference/ts-results.json
 
 # TypeScript
 *.tsbuildinfo
+# Screenshots from 
+pm run android:audit.
+apps/web/android/app-audit/
