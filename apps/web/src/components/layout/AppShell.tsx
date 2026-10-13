@@ -10,9 +10,7 @@ import { PlaybackBar } from './PlaybackBar';
 import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
 import { TopBar } from './TopBar';
-import { CompareViewport } from '@/components/viewport/CompareViewport';
-import { Viewport } from '@/components/viewport/Viewport';
-import { useCompareStore } from '@/store/compareStore';
+import { LazyViewport } from '@/components/viewport/LazyViewport';
 
 /* =========================================================================
    App shell — the three-zone workspace.
@@ -33,7 +31,6 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
   const [tab, setTab] = useState<MobileTab>('build');
   const [panelOpen, setPanelOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);
-  const compareEnabled = useCompareStore((s) => s.enabled);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -63,7 +60,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
           {(isDesktop || tab === 'simulate') && (
             <main className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Simulation viewport">
               <div className="min-h-0 flex-1">
-                {compareEnabled ? <CompareViewport /> : <Viewport />}
+                <LazyViewport />
               </div>
               <PlaybackBar />
             </main>

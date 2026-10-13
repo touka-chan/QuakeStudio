@@ -2,11 +2,9 @@ import { Columns2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ComparisonChart } from '@/components/charts/ComparisonChart';
 import { ComparisonTable } from '@/components/charts/ComparisonTable';
-import { DisplacementChart } from '@/components/charts/DisplacementChart';
+import { LazyCharts } from '@/components/charts/LazyCharts';
 import { MetricCard } from '@/components/charts/MetricCard';
-import { PeakByFloorChart } from '@/components/charts/PeakByFloorChart';
 import { formatMm, formatPct } from '@/lib/utils';
 import { useCompareStore, defaultCompareBuilding } from '@/store/compareStore';
 import { useConfigStore, resolveNow } from '@/store/configStore';
@@ -107,11 +105,11 @@ export function ResultsPanel() {
           />
         </div>
 
-        <DisplacementChart />
-        <PeakByFloorChart />
+        <LazyCharts />
 
+        {/* The table stays eager: it carries the numbers, and there is nothing
+            to gain by deferring it. */}
         <ComparisonTable />
-        <ComparisonChart />
 
         <div className="space-y-2">
           <Button
