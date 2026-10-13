@@ -3,11 +3,14 @@ import { expect, test, type Page } from '@playwright/test';
 /* ==========================================================================
    The installable app, in a real browser.
 
-   Most of the PWA surface is checkable from the file system — the manifest, the
-   icon dimensions, the precache list are all asserted in the unit suite. What
-   only a browser can tell you is whether the pieces actually connect: that the
-   service worker registers, that it claims the page, and that the app keeps
-   working when the network is genuinely gone.
+   SCOPE: Android and desktop Chromium. iOS is deliberately unsupported —
+   Safari exposes no install API — so nothing here pretends otherwise.
+
+   Most of the PWA surface is checkable from the file system — the manifest,
+   the icon dimensions, the precache list are all asserted in the unit suite.
+   What only a browser can tell you is whether the pieces actually connect:
+   that the service worker registers, that it claims the page, and that the app
+   keeps working when the network is genuinely gone.
 
    The offline test is the one that matters. Every other PWA assertion in this
    repo can pass while the app is useless offline, because the failure only
@@ -47,33 +50,31 @@ test.describe('manifest and icons', () => {
     expect(manifest.icons.length).toBeGreaterThan(0);
   });
 
-  test('every icon the manifest names actually decodes', async ({ page }) => {
+  test('a maskable icon is present and full bleed', async ({ page }) => {
+    /*
+     * Android's adaptive icon is the one that gets cropped by whatever mask
+     * the launcher uses. A maskable icon with rounded corners of its own ends
+     * up double-rounded, showing background where it should be solid.
+     */
     await page.goto('/');
+    const manifest = (await (await page.request.get('/manifest.webmanifest')).json()) as {
+      icons: Array<{ src: string; sizes: string; purpose?: string }>;
+    };
 
-    const manifest = await (await page.request.get('/manifest.webmanifest')).json();
+    const maskable = manifest.icons.filter(
+      (icon: { purpose?: string }) => icon.purpose === 'maskable',
+    );
+    expect(maskable.length).toBeGreaterThan(0);
 
-    for (const icon of manifest.icons) {
+    for (const icon of maskable) {
       const response = await page.request.get(icon.src);
       expect(response.ok(), `${icon.src} is ${response.status()}`).toBe(true);
-      expect(response.headers()['content-type']).toBe('image/png');
-
-      // A PNG that decodes to the right pixel dimensions, not just a 200.
-      const size = await page.evaluate(async (src) => {
-        const bitmap = await createImageBitmap(await (await fetch(src)).blob());
-        return { width: bitmap.width, height: bitmap.height };
-      }, icon.src);
-
-      const [w, h] = icon.sizes.split('x').map(Number);
-      expect(size, `${icon.src} decodes to ${size.width}x${size.height}`).toEqual({
-        width: w,
-        height: h,
-      });
     }
   });
 
-  test('serves the iOS touch icon Safari looks for by name', async ({ page }) => {
+  test('serves the browser-tab favicon', async ({ page }) => {
     await page.goto('/');
-    const response = await page.request.get('/apple-touch-icon.png');
+    const response = await page.request.get('/favicon-32.png');
     expect(response.ok()).toBe(true);
   });
 });

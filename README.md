@@ -71,33 +71,41 @@ from what the engine actually runs.
 
 ## Installing it as an app
 
-QuakeStudio is an installable **Progressive Web App**. Open it on a phone,
-tablet or laptop and it can be added to the home screen, where it opens
-full-screen with its own icon and — this is the useful part for a student in a
-basement lab — **works with no signal at all**.
+QuakeStudio is an installable **Progressive Web App** on **Android and desktop
+Chromium**. Open it on a phone, tablet or laptop and it can be added to the home
+screen, where it opens full-screen with its own icon and — this is the useful
+part for a student in a basement lab — **works with no signal at all**.
 
 That is not a degraded offline mode. There is no server call anywhere in the
 app: mass, stiffness, damping, the Newmark integration and the Cholesky solve
 all happen on the device, so the only thing the network provides is the
 download.
 
-| Platform | How |
-|---|---|
-| Android / desktop Chrome, Edge | The **Install app** button in the top bar |
-| iOS Safari | No install API exists. Share → **Add to Home Screen**. The button gives the same three steps |
+**Android** gets a real one-click install: the **Install app** button in the top
+bar, driven by Chromium's `beforeinstallprompt`.
 
-Two platform quirks are handled and worth knowing about:
+**iOS is not supported, on purpose.** Safari exposes no install API at all —
+there is no event to catch and nothing to call. The only route is a manual
+Share → Add to Home Screen action that a web page cannot perform. Shipping a
+button that opens a dialog explaining this would be worse than shipping
+nothing: it advertises an install the app cannot deliver.
 
-- **iOS ignores the manifest** for the home-screen icon and for full-screen
-  mode, so `index.html` carries the `apple-mobile-web-app-*` tags and a
-  separately generated `apple-touch-icon.png`.
+QuakeStudio still **works** in Safari as an ordinary web page. What is dropped is
+the promise that it can be installed there.
+
+Two Android-specific details worth knowing:
+
 - **A single `<meta name="theme-color">` gives a white status bar in dark
   mode.** There are two, one per `prefers-color-scheme`.
+- **The adaptive (maskable) icon is full bleed with the artwork inset.** A
+  maskable icon with rounded corners of its own gets double-rounded under the
+  launcher's mask, showing background where it should be solid. A unit test
+  decodes the actual corner pixels to keep that honest.
 
-The button is hidden entirely when the app is already installed, and on
-browsers that can never install it — a permanent dead button trains people to
-ignore the ones that work. See [`docs/performance.md`](docs/performance.md) for
-what the service worker precaches and how that is tested.
+The button is hidden entirely when the app is already installed, and in any
+browser that cannot install it — a permanent dead button trains people to ignore
+the ones that work. See [`docs/performance.md`](docs/performance.md) for what the
+service worker precaches and how that is tested.
 
 Regenerate the icons after changing the brand colour:
 
@@ -388,7 +396,7 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **362 tests** |
+| `npm test` | Vitest unit + component tests — **356 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
 | `npm run e2e` | Playwright end-to-end tests — **59 specs** |

@@ -156,13 +156,15 @@ describe('the web app manifest', () => {
     }
   });
 
-  it('ships the iOS touch icon, which iOS reads instead of the manifest', () => {
-    // Safari ignores manifest icons entirely for the home screen icon.
-    expect(() => readFileSync(join(PUBLIC_DIR, 'apple-touch-icon.png'))).not.toThrow();
-    expect(pngSize(join(PUBLIC_DIR, 'apple-touch-icon.png'))).toEqual({
-      width: 180,
-      height: 180,
-    });
+  it('ships no iOS-only assets', () => {
+    /*
+     * iOS install support is out of scope — Safari exposes no install API, so
+     * the only route is a manual Share-menu action the page cannot perform.
+     *
+     * A stray `apple-touch-icon.png` would do nothing at all except confuse
+     * whoever next reads the manifest and wonders why it is not listed.
+     */
+    expect(() => readFileSync(join(PUBLIC_DIR, 'apple-touch-icon.png'))).toThrow();
   });
 });
 
@@ -185,13 +187,23 @@ describe('the document head', () => {
     expect(html).toContain('(prefers-color-scheme: dark)');
   });
 
-  it('carries the iOS meta tags Safari needs to open full-screen', () => {
-    expect(html).toContain('apple-mobile-web-app-capable');
-    expect(html).toContain('apple-mobile-web-app-title');
-    expect(html).toContain('rel="apple-touch-icon"');
+  it('carries no iOS-only tags', () => {
+    /*
+     * iOS install support is out of scope, so none of these should be present.
+     * Leaving them behind would be worse than removing them: they make the app
+     * *look* installable on a platform where it is not, and no button ever
+     * appears to explain why. Better to leave no trace of the promise.
+     */
+    expect(html).not.toContain('apple-mobile-web-app');
+    expect(html).not.toContain('apple-touch-icon');
   });
 
-  it('sets viewport-fit=cover so a notched display does not clip the layout', () => {
-    expect(html).toMatch(/<meta[^>]+name="viewport"[^>]+viewport-fit=cover/);
+  it('does not set viewport-fit=cover', () => {
+    /*
+     * That was added for iOS notches. Without the iOS target there is no
+     * reason to extend the layout under a display cutout, and on Android it
+     * can push content under the status bar.
+     */
+    expect(html).not.toContain('viewport-fit=cover');
   });
 });

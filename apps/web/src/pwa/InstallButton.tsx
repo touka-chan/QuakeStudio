@@ -1,15 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Download, Share } from 'lucide-react';
+import { Download } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import {
   chromiumCanInstall,
   currentInstallState,
@@ -18,37 +10,28 @@ import {
 } from './install';
 
 /* =========================================================================
-   Installing QuakeStudio
+   Installing QuakeStudio — Android and desktop Chromium
    -------------------------------------------------------------------------
-   A PWA is only useful if people can find the install affordance, and the two
-   platforms need different ones:
+   One path, via Chromium's `beforeinstallprompt`. The browser fires this so the
+   app can suppress its own mini-infobar and offer the install somewhere useful;
+   holding the event and replaying it is what turns that into a real one-click
+   install.
 
-   • Chromium (Chrome, Edge, Android) fires `beforeinstallprompt`, which the
-     page can hold and replay. That gives a real one-click install.
+   The button is deliberately NOT shown when the app is already installed, and
+   NOT shown in a browser that can never install it — a permanent dead button
+   trains people to ignore the ones that work. The decision itself lives in
+   `./install`, where it is a pure function and is tested directly.
 
-   • iOS Safari has NO install API. There is no event to catch and nothing to
-     call. The only route is Share -> "Add to Home Screen", and iOS only
-     *sometimes* offers that menu item — not in every Safari version, not on
-     every iPad.
-
-   So the button does two different things depending on what the browser
-   supports, and says which one it is rather than failing quietly. A button
-   labelled "Install" that does nothing on a student's iPhone is worse than no
-   button at all.
-
-   It is deliberately NOT shown when the app is already installed, and NOT
-   shown to a browser that will never offer an install — a permanent dead
-   button trains people to ignore the ones that work. The decision itself
-   lives in `./install`, where it is a pure function and is tested directly.
+   iOS is out of scope on purpose: Safari exposes no install API, so the only
+   route is a manual Share-menu action this page cannot perform.
    ========================================================================== */
 
 export function InstallButton() {
-  // Lazily initialised from the environment rather than set in an effect:
-  // this is a one-time read, and setting state in an effect body would cost an
-  // extra render on every mount for a value that is already known.
+  // Lazily initialised from the environment rather than set in an effect: this
+  // is a one-time read, and setting state in an effect body would cost an extra
+  // render on every mount for a value that is already known.
   const [state, setState] = useState<InstallState>(currentInstallState);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
-  const [helpOpen, setHelpOpen] = useState(false);
 
   useEffect(() => {
     function onBeforeInstallPrompt(event: Event) {
@@ -59,7 +42,7 @@ export function InstallButton() {
        */
       event.preventDefault();
       setDeferred(event as BeforeInstallPromptEvent);
-      setState((current) => (current === 'ios-help' ? current : 'ready'));
+      setState('ready');
     }
 
     function onInstalled() {
@@ -69,9 +52,8 @@ export function InstallButton() {
 
     /*
      * `onbeforeinstallprompt` is not a real property until Chromium adds it, so
-     * it is feature-detected rather than assumed. `currentInstallState` cannot
-     * see the event before it fires — the property's existence is the only
-     * early signal there is.
+     * it is feature-detected rather than assumed. Its existence is the only
+     * early signal available — the event itself has not fired yet.
      */
     if (!chromiumCanInstall()) return undefined;
 
@@ -83,87 +65,24 @@ export function InstallButton() {
     };
   }, []);
 
-  if (state === 'unsupported') return null;
+  if (state !== 'ready' || !deferred) return null;
 
   async function install() {
-    if (state === 'ios-help') {
-      setHelpOpen(true);
-      return;
-    }
-    if (!deferred) return;
-
-    await deferred.prompt();
-    const { outcome } = await deferred.userChoice;
+    await deferred!.prompt();
+    const { outcome } = await deferred!.userChoice;
     /*
-     * A dismissal is not a failure — the user changed their mind. Leave the
-     * button up; hiding it after one "no" means a student who was interrupted
-     * can never install.
+     * A dismissal is not a failure — the user changed their mind. Leaving the
+     * button up is right here: there is no other install path to fall back to,
+     * so someone who was interrupted must still be able to install later.
      */
     if (outcome === 'accepted') setState('unsupported');
     setDeferred(null);
   }
 
   return (
-    <>
-      <Button variant="outline" size="sm" onClick={install}>
-        {state === 'ios-help' ? <Share aria-hidden="true" /> : <Download aria-hidden="true" />}
-        <span className="hidden lg:inline">Install app</span>
-      </Button>
-
-      {/* Beside its trigger, so Radix restores focus here on close. */}
-      <Dialog open={helpOpen} onOpenChange={setHelpOpen}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add QuakeStudio to your home screen</DialogTitle>
-            <DialogDescription>
-              iOS does not let a website install itself. It takes two taps from the Share menu.
-            </DialogDescription>
-          </DialogHeader>
-
-          <ol className="space-y-2.5 text-sm">
-            <li className="flex gap-3">
-              <Step number="1">
-                Tap the <strong>Share</strong> button in Safari’s toolbar — the square with an arrow
-                pointing up.
-              </Step>
-            </li>
-            <li className="flex gap-3">
-              <Step number="2">
-                Scroll down and tap <strong>Add to Home Screen</strong>.
-              </Step>
-            </li>
-            <li className="flex gap-3">
-              <Step number="3">
-                Tap <strong>Add</strong>. QuakeStudio opens full-screen from then on, and works with
-                no signal.
-              </Step>
-            </li>
-          </ol>
-
-          <p className="text-xs text-muted-foreground">
-            If you cannot see <em>Add to Home Screen</em> in the Share menu, it is not offered on
-            this browser — Safari on iPhone is the usual way in.
-          </p>
-
-          <DialogFooter>
-            <Button onClick={() => setHelpOpen(false)}>Got it</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
-
-function Step({ number, children }: { number: string; children: React.ReactNode }) {
-  return (
-    <>
-      <span
-        aria-hidden="true"
-        className="grid size-6 shrink-0 place-items-center rounded-full bg-surface-2 text-xs font-semibold"
-      >
-        {number}
-      </span>
-      <span>{children}</span>
-    </>
+    <Button variant="outline" size="sm" onClick={install}>
+      <Download aria-hidden="true" />
+      <span className="hidden lg:inline">Install app</span>
+    </Button>
   );
 }

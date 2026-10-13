@@ -418,10 +418,6 @@ const TARGETS = [
     safeScale: 0.72,
     rounded: false,
   },
-  // iOS uses this one, and IGNORES the manifest. It must exist as a file.
-  // iOS applies its own rounded mask, so it wants full bleed for the same
-  // reason Android does.
-  { file: 'apple-touch-icon.png', size: 180, purpose: 'any', rounded: false },
   { file: 'favicon-32.png', size: 32, purpose: 'any' },
 ];
 

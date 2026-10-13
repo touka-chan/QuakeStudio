@@ -137,7 +137,8 @@ chunk-separation check notices, which is why it exists.
 ## Offline
 
 A service worker precaches the whole build, so QuakeStudio works with no
-network at all. That is not a downgrade: every byte it needs is either in the
+network at all. Android and desktop Chromium; iOS install is out of scope
+because Safari exposes no install API. That is not a downgrade: every byte it needs is either in the
 repository or computed on the device, because there is no server call anywhere
 in the app. A student in a basement lab gets the full simulator.
 
