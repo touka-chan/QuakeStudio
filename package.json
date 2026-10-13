@@ -31,7 +31,8 @@
     "validate": "npm run validate:constants && npm run validate:ts && npm run validate:python",
     "android:sync": "npm run android:sync --workspace apps/web",
     "android:build": "node tools/android/build-apk.mjs --sync",
-    "android:build:release": "node tools/android/build-apk.mjs --release --sync"
+    "android:build:release": "node tools/android/build-apk.mjs --release --sync",
+    "android:smoke": "node tools/android/smoke-apk.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

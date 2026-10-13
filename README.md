@@ -77,7 +77,7 @@ Beyond the browser install, QuakeStudio builds as a **real Android package**:
 npm run android:build   # -> apps/web/android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**~4.8 MB, signed, and self-contained** — every asset is bundled inside it, so
+Verified running on an Android emulator: WebGL live, simulation worker\ncomputing, no crashes. See pm run android:smoke below.\n\n**~4.8 MB, signed, and self-contained** — every asset is bundled inside it, so
 it works on a phone in aeroplane mode with no server and no network. Copy the
 file to a phone, open it, allow "install from unknown sources", done.
 
@@ -435,6 +435,7 @@ Run from the repository root.
 | `npm run pwa:icons` | Regenerate the web AND Android launcher icons |
 | `npm run android:build` | Build the sideloadable Android APK |
 | `npm run android:build:release` | Unsigned release APK (needs a keystore) |
+| `npm run android:smoke` | Install on a device and assert it actually runs |
 | `npm run validate` | Cross-check the engine against the Python reference |
 | `npm run usability:cross-check` | Cross-check the SUS scorer against Python |
 

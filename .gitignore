@@ -55,6 +55,11 @@ Thumbs.db
 # Tooling artifacts
 .openchamber/
 
+# Android
+# Screenshots from `npm run android:smoke`. They are a by-product of running
+# the APK, not source, and they are regenerated every time anyone does it.
+apps/web/android/app-smoke/
+
 # Validation artifacts
 # constants.json IS committed — it is the single shared set of engineering
 # numbers, and the adviser should be able to read exactly what both

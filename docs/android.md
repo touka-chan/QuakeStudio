@@ -58,6 +58,63 @@ What this buys:
 
 ---
 
+## Verifying it actually works
+
+Building is not the same as running. Everything that can break in a Capacitor
+WebView breaks *after* the build — WebGL failing to initialise, the Web Worker
+never loading, a lazy chunk 404ing from the local asset loader. None of that is
+visible in any other test in this repository.
+
+```bash
+npm run android:smoke     # needs a running device or emulator
+```
+
+That installs the APK, launches it, and asserts:
+
+| Check | What it catches |
+|---|---|
+| Process starts | Crash on launch |
+| First-run gate clears | Dialog that cannot be dismissed on a phone |
+| `<canvas>` has a live WebGL context | 3D viewport rendering nothing |
+| A displacement in mm appears | **The Web Worker not running** |
+| Disclaimer and exaggeration caveat present | The honesty copy going missing |
+| No fatal or uncaught JS in logcat | Anything above, in a readable form |
+
+Verified on a Pixel 6 AVD (Android 17, 1080×2400):
+
+```
+PASS — installed, launched, WebGL live, worker computed, no crashes.
+canvas 822x859, WebGL context live
+peak displacement 192.6 mm
+drift 1.88 %
+```
+
+Those figures match the project's documented defaults, which is the useful
+part: the engine produced the same numbers inside a phone WebView as it does in
+a browser.
+
+**It checks the app RUNS, not that the numbers are right.** Correctness is
+`npm run validate`, against the independent Python reference.
+
+### It drives the DOM, not the screen
+
+The first version of this script tapped hard-coded coordinates and reported
+PASS while capturing four screenshots of a stale session. `pm clear` wipes data
+but does not kill a running process, so `am start` simply foregrounded the app
+where it already was.
+
+The second version force-stopped properly, tapped coordinates, and reported
+PASS again — because the taps merely toggled a checkbox. Every "navigation"
+screenshot was still the first-run dialog. The screens differed, so a "did
+anything change?" check passed too.
+
+A debug APK exposes a WebView devtools socket, so the script now speaks the
+Chrome DevTools Protocol: it clicks real elements and asserts on the real DOM.
+No pixel guessing, and a missed step fails loudly instead of producing four
+confident, meaningless screenshots.
+
+---
+
 ## Two things that will bite you
 
 ### 1. The service worker is switched OFF inside the APK
