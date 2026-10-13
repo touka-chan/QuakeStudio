@@ -21,6 +21,8 @@
     "test:watch": "vitest",
     "e2e": "npm run e2e --workspace apps/web",
     "e2e:install": "npm run e2e:install --workspace apps/web",
+    "test:pwa": "npm run test:pwa --workspace apps/web",
+    "pwa:icons": "node tools/pwa/generate-icons.mjs",
     "validate:constants": "tsx --tsconfig apps/web/tsconfig.app.json reference/export-constants.ts",
     "validate:ts": "tsx --tsconfig apps/web/tsconfig.app.json reference/run-ts-engine.ts",
     "validate:python": "python reference/python/compare.py",

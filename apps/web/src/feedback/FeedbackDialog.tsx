@@ -4,7 +4,6 @@ import { Check, Download } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
-  Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -29,7 +28,17 @@ import { aggregateSus, scoreSus, SUS_TARGET_SCORE } from './susScore';
    needs real participants — see `docs/usability-plan.md` for how to run the
    study.
 
-   Two design choices worth defending:
+   ── It renders DialogContent only, deliberately ────────────────────────────
+   The surrounding `<Dialog>` and its `<DialogTrigger>` live in `TopBar`,
+   beside the button that opens this. That is the project's rule, and it is
+   not cosmetic: Radix restores focus to its registered trigger when a dialog
+   closes. Driven by external state with no trigger, this dialog closed and
+   dropped focus onto `<body>` — a keyboard user who opened the questionnaire
+   and dismissed it landed at the top of the page with no idea where they
+   were. `feedback.spec.ts` caught it; an external-state dialog cannot fix it
+   on its own.
+
+   Two more design choices worth defending:
 
    • Responses are NEVER auto-saved. A participant who closes the tab mid-way
      should be able to reopen and finish; silently persisting a half-finished
@@ -51,13 +60,7 @@ export type SusResponse = {
   readonly participantId?: string;
 };
 
-export function FeedbackDialog({
-  open,
-  onOpenChange,
-}: {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}) {
+export function FeedbackDialog() {
   const [answers, setAnswers] = useState<SusAnswers>({});
   const [comments, setComments] = useState('');
   const [participantId, setParticipantId] = useState('');
@@ -109,194 +112,192 @@ export function FeedbackDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col">
-        <DialogHeader>
-          <DialogTitle>Usability feedback</DialogTitle>
-          <DialogDescription>
-            Ten questions about your experience. Your answers stay in this browser until you export
-            them, and are never sent anywhere automatically.
-          </DialogDescription>
-        </DialogHeader>
+    <DialogContent className="flex max-h-[85vh] max-w-2xl flex-col">
+      <DialogHeader>
+        <DialogTitle>Usability feedback</DialogTitle>
+        <DialogDescription>
+          Ten questions about your experience. Your answers stay in this browser until you export
+          them, and are never sent anywhere automatically.
+        </DialogDescription>
+      </DialogHeader>
 
-        <Tabs defaultValue="questionnaire" className="flex min-h-0 flex-1 flex-col">
-          <TabsList>
-            <TabsTrigger value="questionnaire">Questionnaire</TabsTrigger>
-            <TabsTrigger value="responses">
-              Responses
-              {submitted.length > 0 ? (
-                <Badge variant="outline" className="ml-1.5 text-[10px]">
-                  {submitted.length}
-                </Badge>
-              ) : null}
-            </TabsTrigger>
-          </TabsList>
+      <Tabs defaultValue="questionnaire" className="flex min-h-0 flex-1 flex-col">
+        <TabsList>
+          <TabsTrigger value="questionnaire">Questionnaire</TabsTrigger>
+          <TabsTrigger value="responses">
+            Responses
+            {submitted.length > 0 ? (
+              <Badge variant="outline" className="ml-1.5 text-[10px]">
+                {submitted.length}
+              </Badge>
+            ) : null}
+          </TabsTrigger>
+        </TabsList>
 
-          <TabsContent value="questionnaire" className="min-h-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-full pr-3">
-              <div className="space-y-4">
-                <ol className="space-y-5">
-                  {SUS_ITEMS.map((item) => (
-                    <li key={item.number}>
-                      <fieldset>
-                        <legend className="mb-1.5 text-sm">
-                          {item.number}. {item.text}
-                        </legend>
-                        <RadioGroup
-                          value={answers[item.number]?.toString() ?? ''}
-                          onValueChange={(value) =>
-                            setAnswers((previous) => ({
-                              ...previous,
-                              [item.number]: Number(value) as SusScaleValue,
-                            }))
-                          }
-                          className="flex flex-wrap gap-x-3 gap-y-1"
-                          aria-label={`Question ${item.number}`}
-                        >
-                          {SUS_SCALE.map((label, index) => {
-                            const value = (index + 1) as SusScaleValue;
-                            const id = `sus-${item.number}-${value}`;
-                            return (
-                              <div key={label} className="flex items-center gap-1.5">
-                                <RadioGroupItem value={value.toString()} id={id} />
-                                <Label htmlFor={id} className="cursor-pointer text-xs font-normal">
-                                  {label}
-                                </Label>
-                              </div>
-                            );
-                          })}
-                        </RadioGroup>
-                      </fieldset>
-                    </li>
-                  ))}
-                </ol>
+        <TabsContent value="questionnaire" className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full pr-3">
+            <div className="space-y-4">
+              <ol className="space-y-5">
+                {SUS_ITEMS.map((item) => (
+                  <li key={item.number}>
+                    <fieldset>
+                      <legend className="mb-1.5 text-sm">
+                        {item.number}. {item.text}
+                      </legend>
+                      <RadioGroup
+                        value={answers[item.number]?.toString() ?? ''}
+                        onValueChange={(value) =>
+                          setAnswers((previous) => ({
+                            ...previous,
+                            [item.number]: Number(value) as SusScaleValue,
+                          }))
+                        }
+                        className="flex flex-wrap gap-x-3 gap-y-1"
+                        aria-label={`Question ${item.number}`}
+                      >
+                        {SUS_SCALE.map((label, index) => {
+                          const value = (index + 1) as SusScaleValue;
+                          const id = `sus-${item.number}-${value}`;
+                          return (
+                            <div key={label} className="flex items-center gap-1.5">
+                              <RadioGroupItem value={value.toString()} id={id} />
+                              <Label htmlFor={id} className="cursor-pointer text-xs font-normal">
+                                {label}
+                              </Label>
+                            </div>
+                          );
+                        })}
+                      </RadioGroup>
+                    </fieldset>
+                  </li>
+                ))}
+              </ol>
 
-                <div className="space-y-2 border-t border-line pt-3">
-                  <label className="block text-sm font-medium" htmlFor="sus-participant">
-                    Participant ID{' '}
-                    <span className="font-normal text-muted-foreground">(optional)</span>
-                  </label>
-                  <input
-                    id="sus-participant"
-                    value={participantId}
-                    onChange={(event) => setParticipantId(event.target.value)}
-                    placeholder="e.g. P03"
-                    className="w-40 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm"
-                  />
+              <div className="space-y-2 border-t border-line pt-3">
+                <label className="block text-sm font-medium" htmlFor="sus-participant">
+                  Participant ID{' '}
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <input
+                  id="sus-participant"
+                  value={participantId}
+                  onChange={(event) => setParticipantId(event.target.value)}
+                  placeholder="e.g. P03"
+                  className="w-40 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm"
+                />
 
-                  <label className="mt-3 block text-sm font-medium" htmlFor="sus-comments">
-                    Anything else?{' '}
-                    <span className="font-normal text-muted-foreground">(optional)</span>
-                  </label>
-                  <textarea
-                    id="sus-comments"
-                    value={comments}
-                    onChange={(event) => setComments(event.target.value)}
-                    rows={3}
-                    placeholder="What confused you, what you expected to happen, what you would change."
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                  />
-                </div>
+                <label className="mt-3 block text-sm font-medium" htmlFor="sus-comments">
+                  Anything else?{' '}
+                  <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <textarea
+                  id="sus-comments"
+                  value={comments}
+                  onChange={(event) => setComments(event.target.value)}
+                  rows={3}
+                  placeholder="What confused you, what you expected to happen, what you would change."
+                  className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                />
               </div>
-            </ScrollArea>
-          </TabsContent>
+            </div>
+          </ScrollArea>
+        </TabsContent>
 
-          <TabsContent value="responses" className="min-h-0 flex-1 overflow-hidden">
-            <ScrollArea className="h-full pr-3">
-              {submitted.length === 0 ? (
-                <p className="py-8 text-center text-sm text-muted-foreground">
-                  No responses yet. Answer the questionnaire and submit one to see how it scores.
-                </p>
-              ) : (
-                <div className="space-y-3">
-                  <table className="w-full text-sm">
-                    <caption className="sr-only">
-                      System Usability Scale responses collected in this browser
-                    </caption>
-                    <thead>
-                      <tr className="border-b border-line text-left text-xs text-muted-foreground">
-                        <th scope="col" className="py-1.5 pr-2 font-medium">
-                          ID
-                        </th>
-                        <th scope="col" className="py-1.5 pr-2 text-right font-medium">
-                          Score
-                        </th>
-                        <th scope="col" className="py-1.5 text-right font-medium">
-                          Submitted
-                        </th>
+        <TabsContent value="responses" className="min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full pr-3">
+            {submitted.length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No responses yet. Answer the questionnaire and submit one to see how it scores.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                <table className="w-full text-sm">
+                  <caption className="sr-only">
+                    System Usability Scale responses collected in this browser
+                  </caption>
+                  <thead>
+                    <tr className="border-b border-line text-left text-xs text-muted-foreground">
+                      <th scope="col" className="py-1.5 pr-2 font-medium">
+                        ID
+                      </th>
+                      <th scope="col" className="py-1.5 pr-2 text-right font-medium">
+                        Score
+                      </th>
+                      <th scope="col" className="py-1.5 text-right font-medium">
+                        Submitted
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="font-mono-nums">
+                    {submitted.map((response, index) => (
+                      <tr
+                        key={`${response.submittedAt}-${index}`}
+                        className="border-b border-line last:border-0"
+                      >
+                        <td className="py-1.5 pr-2">
+                          {response.participantId ?? `response ${index + 1}`}
+                        </td>
+                        <td className="py-1.5 pr-2 text-right tabular-nums">{response.score}</td>
+                        <td className="py-1.5 text-right text-xs text-muted-foreground">
+                          {new Date(response.submittedAt).toLocaleString()}
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody className="font-mono-nums">
-                      {submitted.map((response, index) => (
-                        <tr
-                          key={`${response.submittedAt}-${index}`}
-                          className="border-b border-line last:border-0"
-                        >
-                          <td className="py-1.5 pr-2">
-                            {response.participantId ?? `response ${index + 1}`}
-                          </td>
-                          <td className="py-1.5 pr-2 text-right tabular-nums">{response.score}</td>
-                          <td className="py-1.5 text-right text-xs text-muted-foreground">
-                            {new Date(response.submittedAt).toLocaleString()}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                    ))}
+                  </tbody>
+                </table>
 
-                  {aggregate ? (
-                    <div className="rounded-app border border-line p-3 text-sm">
-                      <p className="font-medium">So far</p>
-                      <p className="font-mono-nums text-muted-foreground">
-                        mean {aggregate.mean} · median {aggregate.median} · n ={' '}
-                        {aggregate.participants}
+                {aggregate ? (
+                  <div className="rounded-app border border-line p-3 text-sm">
+                    <p className="font-medium">So far</p>
+                    <p className="font-mono-nums text-muted-foreground">
+                      mean {aggregate.mean} · median {aggregate.median} · n ={' '}
+                      {aggregate.participants}
+                    </p>
+                    {aggregate.participants < 5 ? (
+                      <p className="mt-1.5 text-xs text-muted-foreground">
+                        Treat this as a smoke test only. Fewer than five participants gives a mean
+                        far too wide to compare against anything.
                       </p>
-                      {aggregate.participants < 5 ? (
-                        <p className="mt-1.5 text-xs text-muted-foreground">
-                          Treat this as a smoke test only. Fewer than five participants gives a mean
-                          far too wide to compare against anything.
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              )}
-            </ScrollArea>
-          </TabsContent>
-        </Tabs>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </ScrollArea>
+        </TabsContent>
+      </Tabs>
 
-        {status ? (
-          <p
-            role="status"
-            className="shrink-0 rounded-app bg-surface-2 px-3 py-2 text-xs text-muted-foreground"
-          >
-            {status}
-          </p>
-        ) : null}
+      {status ? (
+        <p
+          role="status"
+          className="shrink-0 rounded-app bg-surface-2 px-3 py-2 text-xs text-muted-foreground"
+        >
+          {status}
+        </p>
+      ) : null}
 
-        <DialogFooter className="shrink-0 flex-wrap justify-between gap-2 border-t border-line pt-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={exportResponses}
-            disabled={submitted.length === 0}
-          >
-            <Download aria-hidden="true" />
-            Export responses
+      <DialogFooter className="shrink-0 flex-wrap justify-between gap-2 border-t border-line pt-3">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={exportResponses}
+          disabled={submitted.length === 0}
+        >
+          <Download aria-hidden="true" />
+          Export responses
+        </Button>
+
+        <div className="flex items-center gap-2">
+          <span className="font-mono-nums text-xs text-muted-foreground">
+            {answeredCount}/{SUS_ITEMS.length} answered
+            {preview ? ` · would score ${preview.score}` : ''}
+          </span>
+          <Button size="sm" onClick={submit} disabled={!preview}>
+            <Check aria-hidden="true" />
+            Submit response
           </Button>
-
-          <div className="flex items-center gap-2">
-            <span className="font-mono-nums text-xs text-muted-foreground">
-              {answeredCount}/{SUS_ITEMS.length} answered
-              {preview ? ` · would score ${preview.score}` : ''}
-            </span>
-            <Button size="sm" onClick={submit} disabled={!preview}>
-              <Check aria-hidden="true" />
-              Submit response
-            </Button>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      </DialogFooter>
+    </DialogContent>
   );
 }

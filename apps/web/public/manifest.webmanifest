@@ -1,0 +1,42 @@
+{
+  "id": "/",
+  "name": "QuakeStudio — Earthquake Response Simulator",
+  "short_name": "QuakeStudio",
+  "description": "Build a simplified building, shake it, and watch how it sways. An educational simulation using simplified assumptions — not a structural safety assessment.",
+  "lang": "en",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "categories": ["education", "science", "productivity"],
+  "background_color": "#f8fafc",
+  "theme_color": "#15803d",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Start a new simulation",
+      "short_name": "New run",
+      "url": "/"
+    }
+  ]
+}

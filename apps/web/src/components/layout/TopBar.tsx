@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import { LazyFeedback } from '@/feedback/LazyFeedback';
+import { InstallButton } from '@/pwa/InstallButton';
 import { AssumptionsDialog } from './AssumptionsDialog';
 import { SaveLoadDialog } from './SaveLoadDialog';
 
@@ -41,7 +43,6 @@ export function TopBar({
   panelOpen,
   assumptionsOpen,
   onAssumptionsOpenChange,
-  onOpenFeedback,
 }: {
   onTogglePanel: () => void;
   panelOpen: boolean;
@@ -53,7 +54,6 @@ export function TopBar({
    */
   assumptionsOpen: boolean;
   onAssumptionsOpenChange: (open: boolean) => void;
-  onOpenFeedback: () => void;
 }) {
   /*
    * The dialogs live HERE, beside their trigger buttons, rather than in the
@@ -66,6 +66,9 @@ export function TopBar({
    * that, and it keeps the button and the dialog that it opens together.
    */
   const [saveOpen, setSaveOpen] = useState(false);
+  // The feedback dialog is owned here for the same reason as the others: its
+  // trigger has to sit inside its <Dialog> or Radix cannot restore focus.
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const building = useConfigStore((s) => s.building);
   const motion = useConfigStore((s) => s.motion);
   const result = useConfigStore((s) => s.result);
@@ -159,17 +162,30 @@ export function TopBar({
           <AssumptionsDialog />
         </Dialog>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="sm" onClick={onOpenFeedback}>
-              <ClipboardList aria-hidden="true" />
-              <span className="hidden lg:inline">Feedback</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">
-            Ten usability questions. Answers stay in this browser until you export them.
-          </TooltipContent>
-        </Tooltip>
+        {/* Same shape as the Assumptions dialog above: the trigger is a
+            sibling of the content, inside the <Dialog>, so Radix restores
+            focus here on close. Driven by an onClick alone it did not, and a
+            keyboard user dismissing the questionnaire was dropped onto <body>.
+            See FeedbackDialog.tsx. */}
+        <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DialogTrigger asChild>
+                <Button variant="ghost" size="sm">
+                  <ClipboardList aria-hidden="true" />
+                  <span className="hidden lg:inline">Feedback</span>
+                </Button>
+              </DialogTrigger>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs text-xs">
+              Ten usability questions. Answers stay in this browser until you export them.
+            </TooltipContent>
+          </Tooltip>
+
+          <LazyFeedback />
+        </Dialog>
+
+        <InstallButton />
 
         <Separator orientation="vertical" className="hidden h-6 md:block" />
 

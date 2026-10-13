@@ -69,6 +69,48 @@ from what the engine actually runs.
 
 ---
 
+## Installing it as an app
+
+QuakeStudio is an installable **Progressive Web App**. Open it on a phone,
+tablet or laptop and it can be added to the home screen, where it opens
+full-screen with its own icon and — this is the useful part for a student in a
+basement lab — **works with no signal at all**.
+
+That is not a degraded offline mode. There is no server call anywhere in the
+app: mass, stiffness, damping, the Newmark integration and the Cholesky solve
+all happen on the device, so the only thing the network provides is the
+download.
+
+| Platform | How |
+|---|---|
+| Android / desktop Chrome, Edge | The **Install app** button in the top bar |
+| iOS Safari | No install API exists. Share → **Add to Home Screen**. The button gives the same three steps |
+
+Two platform quirks are handled and worth knowing about:
+
+- **iOS ignores the manifest** for the home-screen icon and for full-screen
+  mode, so `index.html` carries the `apple-mobile-web-app-*` tags and a
+  separately generated `apple-touch-icon.png`.
+- **A single `<meta name="theme-color">` gives a white status bar in dark
+  mode.** There are two, one per `prefers-color-scheme`.
+
+The button is hidden entirely when the app is already installed, and on
+browsers that can never install it — a permanent dead button trains people to
+ignore the ones that work. See [`docs/performance.md`](docs/performance.md) for
+what the service worker precaches and how that is tested.
+
+Regenerate the icons after changing the brand colour:
+
+```bash
+npm run pwa:icons
+```
+
+They are drawn in code by `tools/pwa/generate-icons.mjs` using only Node's
+built-in `zlib`, so there is no native image dependency to install and changing
+the colour is a one-line edit.
+
+---
+
 ## What the app does
 
 **Desktop (≥1024px)** is three zones: controls on the left, the 3D viewport and
@@ -216,10 +258,15 @@ axe-core runs over every surface (idle, comparison mode, every dialog, the
 import path), plus real-browser tests in Chromium for the things jsdom cannot
 see: focus management, tab order, and live-region announcements.
 
-Six defects were found and fixed. The dominant class was **markup that looks
+Seven defects were found and fixed. The dominant class was **markup that looks
 right and conveys nothing** — `aria-label` on a roleless element is *prohibited*
 and silently dropped by screen readers. It was the single most common defect in
 the audit.
+
+The seventh was found later and is the interesting one: the feedback dialog
+dropped focus onto `<body>` when it closed, and its own test had been passing
+*vacuously* — pressing Escape before the dialog finished opening. Written up in
+[`docs/accessibility-audit.md`](docs/accessibility-audit.md) §7.
 
 See [`docs/accessibility-audit.md`](docs/accessibility-audit.md).
 
@@ -341,10 +388,12 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **336 tests** |
+| `npm test` | Vitest unit + component tests — **362 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
 | `npm run e2e` | Playwright end-to-end tests — **59 specs** |
+| `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
+| `npm run pwa:icons` | Regenerate the app icons |
 | `npm run validate` | Cross-check the engine against the Python reference |
 | `npm run usability:cross-check` | Cross-check the SUS scorer against Python |
 
@@ -372,6 +421,7 @@ QuakeStudio/
 │     ├─ config/engineeringAssumptions.ts   # ← ALL placeholder numbers
 │     ├─ engine/                      # solver, building model, worker (Phase 2)
 │     ├─ feedback/                    # SUS instrument, scoring, dialog (Phase 6)
+│     ├─ pwa/                          # install affordance + platform detection
 │     ├─ storage/                     # RunStorage interface + IndexedDB impl
 │     ├─ store/                       # Zustand stores
 │     ├─ styles/tokens.css            # ← design tokens, single source of truth
@@ -382,6 +432,7 @@ QuakeStudio/
 │  ├─ cases.json                      # the 16-case validation matrix
 │  └─ constants.json                  # generated, shared with the Python side
 ├─ tools/usability/                   # SUS analysis + scorer cross-check
+├─ tools/pwa/generate-icons.mjs        # app icons, drawn in code, no dependencies
 ├─ docs/
 │  ├─ assumptions.md                  # ← what the engineering adviser reviews
 │  ├─ validation-report.md            # generated: TS vs Python (Phase 5)

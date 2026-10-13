@@ -99,7 +99,19 @@ test.describe('the usability feedback dialog', () => {
   });
 
   test('returns focus to the button that opened it', async ({ page }) => {
-    await openDialog(page);
+    const dialog = await openDialog(page);
+
+    /*
+     * Wait for the dialog before pressing Escape.
+     *
+     * The dialog is behind a lazy boundary, so on a loaded machine the chunk can
+     * still be in flight when this test reaches the key press. Escape then lands
+     * on nothing, Radix never runs its close handler, and focus is never
+     * restored — a failure in the app that is really a failure in the test.
+     * Pressing Escape before the dialog exists is not a meaningful assertion in
+     * the first place.
+     */
+    await expect(dialog).toBeVisible();
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();

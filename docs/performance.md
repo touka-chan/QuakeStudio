@@ -17,14 +17,16 @@ cannot drift apart silently.
 
 | Chunk | Raw | Gzipped | When it loads |
 |---|---|---|---|
-| **Entry (`index-*.js`)** | 569 KB | **175 KB** | Immediately — the app shell |
+| **Entry (`index-*.js`)** | 575 KB | **176 KB** | Immediately — the app shell |
 | `Viewport3D-*.js` | 943 KB | 251 KB | On demand — Three.js and both viewports |
 | `Charts-*.js` | 380 KB | 109 KB | On demand — Recharts and the three charts |
+| `FeedbackDialog-*.js` | 16 KB | 6 KB | On demand — the usability questionnaire |
 | `worker-*.js` | 7 KB | 3 KB | With the simulation engine |
-| CSS | 59 KB | 13 KB | Immediately |
+| `sw.js` + `workbox-*.js` | 18 KB | — | With the service worker, for offline use |
+| CSS | 62 KB | 13 KB | Immediately |
 | Fonts | 296 KB | — | Only the subsets the page uses |
 
-**Initial JavaScript: 536 KB → 175 KB gzipped, a 67% reduction.**
+**Initial JavaScript: 536 KB → 176 KB gzipped, a 67% reduction.**
 
 Everything the user can interact with in the first moment — controls, playback
 bar, metric cards, the comparison table, the disclaimer — is in the entry chunk.
@@ -121,15 +123,44 @@ regression, not to police kilobytes.
 
 | Budget | Limit | Actual |
 |---|---|---|
-| Entry chunk, gzipped | 220 KB | 175 KB |
-| Total JavaScript, gzipped | 620 KB | 521 KB |
+| Entry chunk, gzipped | 220 KB | 176 KB |
+| Total JavaScript, gzipped | 620 KB | 528 KB |
 | Simulation worker, gzipped | 30 KB | 3 KB |
-| `Viewport3D` and `Charts` must exist as separate chunks | — | ✅ |
+| `Viewport3D`, `Charts` and `FeedbackDialog` must exist as separate chunks | — | ✅ |
+| Every emitted chunk must be precached for offline | — | ✅ |
 | Source maps in `dist` | none | none |
 
 The total-JavaScript budget alone would **not** catch an eager re-import: the
 total does not change when a lazy chunk is folded back in. Only the
 chunk-separation check notices, which is why it exists.
+
+## Offline
+
+A service worker precaches the whole build, so QuakeStudio works with no
+network at all. That is not a downgrade: every byte it needs is either in the
+repository or computed on the device, because there is no server call anywhere
+in the app. A student in a basement lab gets the full simulator.
+
+The precache has to include the **lazy** chunks, and that is the part which is
+easy to get wrong. `Viewport3D`, `Charts` and `FeedbackDialog` are dynamic
+imports, fetched at runtime. Precaching only `index.html` produces an app that
+opens offline and then breaks the moment a student opens the 3D viewport —
+which is most of what they came for. The simulation worker is the same: it is
+created with `new Worker(new URL(...))`, so a stranded worker looks perfectly
+healthy until you notice the numbers never change.
+
+Two budgets would have hidden this: workbox's 2 MB per-file limit silently
+dropped nothing here but would drop the 943 KB 3D chunk as the app grows, and
+the bundle budget does not care what is cached. Both are raised/asserted, and
+`tests/e2e/pwa.spec.ts` verifies the whole sequence with the network genuinely
+switched off.
+
+Run those separately, because they need a production build rather than the dev
+server:
+
+```bash
+npm run test:pwa
+```
 
 ## Runtime performance
 

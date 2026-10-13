@@ -63,9 +63,14 @@ export default tseslint.config(
     },
   },
 
-  // ---- Config files -----------------------------------------------------
+  // ---- Node scripts ------------------------------------------------------
+  // Root-level config files, plus the standalone Node tools under `tools/`.
+  // These are plain `.mjs`, so `no-undef` applies to them as strictly as it
+  // does to the config files — `Buffer` and `console` are real globals here,
+  // not typos. Linting them as browser code produces noise that trains people
+  // to ignore lint output.
   {
-    files: ['*.{js,mjs,cjs}'],
+    files: ['*.{js,mjs,cjs}', 'tools/**/*.{js,mjs,cjs}'],
     languageOptions: {
       globals: globals.node,
     },

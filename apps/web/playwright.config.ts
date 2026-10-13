@@ -11,6 +11,15 @@ const baseURL = `http://localhost:${PORT}`;
  */
 export default defineConfig({
   testDir: './tests/e2e',
+  /*
+   * The PWA specs are excluded here and run separately.
+   *
+   * They need a real production build, because this config serves the dev
+   * server — where the service worker is deliberately disabled, since one
+   * registered over HMR serves stale bundles and makes the dev server look
+   * broken. Run them with `npm run test:pwa`.
+   */
+  testIgnore: /pwa\.spec\.ts/,
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

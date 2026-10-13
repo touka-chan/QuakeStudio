@@ -50,6 +50,17 @@ function deferredChunks(): string[] {
 }
 
 const DOCS = join(process.cwd(), 'docs/performance.md');
+const DIST_ROOT = join(process.cwd(), 'apps/web/dist');
+
+/** Files the service worker precaches, parsed out of the generated `sw.js`. */
+function precached(): string[] {
+  const sw = join(DIST_ROOT, 'sw.js');
+  if (!existsSync(sw)) {
+    throw new Error('No service worker found. Run `npm run build` before the bundle test.');
+  }
+  // Workbox emits the precache manifest as a minified JS array literal.
+  return [...readFileSync(sw, 'utf8').matchAll(/url:"([^"]+)"/g)].map((match) => match[1]!);
+}
 
 describe('bundle budget', () => {
   it('keeps the entry chunk small enough to parse quickly', () => {
@@ -144,6 +155,69 @@ describe('build output', () => {
     expect(maps, `source maps in dist: ${maps.join(', ')}. Build without VITE_SOURCEMAP.`).toEqual(
       [],
     );
+  });
+});
+
+/*
+ * Offline is a headline feature: a student in a basement lab with no signal can
+ * still run a simulation. These assertions are the guard on that claim.
+ *
+ * The failure they protect against is specific and quiet. A glob that misses a
+ * file type — or workbox's 2 MB per-file limit silently dropping the 940 KB 3D
+ * chunk — produces a build that installs fine, opens offline, and then breaks
+ * the moment a student opens the viewport. Nothing else notices: the bundle
+ * budget still passes, the app still works online, and no console error appears
+ * until the network is gone.
+ */
+describe('offline (service worker precache)', () => {
+  it('precaches the app shell', () => {
+    const cached = precached();
+    expect(cached).toContain('index.html');
+    expect(cached.some((url) => url.includes('index-') && url.endsWith('.css'))).toBe(true);
+    expect(cached.some((url) => url.includes('index-') && url.endsWith('.js'))).toBe(true);
+  });
+
+  it('precaches the lazy chunks, not just the entry bundle', () => {
+    /*
+     * The whole app being offline-capable hinges on these. They are loaded by
+     * a dynamic import at runtime, so precaching index.html alone would leave
+     * the 3D viewport and every chart broken with no network — which is most
+     * of what the user came for.
+     */
+    const cached = precached();
+    for (const prefix of ['assets/Viewport3D-', 'assets/Charts-', 'assets/FeedbackDialog-']) {
+      expect(
+        cached.some((url) => url.startsWith(prefix)),
+        `${prefix} not precached`,
+      ).toBe(true);
+    }
+  });
+
+  it('precaches the simulation worker', () => {
+    /*
+     * The worker is created with `new Worker(new URL(...))`, which is a
+     * runtime fetch. If it is not precached, the simulation silently never
+     * runs offline while the rest of the app looks perfectly healthy.
+     */
+    expect(precached().some((url) => url.startsWith('assets/worker-'))).toBe(true);
+  });
+
+  it('precaches the manifest and the icons', () => {
+    const cached = precached();
+    expect(cached).toContain('manifest.webmanifest');
+    expect(cached.some((url) => url.includes('icon-'))).toBe(true);
+  });
+
+  it('caches every emitted JS chunk, so no chunk is stranded', () => {
+    /*
+     * The general form of the checks above: any chunk the build emits must be
+     * in the precache. This catches a new lazy chunk added later and forgotten.
+     */
+    const cached = new Set(precached());
+    const emitted = assets().map((name) => `assets/${name}`);
+
+    const stranded = emitted.filter((name) => !cached.has(name));
+    expect(stranded, `not precached: ${stranded.join(', ')}`).toHaveLength(0);
   });
 });
 

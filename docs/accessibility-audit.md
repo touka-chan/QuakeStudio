@@ -94,6 +94,36 @@ with no indication of which side of the comparison it was.
 
 **Fixed** with an explicit `aria-label` naming the side and the building.
 
+### 7. The feedback dialog dropped focus onto `<body>` on close
+
+Found later, while adding the installable-app work, and worth recording
+separately because of *how* it had been hiding.
+
+The usability questionnaire was opened by a plain `onClick` on the toolbar
+button, with the dialog itself owned by the shell through external state — no
+`DialogTrigger`. Radix restores focus to its registered trigger when a dialog
+closes; a dialog opened by external state has nothing registered, so closing it
+sent focus to `<body>`. A keyboard user who opened the questionnaire and
+dismissed it landed at the top of the document with no indication of where they
+were.
+
+**Fixed** by moving the `<Dialog>` root and a `<DialogTrigger>` into `TopBar`,
+beside the button, and reducing `FeedbackDialog` to rendering `DialogContent`
+only. This is the rule every other dialog in the app already followed; this one
+was the exception.
+
+**Why it survived the Phase 5 audit, which is the interesting part.** The
+`feedback.spec.ts` test that should have caught it pressed Escape *before* the
+dialog had finished opening. Escape landed on nothing, the dialog was never
+shown, `expect(dialog).toBeHidden()` passed because it had never appeared, and
+focus was still on the button from the click. Three assertions, all green, none
+of them testing anything.
+
+Adding `await expect(dialog).toBeVisible()` before the key press turned a
+vacuous pass into a real failure — which is the only reason it was ever found. A
+test that passes when the thing under test never happened is worse than no test,
+because it removes the reason to look.
+
 ## Documented gaps
 
 These are **not** fixed. They are recorded so nobody discovers them later and

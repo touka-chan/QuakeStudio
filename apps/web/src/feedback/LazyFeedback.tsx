@@ -22,10 +22,15 @@ const FeedbackDialog = lazy(() =>
   import('@/feedback/FeedbackDialog').then((module) => ({ default: module.FeedbackDialog })),
 );
 
-export function LazyFeedback(props: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/**
+ * The dialog body only. The `<Dialog>` root and its `<DialogTrigger>` belong
+ * to `TopBar`, next to the button that opens this — that is what lets Radix
+ * restore focus when the dialog closes.
+ */
+export function LazyFeedback() {
   return (
     <Suspense fallback={null}>
-      <FeedbackDialog open={props.open} onOpenChange={props.onOpenChange} />
+      <FeedbackDialog />
     </Suspense>
   );
 }

@@ -122,7 +122,7 @@ Agreeing on the default model proves very little. The matrix is built around the
 
 ## Engine performance
 
-Wall clock for all 16 cases: 59 ms total, 7 ms worst single case.
+Wall clock for all 16 cases: 54 ms total, 7 ms worst single case.
 
 ## What would make this stronger
 
