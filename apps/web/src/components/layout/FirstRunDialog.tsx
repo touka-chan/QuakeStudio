@@ -60,9 +60,33 @@ function shouldShowFirstRun(): boolean {
   }
 }
 
-export function FirstRunDialog({ onOpenAssumptions }: { onOpenAssumptions: () => void }) {
-  const [open, setOpen] = useState(shouldShowFirstRun);
+/**
+ * The disclaimer gate.
+ *
+ * `blocked` is true while something else owns the screen — currently the
+ * guided tour. The gate waits rather than competing: two overlays open at once
+ * would fight over focus, and a race between them shows up as "the app is
+ * stuck" on someone's first run.
+ *
+ * Defaults to false, so this component still behaves exactly as it always has
+ * when rendered on its own.
+ */
+export function FirstRunDialog({
+  onOpenAssumptions,
+  blocked = false,
+}: {
+  onOpenAssumptions: () => void;
+  blocked?: boolean;
+}) {
+  /*
+   * Read once, and separately from `blocked`. A returning user who has already
+   * acknowledged is not gated at all, so the tour is free to run with nothing
+   * behind it.
+   */
+  const [needsGate] = useState(shouldShowFirstRun);
+  const [dismissed, setDismissed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
+  const open = needsGate && !dismissed && !blocked;
 
   function start() {
     try {
@@ -70,7 +94,7 @@ export function FirstRunDialog({ onOpenAssumptions }: { onOpenAssumptions: () =>
     } catch {
       // Non-fatal. The user can still use the app; we just ask again next time.
     }
-    setOpen(false);
+    setDismissed(true);
   }
 
   return (
@@ -138,7 +162,7 @@ export function FirstRunDialog({ onOpenAssumptions }: { onOpenAssumptions: () =>
                * the assumptions is not the same as agreeing to them, and the
                * gate must mean something.
                */
-              setOpen(false);
+              setDismissed(true);
               onOpenAssumptions();
             }}
           >

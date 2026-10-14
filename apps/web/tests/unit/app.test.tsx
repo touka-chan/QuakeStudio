@@ -10,6 +10,7 @@ import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
 import { useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
+import { __testing as tourTesting } from '@/store/tourStore';
 import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
@@ -33,6 +34,21 @@ vi.mock('@/components/viewport/Viewport', () => ({
 
 function skipFirstRun() {
   localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+  /*
+   * The guided tour runs before the disclaimer gate and holds it closed while
+   * it is on screen, so a test that wants the workspace has to get past both.
+   *
+   * `reset` is required as well as the key. The tour store decides once, when
+   * its module is first imported, and a `beforeEach` that writes localStorage
+   * afterwards is too late to change a decision that has already been made.
+   */
+  skipTour();
+}
+
+/** Get past the guided tour only, leaving the disclaimer gate in place. */
+function skipTour() {
+  localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+  tourTesting.reset();
 }
 
 beforeEach(() => {
@@ -77,6 +93,13 @@ describe('theme selection', () => {
 /* ------------------------------------------------------------------------ */
 
 describe('first-run dialog', () => {
+  /*
+   * The tour owns the screen before the gate does, and it is skippable. These
+   * tests are about the gate, so they get past the tour deliberately — and
+   * deliberately do NOT acknowledge the disclaimer, which is what they are for.
+   */
+  beforeEach(skipTour);
+
   it('blocks the start button until the disclaimer is acknowledged', async () => {
     const user = userEvent.setup();
     render(<App />);

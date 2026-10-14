@@ -12,6 +12,8 @@ import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
 import { TopBar } from './TopBar';
 import { LazyViewport } from '@/components/viewport/LazyViewport';
+import { Tour } from '@/components/tutorial/Tour';
+import { useTourStore } from '@/store/tourStore';
 
 /* =========================================================================
    App shell — the three-zone workspace.
@@ -47,6 +49,8 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
   }, []);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);
+  /* True once the tour is out of the way — see Tour.tsx. */
+  const tourSettled = useTourStore((s) => s.settled);
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -67,6 +71,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
                   : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
               }
               aria-label="Building and earthquake controls"
+              data-tour="controls"
             >
               <ControlsPanel />
             </aside>
@@ -91,6 +96,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
                   : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
               }
               aria-label="Simulation results"
+              data-tour="results"
             >
               <ResultsPanel />
             </aside>
@@ -103,7 +109,18 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
             reads time, so it keeps ticking whichever tab is visible. */}
         <PlaybackClock />
 
-        <FirstRunDialog onOpenAssumptions={() => setAssumptionsOpen(true)} />
+        {/* The guided tour. Mounted above the gate on purpose: the tour is
+            skippable, the gate is not, so the tour gets the first beat and
+            releases the gate when it is done. */}
+        <Tour forceDesktopLayout={forceDesktopLayout} />
+
+        {/*
+          The gate stays blocking. `blocked` is true only while the tour is
+          still going to appear this session — so a returning user who has
+          already seen the tour gets the gate immediately, and a new user sees
+          one overlay at a time rather than two fighting over focus.
+        */}
+        <FirstRunDialog onOpenAssumptions={() => setAssumptionsOpen(true)} blocked={!tourSettled} />
       </div>
     </TooltipProvider>
   );

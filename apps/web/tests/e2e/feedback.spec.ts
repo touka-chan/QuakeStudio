@@ -21,6 +21,10 @@ async function openDialog(page: Page) {
   await page.addInitScript(() => {
     try {
       localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      // The guided tour also runs before the workspace is reachable, and it holds
+      // the disclaimer gate closed while it is on screen. This is the storage a user
+      // who has already seen the tour has.
+      localStorage.setItem('quakestudio.tourCompleted', 'true');
     } catch {
       /* storage unavailable — the dialog will show and block these tests */
     }

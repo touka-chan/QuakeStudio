@@ -1,0 +1,102 @@
+import { useCallback, useEffect } from 'react';
+
+import { useIsDesktop } from '@/lib/useMediaQuery';
+import { BACK_REQUESTED } from '@/pwa/backButton';
+import { rememberTourCompleted, useTourStore } from '@/store/tourStore';
+import { SpotlightTour } from './SpotlightTour';
+import { TourModal } from './TourModal';
+import { TOUR_STEPS } from './tourSteps';
+
+/* =========================================================================
+   Guided tour — orchestration
+
+   Owns when the tour opens, which presentation it uses, and how it ends. The
+   two presentations know nothing about each other.
+
+   THE ORDERING RULE
+   This tour runs BEFORE the disclaimer gate, and the two are never open at the
+   same time. The tour's `settled` flag is what releases the gate — see
+   tourStore.ts for why that flag exists and what breaks without it.
+   ========================================================================= */
+
+type Props = {
+  /**
+   * Force the desktop presentation.
+   *
+   * jsdom has no layout engine, so every media query reports "no match" and a
+   * test would silently exercise only the modal. Same escape hatch
+   * `AppShell` and `useIsDesktop` already use.
+   */
+  forceDesktopLayout?: boolean;
+};
+
+export function Tour({ forceDesktopLayout }: Props = {}) {
+  const isDesktop = useIsDesktop(forceDesktopLayout);
+
+  const open = useTourStore((s) => s.open);
+  const step = useTourStore((s) => s.step);
+  const next = useTourStore((s) => s.next);
+  const back = useTourStore((s) => s.back);
+  const finish = useTourStore((s) => s.finish);
+  const skip = useTourStore((s) => s.skip);
+
+  /*
+   * No effect decides whether to open the tour. The store's initial state
+   * already knows, derived from the same storage read that decides `settled`
+   * — see tourStore.ts. Deciding it here instead would mean two independent
+   * decisions that can disagree, and the disagreement is a permanent lockout
+   * of the disclaimer gate rather than anything a user could report usefully.
+   */
+
+  const end = useCallback((settle: () => void) => {
+    rememberTourCompleted();
+    settle();
+  }, []);
+
+  const handleNext = useCallback(() => {
+    // The last step ends the tour rather than advancing past the end of the
+    // array. Without this the card would render `undefined`.
+    if (step >= TOUR_STEPS.length - 1) end(finish);
+    else next();
+  }, [step, next, end, finish]);
+
+  const handleSkip = useCallback(() => end(skip), [end, skip]);
+
+  /*
+   * Android's back button.
+   *
+   * The narrow-screen tour is a Radix dialog and `backButton.ts` already
+   * closes it, which routes here through `onSkip`. The spotlight is a custom
+   * overlay, so nothing closes it and the press would fall through to the tab
+   * bar behind. Handle it explicitly so a back press always means "leave the
+   * tour" while it is on screen.
+   */
+  useEffect(() => {
+    if (!open) return;
+    function onBack() {
+      handleSkip();
+    }
+    document.addEventListener(BACK_REQUESTED, onBack);
+    return () => document.removeEventListener(BACK_REQUESTED, onBack);
+  }, [open, handleSkip]);
+
+  // Clamped rather than trusted: the store is module-level and a bad index
+  // would otherwise render a card with no title.
+  const index = Math.min(Math.max(step, 0), TOUR_STEPS.length - 1);
+  const current = TOUR_STEPS[index];
+  if (!current) return null;
+
+  const shared = {
+    step: current,
+    index,
+    total: TOUR_STEPS.length,
+    isLast: index === TOUR_STEPS.length - 1,
+    onNext: handleNext,
+    onBack: back,
+    onSkip: handleSkip,
+  };
+
+  if (!open) return null;
+
+  return isDesktop ? <SpotlightTour {...shared} /> : <TourModal {...shared} />;
+}

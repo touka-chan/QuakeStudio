@@ -52,6 +52,7 @@ export function PlaybackBar() {
           aria-label={playing ? 'Pause' : 'Play'}
           aria-pressed={playing}
           className="size-11 rounded-full"
+          data-tour="play"
         >
           {playing ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" className="ml-0.5" />}
         </Button>

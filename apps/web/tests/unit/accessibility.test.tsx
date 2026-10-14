@@ -7,6 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
+import { __testing as tourTesting } from '@/store/tourStore';
 import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
@@ -83,6 +84,17 @@ function seedResult(scale = 1): SimulationResult {
 
 beforeEach(() => {
   localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+  /*
+   * The guided tour also runs before the workspace is usable, and it holds the
+   * disclaimer gate closed while it is on screen. axe rules run against
+   * whatever is on screen, so leaving it up would quietly change what is being
+   * measured in every test in this file.
+   *
+   * `reset` as well as the key: the tour store reads storage once, when its
+   * module is imported, so writing the key here is otherwise too late.
+   */
+  localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+  tourTesting.reset();
   useConfigStore.setState({ result: seedResult() });
 });
 

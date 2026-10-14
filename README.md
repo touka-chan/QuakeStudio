@@ -36,7 +36,7 @@ optional and awaiting client + engineering-adviser approval.**
 | Touch targets are reachable | Measured per control at 360px | 14px icons → **44px**; only 8 remain under 40px, all at the 24px WCAG minimum |
 | Nothing is clipped or unreachable at any width | `npm run web:audit` — 6 widths × 6 views, light and dark | **PASS, 0 failures** |
 | It works on a real phone | `npm run android:audit` — every feature walked on a device | **12/14**, both failures since fixed |
-| It is fast enough | Lazy-loaded chunks, no `setState` in the animation loop | Entry JS **569 KB → 179 KB** gzipped, against a 220 KB budget |
+| It is fast enough | Lazy-loaded chunks, no `setState` in the animation loop | Entry JS **593 KB → 182 KB** gzipped, against a 220 KB budget |
 | The wording is honest | A deliberate copy review, defect by defect | 4 defects fixed |
 | The study instrument is correctly scored | Two independent implementations cross-checked | **PASS** — 10 cases agree exactly |
 
@@ -440,10 +440,10 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **375 tests** |
+| `npm test` | Vitest unit + component tests — **405 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests — **62 specs** |
+| `npm run e2e` | Playwright end-to-end tests — **72 specs** |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
 | `npm run web:audit` | Audit every viewport in a browser — 6 widths × 6 views, no device needed |
 | `npm run analysis:drift` | Measure where story drift actually lands, for the colour bands |

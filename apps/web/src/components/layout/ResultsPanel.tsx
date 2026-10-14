@@ -125,6 +125,7 @@ export function ResultsPanel() {
             className="h-11 w-full"
             variant={compareEnabled ? 'outline' : 'default'}
             onClick={toggleCompare}
+            data-tour="compare"
           >
             <Columns2 aria-hidden="true" />
             {compareEnabled ? 'Stop comparing' : 'Compare with another building'}

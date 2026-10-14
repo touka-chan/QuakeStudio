@@ -223,6 +223,17 @@ export const STORAGE_KEYS = {
   theme: 'quakestudio.theme',
   runs: 'quakestudio.runs',
   firstRunAcknowledged: 'quakestudio.firstRunAcknowledged',
+  /*
+   * Deliberately NOT shared with `firstRunAcknowledged`.
+   *
+   * The guided tour is skippable and teaches the interface. The disclaimer is
+   * a gate that must not be skippable. Keying "has the tour run?" off the
+   * disclaimer would mean every existing user - anyone who already ticked the
+   * acknowledgement box - silently never saw the tour, and it would look broken
+   * on release. Two keys, two meanings, so neither can quietly suppress the
+   * other.
+   */
+  tourCompleted: 'quakestudio.tourCompleted',
   appVersion: 'quakestudio.appVersion',
 } as const;
 
