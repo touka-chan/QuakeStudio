@@ -10,7 +10,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   ASSUMPTIONS,
@@ -92,8 +91,9 @@ export function AssumptionsDialog() {
           <TabsTrigger value="glossary">Glossary</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="about" className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full pr-3">
+        <TabsContent value="about" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          {/* `min-h-0 flex-1`, NOT `h-full` — see the note on the assumptions tab. */}
+          <div className="min-h-0 flex-1 overflow-y-auto pr-3">
             <div className="space-y-4 text-sm">
               <p className="rounded-app border border-accent-yellow/40 bg-warning-bg px-3 py-2.5 text-warning-text">
                 {DISCLAIMER_LONG}
@@ -167,10 +167,10 @@ export function AssumptionsDialog() {
                 </p>
               </section>
             </div>
-          </ScrollArea>
+          </div>
         </TabsContent>
 
-        <TabsContent value="assumptions" className="min-h-0 flex-1 overflow-hidden">
+        <TabsContent value="assumptions" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AssumptionsTab />
         </TabsContent>
 
@@ -205,8 +205,23 @@ export function AssumptionsDialog() {
 /* ------------------------------------------------------------------------- */
 
 function AssumptionsTab() {
+  /*
+   * The scroll area is `min-h-0 flex-1`, not `h-full`, and that is the whole
+   * fix for this panel not scrolling.
+   *
+   * `height: 100%` does not resolve here. `TabsContent` is a flex item whose
+   * 398px height comes from the flex algorithm, not from a declared height, so
+   * the percentage had nothing to resolve against. Measured in the browser:
+   * the panel's scroll area came out 2902px tall inside a 398px box, so the
+   * list simply overflowed and the dialog clipped it — which looks exactly
+   * like content that will not scroll.
+   *
+   * The Glossary tab below already used `min-h-0 flex-1` and was measured at
+   * 322px, correctly bounded. All three tabs now use the pattern that works
+   * rather than three variants of it.
+   */
   return (
-    <ScrollArea className="h-full pr-3">
+    <div className="min-h-0 flex-1 overflow-y-auto pr-3">
       <div className="space-y-4">
         {/*
          * The "26 to review" count lived in the tab LABEL until the
@@ -257,7 +272,7 @@ function AssumptionsTab() {
           nothing to confirm.
         </p>
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 
@@ -329,7 +344,7 @@ function GlossaryTab() {
         />
       </div>
 
-      <ScrollArea className="min-h-0 flex-1 pr-3">
+      <div className="min-h-0 flex-1 overflow-y-auto pr-3">
         {entries.length === 0 ? (
           <p className="py-6 text-center text-sm text-muted-foreground">
             Nothing matches “{query}”.
@@ -344,7 +359,7 @@ function GlossaryTab() {
             ))}
           </dl>
         )}
-      </ScrollArea>
+      </div>
 
       <p className="text-xs text-muted-foreground" role="status" aria-live="polite">
         {entries.length} of {Object.keys(GLOSSARY).length} terms

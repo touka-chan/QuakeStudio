@@ -12,7 +12,6 @@ import {
 } from '@/components/ui/dialog';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { downloadCsv } from '@/lib/csv';
 import { SUS_ITEMS, SUS_SCALE, type SusAnswers, type SusScaleValue } from './susItems';
@@ -145,8 +144,8 @@ export function FeedbackDialog() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="questionnaire" className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full pr-3">
+        <TabsContent value="questionnaire" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto pr-3">
             <div className="space-y-4">
               <ol className="space-y-5">
                 {SUS_ITEMS.map((item) => (
@@ -163,7 +162,7 @@ export function FeedbackDialog() {
                             [item.number]: Number(value) as SusScaleValue,
                           }))
                         }
-                        className="flex flex-wrap gap-x-3 gap-y-1"
+                        className="flex flex-col items-start gap-1"
                         aria-label={`Question ${item.number}`}
                       >
                         {SUS_SCALE.map((label, index) => {
@@ -211,11 +210,11 @@ export function FeedbackDialog() {
                 />
               </div>
             </div>
-          </ScrollArea>
+          </div>
         </TabsContent>
 
-        <TabsContent value="responses" className="min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full pr-3">
+        <TabsContent value="responses" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-y-auto pr-3">
             {submitted.length === 0 ? (
               <p className="py-8 text-center text-sm text-muted-foreground">
                 No responses yet. Answer the questionnaire and submit one to see how it scores.
@@ -274,7 +273,7 @@ export function FeedbackDialog() {
                 ) : null}
               </div>
             )}
-          </ScrollArea>
+          </div>
         </TabsContent>
       </Tabs>
 
