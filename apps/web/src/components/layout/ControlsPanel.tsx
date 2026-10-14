@@ -70,7 +70,25 @@ export function ControlsPanel() {
         comparison bug rather than a layout one.
       */}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-6 p-4">
+        {/*
+          Two pieces of padding, both for the floating "How to use" button, and
+          neither of them decoration.
+
+          `pr-16` on a phone reserves a gutter down the right-hand side. The
+          button stands 12px from the edge and is 48px wide, so it covers the
+          right 60px of whatever is showing — and on a 360px screen that band
+          runs right through the material buttons. Bottom padding alone cannot
+          fix this, because the content is not only at the end of the scroll:
+          anything in the middle passes under the button too. That is what the
+          responsive audit caught when it reported the "Wood" button as
+          unclickable even after scrolling it into view.
+
+          `pb-32` stops the last of the content coming to rest underneath it.
+
+          Both are mobile-only: on a desktop layout the panels are far wider
+          and the audit finds nothing underneath.
+        */}
+        <div className="space-y-6 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
           {compareEnabled ? (
             <CompareSwitcher
               editing={editing}

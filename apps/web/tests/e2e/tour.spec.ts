@@ -59,6 +59,18 @@ async function asCompleteFirstTimer(page: Page) {
   });
 }
 
+/** A user who has suppressed the tour and acknowledged the disclaimer: just the app. */
+async function asPlainUser(page: Page) {
+  await page.addInitScript(() => {
+    try {
+      localStorage.setItem('quakestudio.tourSuppressed', 'true');
+      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+    } catch {
+      /* noop */
+    }
+  });
+}
+
 function card(page: Page): Locator {
   return page.getByRole('dialog');
 }
@@ -350,6 +362,120 @@ test.describe('the highlighted control is live', () => {
     const size = page.viewportSize()!;
     expect(outline!.x).toBeGreaterThanOrEqual(-10);
     expect(outline!.y + outline!.height).toBeLessThanOrEqual(size.height + 10);
+  });
+});
+
+/*
+ * The floating "How to use" button.
+ *
+ * A fixed button covers whatever it lands on, and this one is meant to sit over
+ * the results panel on a desktop layout and over the playback bar on a phone —
+ * both of which are full of controls. So the property is checked at every size
+ * that matters, rather than assumed from the CSS.
+ */
+test.describe('the floating How to use button', () => {
+  async function openApp(page: Page) {
+    await asPlainUser(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
+    // The 3D viewport mounts late and resizes the panels when it does, so an
+    // early reading catches a layout that was never shown to anyone.
+    await page.waitForTimeout(900);
+  }
+
+  /** Interactive controls that sit under the button, if any. */
+  async function controlsUnderneath(page: Page): Promise<string[]> {
+    return page.evaluate(() => {
+      const fab = document.querySelector<HTMLElement>('[aria-label="How to use"]');
+      if (!fab) throw new Error('no floating button');
+      const r = fab.getBoundingClientRect();
+      const points: [number, number][] = [
+        [r.x + r.width / 2, r.y + r.height / 2],
+        [r.x + 6, r.y + r.height / 2],
+        [r.x + r.width - 6, r.y + r.height / 2],
+        [r.x + r.width / 2, r.y + 6],
+        [r.x + r.width / 2, r.y + r.height - 6],
+      ];
+      const found = new Set<string>();
+      for (const [x, y] of points) {
+        // Skip index 0: that is the button itself.
+        const below = document
+          .elementsFromPoint(x, y)
+          .slice(1)
+          .find((e) => ['BUTTON', 'A', 'INPUT', 'SELECT', 'TEXTAREA', 'LABEL'].includes(e.tagName));
+        if (below) {
+          found.add(
+            `${below.tagName}: ${(below.getAttribute('aria-label') || below.textContent || '').trim().slice(0, 30)}`,
+          );
+        }
+      }
+      return [...found];
+    });
+  }
+
+  for (const size of [
+    { w: 1600, h: 900, name: 'a wide desktop' },
+    { w: 1280, h: 720, name: 'a laptop' },
+    { w: 360, h: 720, name: 'a phone' },
+  ]) {
+    test(`stays on screen at ${size.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await openApp(page);
+
+      const box = await page.getByRole('button', { name: /how to use/i }).boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x, 'runs off the left').toBeGreaterThanOrEqual(0);
+      expect(box!.y, 'runs off the top').toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width, 'runs off the right').toBeLessThanOrEqual(size.w + 1);
+      expect(box!.y + box!.height, 'runs off the bottom').toBeLessThanOrEqual(size.h + 1);
+    });
+  }
+
+  /*
+   * A floating button covers whatever is under it. Over a panel that scrolls
+   * that is unavoidable and normal — the content moves out from under it as
+   * soon as the user scrolls, which is how every floating button in every app
+   * behaves. Both scrolling panels reserve bottom padding so nothing is left
+   * trapped underneath at the end of their scroll.
+   *
+   * What is NOT acceptable is covering the chrome that does not move: the tab
+   * bar, the transport controls. Those are the ones a user cannot scroll away
+   * from, so they are what is checked.
+   */
+  test('covers nothing that cannot be scrolled away from', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 720 });
+    await openApp(page);
+
+    // The playback bar: transport, speed, exaggeration. It lives at the bottom
+    // of the Simulate tab and does not move.
+    await page.getByRole('tab', { name: /simulate/i }).click();
+    await page.waitForTimeout(400);
+    expect(await controlsUnderneath(page), 'it is covering the playback bar').toEqual([]);
+  });
+
+  test('covers nothing fixed on a desktop layout', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await openApp(page);
+
+    expect(await controlsUnderneath(page), 'it is covering a fixed control').toEqual([]);
+  });
+
+  test('has an accessible name, being an icon', async ({ page }) => {
+    await openApp(page);
+    await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
+  });
+
+  /*
+   * The card already offers "Skip tour", so a second exit floating over the
+   * overlay is clutter — and this button sits below the tour's own layers, so
+   * leaving it visible would look live and not be.
+   */
+  test('is gone while the tour is showing', async ({ page }) => {
+    await asFirstTimer(page);
+    await page.goto('/');
+    await expect(card(page)).toBeVisible();
+
+    await expect(page.getByRole('button', { name: /how to use/i })).toHaveCount(0);
   });
 });
 

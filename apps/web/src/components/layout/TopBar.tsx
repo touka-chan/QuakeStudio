@@ -6,7 +6,6 @@ import { LazyFeedback } from '@/feedback/LazyFeedback';
 import { InstallButton } from '@/pwa/InstallButton';
 import { AssumptionsDialog } from './AssumptionsDialog';
 import { SaveLoadDialog } from './SaveLoadDialog';
-import { TourButton } from '@/components/tutorial/TourButton';
 
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
@@ -181,10 +180,6 @@ export function TopBar({
 
           <AssumptionsDialog />
         </Dialog>
-
-        {/* Re-entry for the guided tour. The tour runs once on a first visit;
-            this is the only route back to it after that. */}
-        <TourButton />
 
         {/* Same shape as the Assumptions dialog above: the trigger is a
             sibling of the content, inside the <Dialog>, so Radix restores

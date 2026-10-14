@@ -57,7 +57,21 @@ export function ResultsPanel() {
 
   return (
     <ScrollArea className="min-h-0 flex-1">
-      <div className="space-y-4 p-4">
+      {/*
+        The right gutter and the extra bottom padding are both for the floating
+        "How to use" button.
+
+        The gutter matters on a phone, where this panel is the thing on the
+        right and the button covers the right 60px of it — right through the
+        "Compare with another building" control. Bottom padding alone cannot
+        fix it, because content in the middle of the scroll passes underneath
+        too; that is what the responsive audit caught when it reported a
+        control as unclickable even after scrolling it into view.
+
+        Both are mobile-only: a desktop layout is wide enough that the audit
+        finds nothing underneath.
+      */}
+      <div className="space-y-4 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
         <header className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase">Results</h2>
           {status === 'computing' ? (

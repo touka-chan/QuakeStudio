@@ -180,24 +180,35 @@ describe('guided tour — re-entry', () => {
    * `start()` rewinds to step 0. A live button during the tour would let a
    * click throw away progress part way through.
    */
-  it('disables its own button while the tour is showing', async () => {
+  /*
+   * Hidden, not disabled.
+   *
+   * It used to sit disabled in the top bar. As a floating button it would be
+   * visible over the overlay and under the tour's own layers — looking live and
+   * not responding — while the card already offers "Skip tour".
+   */
+  it('takes its own button out of reach while the tour is showing', async () => {
     localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
     asFirstTimer();
     render(<App />);
 
+    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+
     /*
-     * Queried by label rather than by role with a name filter.
+     * Out of reach, but still mounted.
      *
-     * The tour is a Radix modal here, so the top bar is behind an
-     * `aria-hidden` subtree — correctly, since assistive technology should not
-     * reach past a modal. And an `aria-hidden` element has no accessible
-     * *name* to compute, so `getByRole(..., { name })` cannot match it at all.
-     * Reading the label attribute directly is unaffected.
-     *
-     * That the query needs this workaround is itself the assertion: while the
-     * tour owns the page, nothing behind it is reachable.
+     * It used to sit disabled in the top bar, and the first floating version
+     * returned null — which broke focus restoration, because this button is
+     * the usual way into the tour and so is usually what had focus when the
+     * tour opened. Unmounting it means the focus trap hands focus to an
+     * element that is gone, and it lands on <body> instead.
      */
-    expect(await screen.findByLabelText('How to use')).toBeDisabled();
+    const button = document.querySelector<HTMLElement>('[aria-label="How to use"]');
+    expect(button, 'the button was removed rather than hidden').not.toBeNull();
+    // Hidden from assistive technology and not in the tab order. The tabIndex
+    // is what makes the aria-hidden legal — axe checks for that pairing.
+    expect(button).toHaveAttribute('aria-hidden', 'true');
+    expect(button).toHaveAttribute('tabindex', '-1');
   });
 });
 
