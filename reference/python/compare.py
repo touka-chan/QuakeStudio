@@ -225,6 +225,22 @@ def pct(value: float) -> str:
     return f"{value * 100:.4f}"
 
 
+def coarse_duration(ms: float) -> str:
+    """A duration as an order of magnitude, not as a measurement.
+
+    Used for the one line in the generated report that is about wall-clock
+    time. Those numbers vary with the machine and with whatever else is
+    running, and the report is committed - so a precise figure makes every run
+    produce a diff, and a diff that is always non-empty stops being read.
+    """
+    for limit, label in ((1.0, "under 1 ms"), (10.0, "under 10 ms"),
+                         (100.0, "under 100 ms"), (500.0, "under 0.5 s"),
+                         (1000.0, "under a second")):
+        if ms < limit:
+            return label
+    return f"about {ms / 1000:.1f} s"
+
+
 def write_report(
     rows: list[dict[str, Any]],
     tolerance: float,
@@ -451,9 +467,23 @@ def write_report(
         times = ts_meta["solveTimes"]
         add("## Engine performance")
         add("")
+        # Reported as an order of magnitude, not as a measurement.
+        #
+        # This line used to be a precise wall-clock figure, which meant every
+        # `npm run validate` on a different machine - or with anything else
+        # running - rewrote it. The report is a committed artefact, so that
+        # turned a real change into noise in the diff, and noise in a diff is
+        # how real changes stop being noticed.
+        #
+        # What the line is actually for is "fast enough to re-run on every
+        # parameter change", and that holds across an order of magnitude of
+        # machines: a laptop idle and a laptop under load are both well under
+        # a second.
         add(
-            f"Wall clock for all {len(times)} cases: "
-            f"{sum(times):.0f} ms total, {max(times):.0f} ms worst single case."
+            f"All {len(times)} cases solve in well under a second combined "
+            f"(worst single case {coarse_duration(max(times))}). Fast enough "
+            f"to re-run on every parameter change, which is what makes this "
+            f"usable for exploration rather than a one-off check."
         )
         add("")
 

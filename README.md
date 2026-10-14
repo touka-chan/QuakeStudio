@@ -33,7 +33,10 @@ optional and awaiting client + engineering-adviser approval.**
 | The engine implements the specified model | TypeScript vs an independent Python solver, 16 cases | **PASS** — worst disagreement 6.3e-11% |
 | The app is accessible | axe-core over every surface + real-browser focus/tab/live-region tests | **0 violations** |
 | The app is usable with a keyboard | Playwright tab-order and focus-return specs | **Pass** |
-| It is fast enough | Lazy-loaded chunks, no `setState` in the animation loop | Entry JS **536 KB → 175 KB** gzipped |
+| Touch targets are reachable | Measured per control at 360px | 14px icons → **44px**; only 8 remain under 40px, all at the 24px WCAG minimum |
+| Nothing is clipped or unreachable at any width | `npm run web:audit` — 6 widths × 6 views, light and dark | **PASS, 0 failures** |
+| It works on a real phone | `npm run android:audit` — every feature walked on a device | **12/14**, both failures since fixed |
+| It is fast enough | Lazy-loaded chunks, no `setState` in the animation loop | Entry JS **569 KB → 179 KB** gzipped, against a 220 KB budget |
 | The wording is honest | A deliberate copy review, defect by defect | 4 defects fixed |
 | The study instrument is correctly scored | Two independent implementations cross-checked | **PASS** — 10 cases agree exactly |
 
@@ -46,7 +49,17 @@ a wrong assumption is reproduced identically on both sides of the comparison.
 So the *relationships* are trustworthy — a braced frame really does sway less, a
 taller building really does have a longer period — while the *absolute values*
 are not. Every coefficient awaits adviser review
-([`docs/assumptions.md`](docs/assumptions.md)).
+([`docs/review-packet.md`](docs/review-packet.md)).
+
+Two things were measured rather than assumed, so the adviser starts with data
+instead of a blank page:
+
+- **The drift colour bands do not work.** Across 84 runs through the shipping
+  engine, the thresholds that shipped put **74 % of runs in one colour**, and
+  the default 5-storey building read "very large" at every shaking intensity
+  above 0.10 g. A logarithmic scale is recommended — `npm run analysis:drift`.
+- **The period coefficients are the same for all four materials**, which is
+  almost certainly wrong and is the weakest point in the model.
 
 ---
 
@@ -427,19 +440,26 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **359 tests** |
+| `npm test` | Vitest unit + component tests — **375 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests — **59 specs** |
+| `npm run e2e` | Playwright end-to-end tests — **62 specs** |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
+| `npm run web:audit` | Audit every viewport in a browser — 6 widths × 6 views, no device needed |
+| `npm run analysis:drift` | Measure where story drift actually lands, for the colour bands |
 | `npm run pwa:icons` | Regenerate the web AND Android launcher icons |
 | `npm run android:build` | Build the sideloadable Android APK |
 | `npm run android:build:release` | Unsigned release APK (needs a keystore) |
 | `npm run android:smoke` | Install on a device and assert it actually runs |
+| `npm run android:audit` | Walk every feature on a real phone, with a screenshot per step |
 | `npm run validate` | Cross-check the engine against the Python reference |
 | `npm run usability:cross-check` | Cross-check the SUS scorer against Python |
 
 `npm run e2e` fails until you have run `npm run e2e:install` at least once.
+
+`npm run web:audit` builds nothing itself — run `npm run build` first, because
+it audits the production bundle rather than the dev server. Add
+`-- --theme dark` to sweep the dark theme.
 
 `npm run validate` and `npm run usability:cross-check` need Python with NumPy
 and SciPy:
@@ -476,15 +496,18 @@ QuakeStudio/
 │  └─ constants.json                  # generated, shared with the Python side
 ├─ tools/usability/                   # SUS analysis + scorer cross-check
 ├─ tools/pwa/generate-icons.mjs        # app icons, drawn in code, no dependencies
+├─ tools/web/audit-responsive.mjs      # viewport sweep, no device needed
+├─ tools/analysis/drift-distribution.ts # where story drift actually lands
 ├─ tools/android/build-apk.mjs         # finds a working JDK, then builds the APK
 ├─ docs/
-│  ├─ assumptions.md                  # ← what the engineering adviser reviews
-│  ├─ validation-report.md            # generated: TS vs Python (Phase 5)
-│  ├─ accessibility-audit.md          # axe results + findings (Phase 5)
-│  ├─ performance.md                  # bundle sizes and budgets (Phase 5)
-│  ├─ copy-review.md                  # wording review (Phase 5)
-│  ├─ usability-plan.md               # study protocol (Phase 6)
-│  └─ heuristic-evaluation.md         # Nielsen's ten heuristics (Phase 6)
+│  ├─ review-packet.md                 # ← what the engineering adviser reviews
+│  ├─ assumptions.md                   # the full record behind that packet
+│  ├─ validation-report.md             # generated: TS vs Python (Phase 5)
+│  ├─ accessibility-audit.md           # axe results + findings (Phase 5)
+│  ├─ performance.md                   # bundle sizes and budgets (Phase 5)
+│  ├─ copy-review.md                   # wording review (Phase 5)
+│  ├─ usability-plan.md                # study protocol (Phase 6)
+│  └─ heuristic-evaluation.md          # Nielsen's ten heuristics (Phase 6)
 ├─ vitest.config.ts                   # unit tests, run from the root
 └─ eslint.config.js
 ```
@@ -580,13 +603,25 @@ it is best done now rather than once there are more commits.
 
 ## Open items
 
+> **An adviser should start with [`docs/review-packet.md`](docs/review-packet.md).**
+> It is the same material as `docs/assumptions.md`, arranged as a review that
+> can be worked through in order — roughly 20 minutes for the values that can
+> be looked up, then the questions that need judgement.
+
 | Item | Blocked on |
 |---|---|
-| Every engineering coefficient is a placeholder | Engineering adviser — [`docs/assumptions.md`](docs/assumptions.md) §1 |
-| Drift colour bands do not discriminate | Engineering adviser — `docs/assumptions.md` §7a |
+| Every engineering coefficient is a placeholder | Engineering adviser — [`docs/review-packet.md`](docs/review-packet.md), group 1 |
+| Drift colour bands — **measured, recommendation attached** | Engineering adviser — [`docs/review-packet.md`](docs/review-packet.md) group 3a, [`docs/assumptions.md`](docs/assumptions.md) §7a |
+| Period coefficients are the same for all four materials | Engineering adviser — [`docs/review-packet.md`](docs/review-packet.md) group 2a |
 | Drift-ratio definition differs per-floor *peaks* | Engineering adviser |
 | Usability study has not been run | **People** — needs ~10 students, [`docs/usability-plan.md`](docs/usability-plan.md) |
 | Site factors (soil, foundation, fault distance) | Client + engineering adviser (Phase 7) |
+
+The drift bands were measured rather than guessed: across 84 runs through the
+shipping engine, the thresholds that shipped put **74 % of runs in one colour**,
+and the default 5-storey building read "very large" at every shaking intensity
+above 0.10 g. A logarithmic scale is recommended, with the distribution and two
+alternatives in §7a. Reproduce it with `npm run analysis:drift`.
 
 ---
 

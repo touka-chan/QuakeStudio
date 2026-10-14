@@ -16,3 +16,10 @@ pm run validate. Re-emitting them on every run would make
 pm run format:check fail immediately after, so they are not formatted.
 reference/constants.json
 reference/ts-results.json
+
+# Capacitor's copy of the built app, produced by 
+pm run android:sync. These
+# are generated bundles - formatting them achieves nothing and every sync
+# would rewrite them. Only the Capacitor-owned JSON files are stable, and
+# they are generated too.
+apps/web/android/app/src/main/assets/

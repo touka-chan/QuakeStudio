@@ -60,6 +60,10 @@ Thumbs.db
 # the APK, not source, and they are regenerated every time anyone does it.
 apps/web/android/app-smoke/
 
+# Screenshots from `npm run android:audit`. One per audited step, for the same
+# reason.
+apps/web/android/app-audit/
+
 # Validation artifacts
 # constants.json IS committed — it is the single shared set of engineering
 # numbers, and the adviser should be able to read exactly what both
@@ -69,9 +73,6 @@ reference/ts-results.json
 
 # TypeScript
 *.tsbuildinfo
-# Screenshots from 
-pm run android:audit.
-apps/web/android/app-audit/
 
 # Screenshots from `npm run web:audit`.
 apps/web/responsive-audit/

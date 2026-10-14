@@ -158,7 +158,7 @@ export type SusAggregate = {
  *
  * Hard-coded rather than pulled from scipy: this runs in the browser, and a
  * 400 KB statistics library to compute eleven numbers would be a poor trade.
- * Values beyond df = 30 fall back to 2.042, the limit �� within 0.6% for any
+ * Values beyond df = 30 fall back to 2.042, the limit, good to within 0.6% for any
  * plausible study size.
  */
 const T_95: Readonly<Record<number, number>> = {

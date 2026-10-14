@@ -176,9 +176,7 @@ async function shareCsv(filename: string, contents: string): Promise<void> {
     await Share.share({ title: filename, url: uri });
   } catch (error) {
     console.error('CSV export failed:', error);
-    throw new Error(
-      'Could not export the CSV. The file could not be written on this device.',
-    );
+    throw new Error('Could not export the CSV. The file could not be written on this device.');
   }
 }
 

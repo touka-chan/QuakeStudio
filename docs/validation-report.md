@@ -122,7 +122,7 @@ Agreeing on the default model proves very little. The matrix is built around the
 
 ## Engine performance
 
-Wall clock for all 16 cases: 63 ms total, 8 ms worst single case.
+All 16 cases solve in well under a second combined (worst single case under 10 ms). Fast enough to re-run on every parameter change, which is what makes this usable for exploration rather than a one-off check.
 
 ## What would make this stronger
 
