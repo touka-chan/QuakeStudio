@@ -284,29 +284,52 @@ function AssumptionsTab() {
  * trust the output.
  */
 function AssumptionItem({ row }: { row: AssumptionRow }) {
+  /*
+   * Stacked on a narrow screen, one row from `sm` up.
+   *
+   * This used to be a single flex row with the label at `flex-1 min-w-0` and
+   * the value and status badge at `shrink-0`. On a 320px phone that left the
+   * label about 60px once the value and badge had taken their share, and
+   * "Concrete - Mass per unit floor area" came out one word per line:
+   *
+   *     Concrete - Mass per unit floor area     600 kg/m2   [needs review]
+   *     - Mass
+   *     per unit
+   *     floor
+   *     area
+   *
+   * `min-w-0` is what let it shrink that far: a flex item refuses to shrink
+   * below its longest word by default, and this asked it to.
+   *
+   * Below `sm` the label takes its own line and the value and badge sit
+   * together underneath - the same answer the questionnaire settled on.
+   * Above it, nothing changes.
+   */
   return (
-    <li className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 rounded-app border border-line px-3 py-2">
-      <span className="min-w-0 flex-1">
+    <li className="flex flex-col gap-1 rounded-app border border-line px-3 py-2 sm:flex-row sm:items-baseline sm:gap-x-2">
+      <span className="min-w-0 sm:flex-1">
         <span className="text-sm">{row.label}</span>
         <span className="block text-xs text-muted-foreground">{row.note}</span>
       </span>
 
-      <span className="font-mono-nums shrink-0 text-sm tabular-nums">
-        {row.value}
-        {row.units !== '—' ? (
-          <span className="ml-1 text-xs text-muted-foreground">{row.units}</span>
-        ) : null}
-      </span>
+      <span className="flex items-baseline gap-2">
+        <span className="font-mono-nums text-sm tabular-nums">
+          {row.value}
+          {row.units !== '—' ? (
+            <span className="ml-1 text-xs text-muted-foreground">{row.units}</span>
+          ) : null}
+        </span>
 
-      <span
-        className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-          row.placeholder
-            ? 'bg-accent-yellow/15 text-accent-yellow-text'
-            : 'bg-surface-2 text-muted-foreground'
-        }`}
-      >
-        <span aria-hidden="true">{row.placeholder ? '☐' : '☑'}</span>{' '}
-        {row.placeholder ? 'needs review' : 'fixed by method'}
+        <span
+          className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+            row.placeholder
+              ? 'bg-accent-yellow/15 text-accent-yellow-text'
+              : 'bg-surface-2 text-muted-foreground'
+          }`}
+        >
+          <span aria-hidden="true">{row.placeholder ? '☐' : '☑'}</span>{' '}
+          {row.placeholder ? 'needs review' : 'fixed by method'}
+        </span>
       </span>
     </li>
   );
