@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useIsDesktop } from '@/lib/useMediaQuery';
+import { BACK_REQUESTED } from '@/pwa/backButton';
 import { ControlsPanel } from './ControlsPanel';
 import { FirstRunDialog } from './FirstRunDialog';
 import { MobileTabBar, type MobileTab } from './MobileTabBar';
@@ -29,6 +30,21 @@ import { LazyViewport } from '@/components/viewport/LazyViewport';
 
 export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean } = {}) {
   const [tab, setTab] = useState<MobileTab>('build');
+
+  /*
+   * Android's back button, when there is no dialog to dismiss.
+   *
+   * The listener lives in pwa/backButton.ts; this only reacts to its event.
+   * Returning to Build rather than closing the app matches what the button
+   * means everywhere else on Android.
+   */
+  useEffect(() => {
+    function onBack(event: Event) {
+      setTab((event as CustomEvent<{ tab: MobileTab }>).detail.tab);
+    }
+    document.addEventListener(BACK_REQUESTED, onBack);
+    return () => document.removeEventListener(BACK_REQUESTED, onBack);
+  }, []);
   const [panelOpen, setPanelOpen] = useState(false);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);

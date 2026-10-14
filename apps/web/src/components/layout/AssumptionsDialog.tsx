@@ -55,6 +55,7 @@ import { APP_VERSION } from '@/types';
  */
 export function AssumptionsDialog() {
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
 
   const copyForReview = async () => {
     const markdown = assumptionsMarkdown();
@@ -65,7 +66,13 @@ export function AssumptionsDialog() {
       // Clipboard access can be denied. Falling back to a download keeps the
       // feature useful rather than failing silently.
       const { downloadCsv } = await import('@/lib/csv');
-      downloadCsv(assumptionsFilename(), markdown);
+      try {
+        // Awaited, because the native path can genuinely fail — an unwritten file
+        // with no error would be worse than the clipboard denial we just hit.
+        await downloadCsv(assumptionsFilename(), markdown);
+      } catch {
+        setCopyFailed(true);
+      }
     }
   };
 
@@ -183,7 +190,11 @@ export function AssumptionsDialog() {
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
         <Button variant="outline" size="sm" onClick={() => void copyForReview()}>
           <ClipboardCopy aria-hidden="true" />
-          {copied ? 'Copied — paste into the review' : 'Copy assumptions for review'}
+          {copied
+            ? 'Copied — paste into the review'
+            : copyFailed
+              ? 'Could not copy or download — select the text above'
+              : 'Copy assumptions for review'}
         </Button>
         <a
           href="https://github.com/touka-chan/QuakeStudio/blob/main/docs/assumptions.md"

@@ -73,14 +73,28 @@ export function TopBar({
   const motion = useConfigStore((s) => s.motion);
   const result = useConfigStore((s) => s.result);
   const [exported, setExported] = useState<string | null>(null);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   // Export writes the SAME result object the charts render, so the file and
   // the screen cannot disagree. See lib/csv.ts.
-  const exportCsv = () => {
+  //
+  // It can now FAIL — on a phone the native write is not guaranteed — and a
+  // silent failure here is precisely the bug this button used to have. If it
+  // does not work, the user is told, in the live region, in words.
+  const exportCsv = async () => {
     if (result.time.length === 0) return;
-    const filename = csvFilename(building);
-    downloadCsv(filename, buildCsv(building, motion, result));
-    setExported(filename);
+    setExportError(null);
+
+    try {
+      const filename = csvFilename(building);
+      await downloadCsv(filename, buildCsv(building, motion, result));
+      setExported(filename);
+    } catch (error) {
+      setExported(null);
+      setExportError(
+        error instanceof Error ? error.message : 'The CSV could not be exported.',
+      );
+    }
   };
 
   return (
@@ -137,11 +151,24 @@ export function TopBar({
           </TooltipContent>
         </Tooltip>
 
-        {/* Announces the download to assistive tech without shifting the
-            toolbar with a toast. */}
+        {/* Announces the result to assistive tech without shifting the toolbar
+            with a toast. A FAILURE is announced too — a silent export is the
+            bug this whole path exists to fix. */}
         <span className="sr-only" role="status" aria-live="polite">
-          {exported ? `Exported ${exported}` : ''}
+          {exportError ? `Export failed. ${exportError}` : exported ? `Exported ${exported}` : ''}
         </span>
+
+        {/* Visible to everyone, not just screen readers. The share sheet is a
+            system UI that may never appear, and on a failure the user needs to
+            know in ordinary sight. */}
+        {exportError ? (
+          <p
+            role="alert"
+            className="w-full rounded-app border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive sm:w-auto"
+          >
+            {exportError}
+          </p>
+        ) : null}
 
         <Dialog open={assumptionsOpen} onOpenChange={onAssumptionsOpenChange}>
           <Tooltip>

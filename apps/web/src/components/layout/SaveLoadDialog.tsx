@@ -175,12 +175,15 @@ export function SaveLoadDialog({
   };
 
   const exportAll = async () => {
+    setBusy(true);
     try {
       const json = await storage.exportAll();
-      downloadCsv(bundleFilename(), json);
+      await downloadCsv(bundleFilename(), json);
       setStatus({ tone: 'ok', message: 'Exported every saved run.' });
     } catch (error) {
       setStatus({ tone: 'error', message: describe(error) });
+    } finally {
+      setBusy(false);
     }
   };
 

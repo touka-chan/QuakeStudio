@@ -1,3 +1,5 @@
+import { Capacitor } from '@capacitor/core';
+
 import { APP_VERSION } from '@/types';
 import { formatMm, formatPct } from '@/lib/utils';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
@@ -101,14 +103,37 @@ export function buildCsv(
   return lines.join('\n');
 }
 
-/** Trigger a browser download. No-op outside a DOM. */
-export function downloadCsv(filename: string, contents: string): void {
+/**
+ * Trigger a download.
+ *
+ * ── WHY THIS IS NOT JUST an <a download> ──────────────────────────────────
+ * On the web that is all it takes. Inside an Android WebView it is not:
+ * `URL.createObjectURL` plus a synthetic anchor click is SILENTLY IGNORED,
+ * because the WebView has no download listener registered. No file appears, no
+ * error is thrown, and nothing is logged. Verified on a realme running
+ * Android 11 — the button appears to work and produces nothing at all.
+ *
+ * That is the worst possible failure mode for this button: CSV export is how a
+ * student gets simulation data into a report, so "no error, no file" looks
+ * exactly like success until the moment they go to submit.
+ *
+ * So on a native platform the bytes go to the filesystem and the system share
+ * sheet opens instead. On the web, nothing changes.
+ *
+ * The BOM makes Excel read the file as UTF-8 rather than the local codepage.
+ * Prepended as an escape sequence: a literal U+FEFF character in source trips
+ * ESLint's no-irregular-whitespace rule.
+ */
+export async function downloadCsv(filename: string, contents: string): Promise<void> {
+  const BOM = '\uFEFF';
+
+  if (Capacitor.isNativePlatform()) {
+    await shareCsv(filename, BOM + contents);
+    return;
+  }
+
   if (typeof document === 'undefined') return;
 
-  // The BOM makes Excel read the file as UTF-8 rather than the local codepage.
-  // Prepended as an escape sequence: a literal U+FEFF character in source trips
-  // ESLint's no-irregular-whitespace rule.
-  const BOM = '\uFEFF';
   const blob = new Blob([BOM + contents], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
 
@@ -120,6 +145,41 @@ export function downloadCsv(filename: string, contents: string): void {
   link.remove();
 
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Native export: write the file, then offer it.
+ *
+ * Both plugins are imported dynamically. A static import would pull native
+ * code into the web build for a path that only ever runs on a phone, and the
+ * entry chunk has a deliberate budget.
+ */
+async function shareCsv(filename: string, contents: string): Promise<void> {
+  try {
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem');
+    const { Share } = await import('@capacitor/share');
+
+    await Filesystem.writeFile({
+      path: filename,
+      data: contents,
+      directory: Directory.Cache,
+      encoding: Encoding.UTF8,
+    });
+
+    const { uri } = await Filesystem.getUri({ path: filename, directory: Directory.Cache });
+
+    /*
+     * The share SHEET rather than a silent save to a fixed folder: on a phone
+     * "where did that file go" is a question with no good answer, whereas Drive,
+     * email or a cable are all one tap away and a visible choice.
+     */
+    await Share.share({ title: filename, url: uri });
+  } catch (error) {
+    console.error('CSV export failed:', error);
+    throw new Error(
+      'Could not export the CSV. The file could not be written on this device.',
+    );
+  }
 }
 
 /** Filesystem-safe name, e.g. `quakestudio-5-story-concrete-frame.csv`. */

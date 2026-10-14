@@ -26,6 +26,7 @@ import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 import App from './App';
+import { registerBackButton } from './pwa/backButton';
 import { registerServiceWorker } from './pwa/registerServiceWorker';
 
 const container = document.getElementById('root');
@@ -46,3 +47,9 @@ createRoot(container).render(
  * update. See src/pwa/registerServiceWorker.ts.
  */
 void registerServiceWorker();
+
+/*
+ * Android's hardware back button. Without this it closes the activity, so back
+ * inside any dialog drops the user out of the app entirely. No-op in a browser.
+ */
+void registerBackButton();

@@ -98,7 +98,7 @@ export function FeedbackDialog() {
     setStatus('Response recorded locally. Nothing has been sent anywhere.');
   };
 
-  const exportResponses = () => {
+  const exportResponses = async () => {
     const payload = {
       format: 'quakestudio-sus',
       version: 1,
@@ -107,8 +107,19 @@ export function FeedbackDialog() {
       targetScore: SUS_TARGET_SCORE,
       responses: submitted,
     };
-    downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
-    setStatus(`Exported ${submitted.length} response${submitted.length === 1 ? '' : 's'}.`);
+
+    try {
+      // Awaited: on a phone the native write and share can fail, and a study
+      // response silently lost is not recoverable by anyone.
+      await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
+      setStatus(`Exported ${submitted.length} response${submitted.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      setStatus(
+        error instanceof Error
+          ? `Export failed: ${error.message}`
+          : 'Export failed. The responses are still in this browser.',
+      );
+    }
   };
 
   return (
