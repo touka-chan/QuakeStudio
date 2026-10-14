@@ -63,6 +63,28 @@ function card(page: Page): Locator {
   return page.getByRole('dialog');
 }
 
+/**
+ * The box, once it has stopped moving.
+ *
+ * A step change scrolls its target into view smoothly, and `boundingBox()`
+ * resolves immediately rather than waiting for an animation. Measuring through
+ * a scroll measures a position the user never saw, and a test built on that
+ * passes or fails for reasons that have nothing to do with the code.
+ *
+ * Polls until two consecutive reads agree.
+ */
+async function settledBox(locator: Locator): Promise<Awaited<ReturnType<Locator['boundingBox']>>> {
+  let previous = '';
+  for (let i = 0; i < 40; i += 1) {
+    const box = await locator.boundingBox();
+    const key = box ? JSON.stringify(box) : 'none';
+    if (key === previous) return box;
+    previous = key;
+    await locator.page().waitForTimeout(50);
+  }
+  return locator.boundingBox();
+}
+
 /** True when the box is entirely within the viewport. */
 function fullyOnScreen(
   box: { x: number; y: number; width: number; height: number },
@@ -88,7 +110,7 @@ test.describe('guided tour', () => {
     expect(steps).toBe(4);
 
     for (let i = 0; i < steps; i += 1) {
-      const box = await card(page).boundingBox();
+      const box = await settledBox(card(page));
       expect(box, `step ${i + 1} has no box`).not.toBeNull();
       expect(fullyOnScreen(box!, page.viewportSize()!), `step ${i + 1} card is off screen`).toBe(
         true,
@@ -107,8 +129,8 @@ test.describe('guided tour', () => {
    */
   test('the card never covers the element it is describing', async ({ page }) => {
     for (let i = 0; i < 4; i += 1) {
-      const outline = await page.locator('[data-tour-outline]').boundingBox();
-      const cardBox = await card(page).boundingBox();
+      const outline = await settledBox(page.locator('[data-tour-outline]'));
+      const cardBox = await settledBox(card(page));
 
       // Both are measured after the step has settled, so this is the layout
       // the user actually reads rather than a frame mid-transition.
@@ -133,13 +155,37 @@ test.describe('guided tour', () => {
     for (let i = 0; i < 4; i += 1) {
       const outlined = page.locator('[data-tour-outline]');
       await expect(outlined).toHaveCount(1);
-      const box = await outlined.boundingBox();
+      const box = await settledBox(outlined);
       expect(box?.width ?? 0).toBeGreaterThan(0);
       expect(box?.height ?? 0).toBeGreaterThan(0);
 
+      /*
+       * And the thing being pointed at has to be somewhere the user can
+       * actually see.
+       *
+       * Step 4 points at the compare button, which sits below the fold of the
+       * results panel. Without the tour scrolling its target into view the
+       * outline was drawn around a control off the bottom of the screen — the
+       * card got placed for something the reader had never been shown.
+       *
+       * Measured on the element rather than the outline, which deliberately
+       * overhangs it by 8px and so hangs off the bottom of the screen whenever
+       * the target is a full-height panel.
+       */
+      const size = page.viewportSize()!;
+      const active = page.locator('[data-tour-active]');
+      await expect(active).toHaveCount(1);
+      const shown = await settledBox(active);
+      expect(shown!.y, `step ${i + 1} starts above the screen`).toBeGreaterThanOrEqual(0);
+      expect(shown!.y + shown!.height, `step ${i + 1} runs off the bottom`).toBeLessThanOrEqual(
+        size.height,
+      );
+      expect(shown!.x + shown!.width, `step ${i + 1} runs off the right`).toBeLessThanOrEqual(
+        size.width,
+      );
+
       const next = card(page).getByRole('button', { name: /^next$/i });
       if (await next.count()) await next.click();
-      else break;
     }
   });
 
@@ -200,7 +246,7 @@ test.describe('guided tour on a phone', () => {
 
     await expect(card(page)).toBeVisible();
 
-    const box = await card(page).boundingBox();
+    const box = await settledBox(card(page));
     expect(fullyOnScreen(box!, page.viewportSize()!)).toBe(true);
   });
 

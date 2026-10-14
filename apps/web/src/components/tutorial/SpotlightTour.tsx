@@ -40,14 +40,24 @@ type Props = {
   onSkip: () => void;
 };
 
+/** How much the page behind is softened. Enough to isolate, not enough to hide. */
+const BLUR_PX = 3;
+
 export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSkip }: Props) {
-  const rect = useTargetRect(step.target, true);
+  const reduced = usePrefersReducedMotion();
+  /*
+   * `nearest`, and never smooth for a reduced-motion user. Both matter: the
+   * results panel is long, and without the scroll the tour would happily
+   * highlight a compare button that is below the fold.
+   */
+  const rect = useTargetRect(step.target, true, {
+    scrollIntoView: { behavior: reduced ? 'auto' : 'smooth', block: 'center' },
+  });
   const cardRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLHeadingElement>(null);
   const maskId = useId();
   const titleId = useId();
   const bodyId = useId();
-  const reduced = usePrefersReducedMotion();
 
   useFocusTrap(cardRef, true);
 
@@ -64,7 +74,20 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
     if (!el) return;
     const before = el.getAttribute('aria-describedby');
     el.setAttribute('aria-describedby', before ? `${before} ${bodyId}` : bodyId);
+
+    /*
+     * Mark the element this step is about.
+     *
+     * Every step's target is in the DOM at once, so `data-tour` on its own does
+     * not say which one is live. Needed because the outline is the wrong thing
+     * to measure for visibility — it deliberately overhangs the element by
+     * OUTLINE_PAD, so on a full-height panel it hangs eight pixels past the
+     * bottom of the screen while the element itself is perfectly visible.
+     */
+    el.setAttribute('data-tour-active', '');
+
     return () => {
+      el.removeAttribute('data-tour-active');
       if (before) el.setAttribute('aria-describedby', before);
       else el.removeAttribute('aria-describedby');
     };
@@ -132,8 +155,60 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
       height: rect.height + OUTLINE_PAD * 2,
     } as const);
 
+  /*
+   * The hole in the blur.
+   *
+   * `backdrop-filter` applies to everything painted behind the element, with no
+   * way to exclude anything — so the element being talked about would be
+   * blurred along with everything else, which defeats the point of cutting it
+   * out in the first place. The client's wording was "blurs OTHER elements",
+   * which implies the shown part stays sharp.
+   *
+   * A `clip-path` polygon rather than the same SVG mask the dim uses. The mask
+   * is fine inside the SVG, but referencing an SVG <mask> from a CSS property
+   * has patchy sizing behaviour across engines, and getting it subtly wrong
+   * means the blur covers the target with nothing obviously broken to look at.
+   * A polygon is arithmetic, and arithmetic can be tested.
+   *
+   * The inner rectangle is listed in the opposite winding to the outer one.
+   * `polygon()` fills with the nonzero rule, so opposite winding is what makes
+   * it a hole rather than a notch bitten out of one side.
+   */
+  const holeClip = outline
+    ? (() => {
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+        const x0 = (outline.left / vw) * 100;
+        const x1 = ((outline.left + outline.width) / vw) * 100;
+        const y0 = (outline.top / vh) * 100;
+        const y1 = ((outline.top + outline.height) / vh) * 100;
+        return [
+          'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%',
+          `${x0}% ${y1}%`,
+          `${x1}% ${y1}%`,
+          `${x1}% ${y0}%`,
+          `${x0}% ${y0}%)`,
+        ].join(', ');
+      })()
+    : undefined;
+
   return (
     <>
+      {/* ---- The blur, with the target cut out of it ---- */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 z-50"
+        style={{
+          backdropFilter: `blur(${BLUR_PX}px)`,
+          WebkitBackdropFilter: `blur(${BLUR_PX}px)`,
+          // No clip means no hole, which is the right fallback while the target
+          // has not been measured: everything softened, rather than a hard
+          // unblurred window over the wrong element.
+          clipPath: holeClip,
+          WebkitClipPath: holeClip,
+        }}
+      />
+
       {/* ---- The dim, with the target cut out of it ---- */}
       <div className="fixed inset-0 z-50">
         <svg className="absolute inset-0 size-full" aria-hidden="true">

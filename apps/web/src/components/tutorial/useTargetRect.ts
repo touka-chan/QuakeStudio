@@ -31,18 +31,46 @@ export type TargetRect = {
 /** How many frames to keep looking for a target that is not mounted yet. */
 const MAX_FRAMES = 20;
 
+export type ScrollOptions = {
+  behavior?: 'auto' | 'smooth';
+  /** Where the target should end up. Defaults to `nearest`. */
+  block?: 'start' | 'center' | 'nearest';
+};
+
+type Options = {
+  /**
+   * Bring the target into view before measuring it.
+   *
+   * Without this the tour happily highlighted an element that was scrolled out
+   * of sight: step 4 points at the compare button, which lives below the fold
+   * of the results panel, so the card was placed for a target the user could
+   * not see. Measuring and highlighting are not the same as showing.
+   */
+  scrollIntoView?: ScrollOptions;
+};
+
 /** A measurement, tagged with what it was a measurement OF. */
 type Measurement = { target: string | null; rect: Exclude<TargetRect, null> | null };
 
-export function useTargetRect(target: string | null, enabled: boolean): TargetRect {
+export function useTargetRect(
+  target: string | null,
+  enabled: boolean,
+  options: Options = {},
+): TargetRect {
+  const { scrollIntoView } = options;
   const [measured, setMeasured] = useState<Measurement>({ target: null, rect: null });
+
+  const find = useCallback(
+    () => (target ? document.querySelector<HTMLElement>(`[data-tour="${target}"]`) : null),
+    [target],
+  );
 
   const measure = useCallback(() => {
     if (!target) {
       setMeasured({ target: null, rect: null });
       return;
     }
-    const el = document.querySelector(`[data-tour="${target}"]`);
+    const el = find();
     if (!el) {
       setMeasured({ target, rect: null });
       return;
@@ -64,7 +92,7 @@ export function useTargetRect(target: string | null, enabled: boolean): TargetRe
         rect: { top: box.top, left: box.left, width: box.width, height: box.height },
       };
     });
-  }, [target]);
+  }, [target, find]);
 
   /*
    * A measurement is only valid for the element it was taken from.
@@ -81,14 +109,47 @@ export function useTargetRect(target: string | null, enabled: boolean): TargetRe
 
     let frames = 0;
     let raf = 0;
+    let scrolled = scrollIntoView === undefined;
 
     function retry() {
-      measure();
-      const el = document.querySelector(`[data-tour="${target}"]`);
-      if (!el && frames < MAX_FRAMES) {
-        frames += 1;
-        raf = requestAnimationFrame(retry);
+      const el = find();
+
+      if (!el) {
+        measure();
+        if (frames < MAX_FRAMES) {
+          frames += 1;
+          raf = requestAnimationFrame(retry);
+        }
+        return;
       }
+
+      /*
+       * Scroll before measuring, and only once per target. Doing it inside the
+       * retry rather than up front is what makes this work for a lazily
+       * mounted target: if the element is not there yet, the scroll waits with
+       * it rather than silently doing nothing.
+       *
+       * `nearest` was the first choice and it was wrong. It scrolls the least
+       * possible distance, which for a control at the foot of a scrollable
+       * panel leaves it flush against the bottom edge — visible, but with no
+       * margin, half of it feeling like it fell off the screen. `center`
+       * leaves the target surrounded by whatever is above and below it.
+       *
+       * Except when the target is taller than most of the window. Centring
+       * something that does not fit cuts off its top and bottom equally, and
+       * the top of a panel is the part a reader starts from. Those get `start`.
+       */
+      if (!scrolled && scrollIntoView) {
+        scrolled = true;
+        const tall = el.offsetHeight > window.innerHeight * 0.8;
+        el.scrollIntoView({
+          block: tall ? 'start' : (scrollIntoView.block ?? 'nearest'),
+          inline: 'nearest',
+          behavior: scrollIntoView.behavior ?? 'auto',
+        });
+      }
+
+      measure();
     }
 
     window.addEventListener('resize', measure);
@@ -96,19 +157,15 @@ export function useTargetRect(target: string | null, enabled: boolean): TargetRe
     // panels scrolling underneath the spotlight is invisible to us.
     window.addEventListener('scroll', measure, true);
 
-    const el = document.querySelector(`[data-tour="${target}"]`);
-    let observer: ResizeObserver | null = null;
-    if (el && typeof ResizeObserver !== 'undefined') {
-      observer = new ResizeObserver(measure);
-      observer.observe(el);
-    }
+    const observer =
+      find() && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    observer?.observe(find()!);
 
     /*
      * The first measurement happens on the next animation frame rather than
      * synchronously here. Measuring now would mean a setState in the body of
      * this effect, which cascades an extra render on every step change for a
-     * result the browser is about to paint anyway. One frame without the
-     * outline is not something anyone can see.
+     * result the browser is about to paint anyway.
      */
     raf = requestAnimationFrame(retry);
 
@@ -118,7 +175,7 @@ export function useTargetRect(target: string | null, enabled: boolean): TargetRe
       window.removeEventListener('scroll', measure, true);
       observer?.disconnect();
     };
-  }, [enabled, target, measure]);
+  }, [enabled, target, scrollIntoView, measure, find]);
 
   return current;
 }

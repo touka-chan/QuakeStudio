@@ -61,17 +61,46 @@ export function placeCard(
     };
   }
 
+  /*
+   * Above, then right, then below, then left.
+   *
+   * Above first is a change of mind. With "below" first, the card landed below
+   * its target whenever there was room, which for the compare button — the last
+   * thing in the results panel, sitting near the foot of the screen — meant
+   * the card sat over the content it was describing rather than over the
+   * three empty columns above it.
+   *
+   * Reading order is the reason as much as aesthetics: a card above its subject
+   * is the shape most people already expect, because that is where a caption
+   * goes. Each of the four steps still lands where it should with this order —
+   * the tall side panels have no room above, and fall through to beside.
+   */
   const candidates: { left: number; top: number }[] = [
-    { left: target.left, top: target.top + target.height + CARD_GAP },
     { left: target.left, top: target.top - CARD_GAP - card.height },
     { left: target.left + target.width + CARD_GAP, top: target.top },
+    { left: target.left, top: target.top + target.height + CARD_GAP },
     { left: target.left - CARD_GAP - card.width, top: target.top },
   ];
 
+  /*
+   * A candidate is acceptable when the card lands fully on screen AND does not
+   * cover the target. Both halves matter, and neither is the same as "the clamp
+   * changed nothing".
+   *
+   * That distinction was a real bug, and it was found by measuring the app
+   * rather than by reading the code. The compare button sits eight pixels from
+   * the right edge — that is the outline padding — so a card aligned to it was
+   * one pixel past the limit and got clamped by one. Testing for "the clamp
+   * did not move this" threw that candidate away over a single pixel, and the
+   * card ended up beside the button rather than above it.
+   *
+   * Asking the question we actually care about — is it on screen, and is the
+   * target still visible — gets the case right and does not care where the
+   * target happens to sit.
+   */
   for (const c of candidates) {
-    const clamped = clampBox(c, card, viewport);
-    // "Fits" means the clamp was not needed, not merely that it is on screen.
-    if (Math.abs(clamped.top - c.top) < 1 && Math.abs(clamped.left - c.left) < 1) return c;
+    const at = clampBox(c, card, viewport);
+    if (!overlaps(at, card, target)) return at;
   }
 
   const centreX = target.left + target.width / 2;
@@ -82,6 +111,16 @@ export function placeCard(
   return candidates
     .map((c) => clampBox(c, card, viewport))
     .sort((a, b) => distance(b) - distance(a))[0]!;
+}
+
+/** Do the card and the target share any area? */
+function overlaps(at: { left: number; top: number }, card: Size, target: Box): boolean {
+  return (
+    at.left < target.left + target.width &&
+    target.left < at.left + card.width &&
+    at.top < target.top + target.height &&
+    target.top < at.top + card.height
+  );
 }
 
 function clampBox(

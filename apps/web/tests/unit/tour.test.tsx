@@ -310,9 +310,17 @@ describe('guided tour — where the card goes', () => {
     );
   }
 
-  it('prefers below the target', () => {
-    const at = placeCard({ top: 100, left: 400, width: 200, height: 100 }, CARD, DESKTOP);
-    expect(at.top).toBeGreaterThan(200);
+  /*
+   * Above, not below.
+   *
+   * This was the opposite way round until it was measured on a running app: a
+   * card that lands above its subject reads like a caption, and for the compare
+   * button — the last thing in a long scrollable panel — "below" put the card
+   * straight over the content it was describing.
+   */
+  it('prefers above the target', () => {
+    const at = placeCard({ top: 400, left: 400, width: 200, height: 100 }, CARD, DESKTOP);
+    expect(at.top + CARD.height).toBeLessThanOrEqual(400);
   });
 
   /*
@@ -392,6 +400,66 @@ describe('guided tour — where the card goes', () => {
     const phone = { width: 360, height: 720 };
     const at = placeCard({ top: 60, left: 0, width: 360, height: 600 }, CARD, phone);
     expect(onScreen(at, phone)).toBe(true);
+  });
+
+  /*
+   * The regression, with the numbers measured off a running app rather than
+   * invented — and at the size they were measured at.
+   *
+   * The compare button's right edge is eight pixels from the window edge — that
+   * is the outline padding — so a card aligned to it came out one pixel past
+   * the clamp limit. The old "nothing may be clamped" rule threw that
+   * candidate away and the card landed beside the button instead of above it.
+   *
+   * These four numbers are the box of that button and of the card, read out of
+   * a 1600x900 browser. An earlier version of this test used them against
+   * DESKTOP, which is 1280x720 — so the target sat below the viewport and the
+   * test passed for a reason that had nothing to do with placement. Same
+   * numbers, wrong window, worthless test.
+   */
+  it('puts the card above a target sitting against the right edge', () => {
+    const wide = { width: 1600, height: 900 };
+    const realCard = { width: 352, height: 223 };
+    const button = { top: 800, left: 1233, width: 351, height: 44 };
+
+    const at = placeCard(button, realCard, wide);
+
+    expect(onScreen(at, wide)).toBe(true);
+    // Above the button, not beside it and not on top of it.
+    expect(at.top + realCard.height).toBeLessThanOrEqual(button.top);
+    expect(at.left).toBeGreaterThanOrEqual(button.left - 1);
+  });
+
+  /*
+   * The property the placement is for, checked across the same sweep: wherever
+   * a non-covering position exists at all, the card finds it.
+   */
+  it('never covers the target when the page leaves room somewhere', () => {
+    const topLefts = [
+      { top: 40, left: 40 },
+      { top: 40, left: 800 },
+      { top: 600, left: 40 },
+      { top: 600, left: 800 },
+      { top: 300, left: 400 },
+    ];
+    const sizes = [
+      { width: 60, height: 44 },
+      { width: 200, height: 80 },
+      { width: 351, height: 44 },
+    ];
+
+    for (const topLeft of topLefts) {
+      for (const size of sizes) {
+        const target = { ...topLeft, ...size };
+        const at = placeCard(target, CARD, DESKTOP);
+        const covers =
+          at.left < target.left + target.width &&
+          target.left < at.left + CARD.width &&
+          at.top < target.top + target.height &&
+          target.top < at.top + CARD.height;
+        expect(covers, `target ${JSON.stringify(target)} -> ${JSON.stringify(at)}`).toBe(false);
+      }
+    }
   });
 });
 

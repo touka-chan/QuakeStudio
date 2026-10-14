@@ -440,7 +440,7 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **405 tests** |
+| `npm test` | Vitest unit + component tests — **407 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
 | `npm run e2e` | Playwright end-to-end tests — **72 specs** |
