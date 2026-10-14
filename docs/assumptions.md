@@ -13,6 +13,11 @@ there and the app follows.
 
 ## 1. Review checklist
 
+> **An adviser should start with [`review-packet.md`](./review-packet.md).** This
+> table is the complete record; the packet is the same content arranged as a
+> review that can be worked through in order, with the open questions stated as
+> questions.
+
 | # | Assumption | Current value | Decision | Source / rationale |
 |---|---|---|---|---|
 | 1.1 | Floor mass per area — concrete | 600 kg/m² | ☐ | Given in the spec; confirm |
@@ -24,15 +29,15 @@ there and the app follows.
 | 2.3 | Damping ratio — composite | 3% | ☐ | |
 | 2.4 | Damping ratio — wood | 5% | ☐ | Typically the most damped |
 | 3.1 | Braced-frame stiffness factor | 2.0× moment frame | ☐ | Literature suggests ~1.8–2.2×; confirm |
-| 4.1 | Period coefficients `Ct`, `x` | 0.072, 0.8 (all materials) | ☐ | **Same values for all four materials is almost certainly wrong** — see §5 |
-| 5.1 | Model type | Linear-elastic shear building, 1 direction (X) | ☐ | Confirm this simplification is acceptable for the teaching goal |
+| 4.1 | Period coefficients `Ct`, `x` | 0.072, 0.8 (all materials) | ☐ | **Same values for all four materials is almost certainly wrong** — see §5, and Group 2a of the review packet |
+| 5.1 | Model type | Linear-elastic shear building, 1 direction (X) | ☐ | Confirm this simplification is acceptable for the teaching goal — Group 2c of the review packet |
 | 6.1 | Integration timestep `dt` | 0.01 s | ☐ | Spec-fixed; must satisfy `dt ≤ T₁/20` |
 | 7.1 | Rayleigh damping calibration | Modes 1 and 2 | ☐ | Standard choice; confirm |
-| 8.1 | Solver vs Python reference tolerance | ≤ 5% | ☐ | **Confirm before Phase 5** |
-| 9.1 | Drift colour band thresholds | 0.10 %, 0.20 %, 0.35 %, 0.50 % | ☐ | **Display bands only — see §7a** |
+| 8.1 | Solver vs Python reference tolerance | ≤ 5% | ☐ | **Superseded** — validation runs at 1e-6, not 5%; see §9 |
+| 9.1 | Drift colour band thresholds | 0.10 %, 0.20 %, 0.35 %, 0.50 % | ☐ | **Measured and unusable as they stand** — 74 % of runs land in the top band. Recommendation and distribution in §7a and Group 3a of the review packet |
 | 10.1 | A/B series colours | `#0072B2` / `#E69F00` | ☐ | Client spec; deuteranopia check outstanding — §8a |
 | 11.1 | Comparison change column | `% change from A` | ☐ | Product decision — §8a |
-| 12.1 | localStorage fallback may thin history | thinned, peaks exact | ☐ | **Acceptable? — §8a** |
+| 12.1 | localStorage fallback may thin history | thinned, peaks exact | ☐ | **Acceptable? — §8a**, and Group 4 of the review packet |
 
 ---
 
