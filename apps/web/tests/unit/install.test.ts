@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 
+import { Capacitor } from '@capacitor/core';
+
 import { decideInstall, isStandalone } from '@/pwa/install';
 import { isNativeApp, registerServiceWorker } from '@/pwa/registerServiceWorker';
 
@@ -113,12 +115,38 @@ describe('service worker registration', () => {
   it('detects the native Android wrapper', () => {
     expect(isNativeApp()).toBe(false);
 
-    // Capacitor injects `window.Capacitor` into the WebView. Its presence is
-    // the only signal available, and it is what stops a worker from serving a
-    // stale precache after a new APK is installed.
-    (globalThis as Record<string, unknown>).Capacitor = { isNativePlatform: () => true };
+    /*
+     * Spying on the real Capacitor object, not on a global the test invents.
+     *
+     * The previous version of this test assigned
+     * `globalThis.Capacitor = { isNativePlatform: () => true }` and asserted we
+     * saw it. That is a test of its own fixture: it agreed with itself, and
+     * the browser it was meant to protect failed anyway.
+     */
+    const spy = vi.spyOn(Capacitor, 'isNativePlatform').mockReturnValue(true);
     try {
       expect(isNativeApp()).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('reports "not native" in a web bundle, even though window.Capacitor exists', () => {
+    /*
+     * The actual bug this whole file needed to catch.
+     *
+     * `@capacitor/core` assigns `window.Capacitor` as a side effect of being
+     * imported, so in the shipped web build that global IS present for every
+     * ordinary user. Detection that sniffs for it classified every desktop
+     * browser as native, so the service worker never registered and offline
+     * support silently stopped working with nothing in the console.
+     *
+     * This passes only because detection now asks Capacitor directly. Restore
+     * the `Boolean(globalThis.Capacitor)` sniff and this fails.
+     */
+    (globalThis as Record<string, unknown>).Capacitor = { isNativePlatform: () => true };
+    try {
+      expect(isNativeApp()).toBe(false);
     } finally {
       delete (globalThis as Record<string, unknown>).Capacitor;
     }

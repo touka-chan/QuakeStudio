@@ -18,18 +18,27 @@
 
    How to tell the two environments apart
    -------------------------------------------------------------------------
-   Capacitor injects `window.Capacitor` into the WebView. Its absence is the
-   signal, and it is checked at call time rather than at module load, so the
-   same bundle behaves correctly in both places.
+   By asking Capacitor, with `Capacitor.isNativePlatform()`.
+
+   The obvious-looking alternative - checking whether `window.Capacitor`
+   exists - is WRONG, and it broke the PWA build in a way nothing caught.
+
+   `@capacitor/core` assigns `window.Capacitor` as a side effect of being
+   imported, and the web bundle imports it (see src/pwa/backButton.ts). So in
+   a plain desktop browser `window.Capacitor` is present, the sniff reports
+   "native" for every ordinary user, and the service worker silently never
+   registers. Offline support quietly stops working with a clean console.
+
+   The unit test covering this function set `globalThis.Capacitor` by hand, so
+   it passed while the real browser failed. A test that builds its own version
+   of the thing it is checking will always agree with itself.
    ========================================================================== */
 
-type CapacitorGlobal = typeof globalThis & {
-  Capacitor?: { isNativePlatform?: () => boolean };
-};
+import { Capacitor } from '@capacitor/core';
 
 /** True when running inside the native Android wrapper. */
 export function isNativeApp(): boolean {
-  return typeof globalThis !== 'undefined' && Boolean((globalThis as CapacitorGlobal).Capacitor);
+  return Capacitor.isNativePlatform();
 }
 
 /**
