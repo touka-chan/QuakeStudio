@@ -95,6 +95,18 @@ export default tseslint.config(
     },
   },
 
+  // ---- Tools that evaluate code inside the browser ------------------------
+  // `tools/web/audit-responsive.mjs` contains functions that are serialised
+  // and run inside the page (Playwright's `page.evaluate`), where `document`,
+  // `getComputedStyle` and friends are real. Linting them as Node-only reports
+  // twelve `no-undef` errors in code that is correct.
+  {
+    files: ['tools/web/**/*.mjs'],
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
+  },
+
   // Must stay last so it can disable stylistic rules that conflict.
   prettier,
 );

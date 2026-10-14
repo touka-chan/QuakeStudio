@@ -72,3 +72,6 @@ reference/ts-results.json
 # Screenshots from 
 pm run android:audit.
 apps/web/android/app-audit/
+
+# Screenshots from `npm run web:audit`.
+apps/web/responsive-audit/
