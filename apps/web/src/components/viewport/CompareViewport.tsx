@@ -1,5 +1,5 @@
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, Html } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
@@ -116,6 +116,11 @@ export function CompareViewport() {
       </Canvas>
 
       <ViewToggle view={view} onChange={setView} />
+      <CompareTags
+        nameA={describeBuilding(buildingA)}
+        nameB={describeBuilding(buildingB)}
+        ghost={ghost}
+      />
     </div>
   );
 }
@@ -209,13 +214,7 @@ function SwayingBuilding({
    * because position already distinguishes them in Side by side and
    * translucency does it in Ghost overlay.
    */
-  const palette = useCssVars([
-    '--drift-1',
-    '--drift-2',
-    '--drift-3',
-    '--drift-4',
-    '--drift-5',
-  ]);
+  const palette = useCssVars(['--drift-1', '--drift-2', '--drift-3', '--drift-4', '--drift-5']);
 
   const floorRefs = useRef<(THREE.Group | null)[]>([]);
   const floors = building.floors;
@@ -289,30 +288,74 @@ function SwayingBuilding({
           </group>
         );
       })}
-
-      {/*
-       * The A/B tag, which is where identity lives now that the floors are
-       * coloured by drift.
-       *
-       * It uses the same series colour as the "Editing A/B" badge in the
-       * controls panel and the comparison table headers, so the three agree.
-       * `distanceFactor` keeps it the same readable size however far the
-       * camera is pulled back.
-       */}
-      <Html
-        position={[0, floors * floorHeightM + floorHeightM * 0.6, 0]}
-        center
-        distanceFactor={26}
-        zIndexRange={[40, 0]}
-      >
-        <span
-          className="grid size-7 place-items-center rounded-full text-xs font-semibold text-white"
-          style={{ backgroundColor: identityColor }}
-        >
-          {tint.toUpperCase()}
-        </span>
-      </Html>
+      {/* The A/B tags are a DOM overlay instead of drei <Html> - see CompareTags. */}
     </group>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/* ------------------------------------------------------------------------- */
+
+/**
+ * The A/B tags, which is where identity lives now that both buildings are
+ * coloured by drift.
+ *
+ * These were first drawn inside the 3D scene with drei's `<Html>`, anchored
+ * above each building. That was unreliable: with two of them mounted, building
+ * A's tag rendered as an EMPTY container while B's rendered fine — same JSX,
+ * same component. Rather than ship a label that silently disappears for half
+ * the buildings, the tags are ordinary DOM laid over the canvas, the same way
+ * the Side by side / Ghost overlay switch already is.
+ *
+ * The trade is that they no longer track the buildings if you orbit the
+ * camera. In exchange they are always on screen, always legible, and readable
+ * by a screen reader — which an in-scene HTML label is not.
+ *
+ * Side by side puts A left and B right, matching where the buildings stand.
+ * Ghost overlay puts them together, because there the two occupy the same
+ * space and claiming otherwise would be a lie.
+ */
+function CompareTags({ nameA, nameB, ghost }: { nameA: string; nameB: string; ghost: boolean }) {
+  const colorA = useCssVar('--series-a');
+  const colorB = useCssVar('--series-b');
+
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-3 top-12 flex items-start justify-between gap-2"
+      aria-hidden="true"
+    >
+      <IdentityTag letter="A" name={nameA} color={colorA} />
+      <IdentityTag letter="B" name={nameB} color={colorB} align={ghost ? 'left' : 'right'} />
+    </div>
+  );
+}
+
+function IdentityTag({
+  letter,
+  name,
+  color,
+  align = 'left',
+}: {
+  letter: string;
+  name: string;
+  color: string;
+  align?: 'left' | 'right';
+}) {
+  return (
+    <span
+      className={`flex max-w-[45%] items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 backdrop-blur ${
+        align === 'right' ? 'flex-row-reverse' : ''
+      }`}
+    >
+      <span
+        className="grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white"
+        style={{ backgroundColor: color }}
+      >
+        {letter}
+      </span>
+      <span className="truncate text-[11px] text-muted-foreground">{name}</span>
+    </span>
   );
 }
 

@@ -13,6 +13,7 @@ import { sampleDisplacement } from '@/lib/time';
 import { formatMm } from '@/lib/utils';
 import { useCssVar } from '@/lib/useCssVar';
 import { useConfigStore } from '@/store/configStore';
+import { useCompareStore } from '@/store/compareStore';
 import { usePlaybackStore } from '@/store/playbackStore';
 import type { SimulationResult } from '@/types';
 
@@ -39,10 +40,24 @@ const MAX_POINTS = 400;
 export function DisplacementChart() {
   const result = useConfigStore((s) => s.result);
   const building = useConfigStore((s) => s.building);
+  const resultB = useConfigStore((s) => s.resultB);
+  const buildingB = useConfigStore((s) => s.compareBuilding);
   const activeFloor = useConfigStore((s) => s.activeFloor);
   const showGround = activeFloor === null;
 
+  /*
+   * In comparison this chart carries BOTH buildings.
+   *
+   * It used to plot building A only, with a second card below it doing the
+   * A-against-B overlay. Two charts for one question meant scrolling to
+   * compare, and the overlay card could not show a selected floor at all.
+   * Plotting both here means the comparison sits next to the 3D view it
+   * explains, and follows whatever floor is highlighted.
+   */
+  const comparing = useCompareStore((s) => s.enabled) && Boolean(resultB);
+
   const seriesColor = useCssVar('--series-a');
+  const seriesColorB = useCssVar('--series-b');
   const groundColor = useCssVar('--series-ground');
   const gridColor = useCssVar('--border');
   const textMuted = useCssVar('--text-muted');
@@ -51,7 +66,16 @@ export function DisplacementChart() {
   const floorIndex = (activeFloor ?? building.floors) - 1;
   const floorLabel = activeFloor ?? building.floors;
 
-  const data = buildChartData(result, floorIndex, showGround);
+  // A floor above B's roof has no B value to plot; the gap shows as a break.
+  const bFloorIndex = (activeFloor ?? buildingB.floors) - 1;
+  const bHasFloor = bFloorIndex < buildingB.floors;
+
+  const data = buildChartData(
+    result,
+    floorIndex,
+    showGround,
+    comparing && bHasFloor ? { result: resultB!, floorIndex: bFloorIndex } : null,
+  );
 
   // ---- Imperative playback cursor ----
   const plotAreaRef = useRef<HTMLDivElement>(null);
@@ -162,6 +186,18 @@ export function DisplacementChart() {
               name={`Floor ${floorLabel}`}
               isAnimationActive={false}
             />
+
+            {comparing && bHasFloor ? (
+              <Line
+                type="monotone"
+                dataKey="floorB"
+                stroke={seriesColorB}
+                strokeWidth={2}
+                dot={false}
+                name={`B · Floor ${activeFloor ?? buildingB.floors}`}
+                isAnimationActive={false}
+              />
+            ) : null}
           </LineChart>
         </ResponsiveContainer>
 
@@ -177,10 +213,30 @@ export function DisplacementChart() {
       <TimeReadout />
 
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+        {/*
+          The A series keeps its plain name when nothing is being compared, so
+          the single-building reading is unchanged.
+        */}
         <li className="flex items-center gap-1.5">
           <span className="h-0.5 w-4 rounded" style={{ backgroundColor: seriesColor }} />
-          Floor {floorLabel} displacement
+          {comparing ? 'A · Floor ' : 'Floor '}
+          {floorLabel} displacement
         </li>
+        {comparing && bHasFloor ? (
+          <li className="flex items-center gap-1.5">
+            <span className="h-0.5 w-4 rounded" style={{ backgroundColor: seriesColorB }} />B ·
+            Floor {activeFloor ?? buildingB.floors} displacement
+          </li>
+        ) : null}
+        {comparing && !bHasFloor ? (
+          <li className="flex items-center gap-1.5">
+            <span
+              className="h-0.5 w-4 rounded opacity-40"
+              style={{ backgroundColor: seriesColorB }}
+            />
+            B has no floor {floorLabel} — it is {buildingB.floors} storeys
+          </li>
+        ) : null}
         {showGround ? (
           <li className="flex items-center gap-1.5">
             <span
@@ -224,17 +280,32 @@ function TimeReadout() {
  * Downsample before plotting. A 60 s run at dt = 0.01 is 6,000 points; a chart
  * that has to react to a slider must not render all of them per frame.
  */
-function buildChartData(result: SimulationResult, floorIndex: number, includeGround: boolean) {
+function buildChartData(
+  result: SimulationResult,
+  floorIndex: number,
+  includeGround: boolean,
+  compare?: { result: SimulationResult; floorIndex: number } | null,
+) {
   const total = result.time.length;
   if (total === 0) return [];
   const stride = Math.max(1, Math.ceil(total / MAX_POINTS));
   const series = result.floorDisp[floorIndex] ?? [];
+  const compareSeries = compare ? (compare.result.floorDisp[compare.floorIndex] ?? []) : null;
 
-  const rows: Array<{ t: number; floor: number; ground: number }> = [];
+  const rows: Array<{ t: number; floor: number; floorB: number | null; ground: number }> = [];
   for (let i = 0; i < total; i += stride) {
     rows.push({
       t: result.time[i]!,
       floor: (series[i] ?? 0) * M2S_TO_MM,
+      /*
+       * `null` rather than 0 for a missing B point.
+       *
+       * A building B shorter than the selected floor has no value there, and
+       * plotting 0 would draw a flat line along the axis reading "B did not
+       * move" — which is a measurement claim about a building that has no
+       * floor there at all. Recharts leaves a gap for null.
+       */
+      floorB: compareSeries ? (compareSeries[i] ?? null) * M2S_TO_MM : null,
       ground: includeGround ? result.groundAccel[i]! * 40 : 0,
     });
   }
