@@ -2,6 +2,7 @@ import {
   Bar,
   BarChart,
   Cell,
+  LabelList,
   ResponsiveContainer,
   Tooltip as RechartsTooltip,
   XAxis,
@@ -78,6 +79,9 @@ export function PeakByFloorChart() {
     };
   });
 
+  // A floor row needs ~14px for its label; two bars in a row need more.
+  const chartHeight = Math.max(256, data.length * (comparing ? 30 : 20));
+
   return (
     <section
       className="rounded-card border border-line bg-surface p-4"
@@ -90,19 +94,31 @@ export function PeakByFloorChart() {
         <span className="font-mono-nums text-xs text-muted-foreground">mm</span>
       </div>
 
-      <div className="h-64 w-full">
+      {/*
+        Height follows the floor count.
+
+        It was a fixed `h-64`, which was fine for five floors and wrong for
+        twenty: 20 floors in 256px is under 13px a row, so the "Floor N" labels
+        printed on top of each other and the chart became unreadable exactly
+        when it had the most to say. Comparing two buildings made it worse,
+        because two buildings can be twenty storeys between them.
+
+        Each row needs about 14px for its label, and a good deal more when a
+        row carries two bars rather than one.
+      */}
+      <div className="w-full" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
             data={data}
             layout="vertical"
-            margin={{ top: 0, right: 44, bottom: 0, left: 0 }}
+            margin={{ top: 0, right: 56, bottom: 0, left: 0 }}
             barCategoryGap={4}
           >
             <XAxis type="number" hide />
             <YAxis
               type="category"
               dataKey="floor"
-              width={52}
+              width={64}
               tickFormatter={(v: number) => `Floor ${v}`}
               stroke={colors['--text-muted']}
               fontSize={11}
@@ -146,6 +162,14 @@ export function PeakByFloorChart() {
                   cursor="pointer"
                 />
               ))}
+              <LabelList
+                dataKey="mm"
+                position="right"
+                offset={6}
+                fontSize={10}
+                formatter={(v) => (v === null || v === undefined ? '' : formatMm(Number(v)))}
+                fill={colors['--text-muted']}
+              />
             </Bar>
 
             {/*
@@ -175,6 +199,14 @@ export function PeakByFloorChart() {
                     cursor="pointer"
                   />
                 ))}
+                <LabelList
+                  dataKey="mmB"
+                  position="right"
+                  offset={6}
+                  fontSize={10}
+                  formatter={(v) => (v === null || v === undefined ? '' : formatMm(Number(v)))}
+                  fill={colors['--text-muted']}
+                />
               </Bar>
             ) : null}
           </BarChart>
@@ -184,10 +216,15 @@ export function PeakByFloorChart() {
       <DriftLegend colors={colors} />
 
       {/*
-        The key says which column of bars is which building. Colour alone
+        The key says which bar of each pair is which building. Colour alone
         cannot do this job here — both buildings' bars are coloured by drift,
         on purpose, so that same-coloured floors have the same drift across
         the 3D view and this chart.
+
+        "Top" and "bottom", not "left" and "right": the bars run horizontally
+        but they are stacked WITHIN each floor row, because the axis is
+        vertical. An earlier version of this key said left/right, which is
+        simply false of this chart.
       */}
       {comparing ? (
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -197,7 +234,7 @@ export function PeakByFloorChart() {
               style={{ backgroundColor: colors['--series-a'] }}
               aria-hidden="true"
             />
-            Building A (left bar)
+            Building A (top bar)
           </li>
           <li className="flex items-center gap-1.5">
             <span
@@ -205,14 +242,14 @@ export function PeakByFloorChart() {
               style={{ backgroundColor: colors['--series-b'] }}
               aria-hidden="true"
             />
-            Building B (right bar)
+            Building B (bottom bar)
           </li>
         </ul>
       ) : null}
 
       <p className="mt-3 text-xs text-muted-foreground">
-        Bar colour shows story drift. The number is printed beside every bar, so colour is never the
-        only cue. Click a bar, or a floor in 3D, to highlight it.
+        Bar colour shows story drift. The peak in millimetres is printed beside every bar, so colour
+        is never the only cue. Click a bar, or a floor in 3D, to highlight it.
         {comparing
           ? ' Both buildings are coloured on the same drift scale, so floors sharing a colour have the same drift.'
           : ''}
