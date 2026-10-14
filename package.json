@@ -34,7 +34,8 @@
     "android:build:release": "node tools/android/build-apk.mjs --release --sync",
     "android:smoke": "node tools/android/smoke-apk.mjs",
     "android:audit": "node tools/android/audit-device.mjs",
-    "web:audit": "node tools/web/audit-responsive.mjs"
+    "web:audit": "node tools/web/audit-responsive.mjs",
+    "analysis:drift": "tsx --tsconfig apps/web/tsconfig.app.json tools/analysis/drift-distribution.ts"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",

@@ -145,30 +145,76 @@ result" — so that the tone stays calm and scientific rather than alarming.
 
 ---
 
-## 7a. Drift colour bands — a Phase 2 observation
+## 7a. Drift colour bands — measured, and awaiting sign-off
 
-The five-band drift scale currently splits at 0.10 %, 0.20 %, 0.35 % and 0.50 %
-(`src/lib/driftScale.ts`). Those thresholds were chosen when there were no real
-results to look at.
+The five-band drift scale splits at 0.10 %, 0.20 %, 0.35 % and 0.50 %
+(`src/lib/driftScale.ts`). Those thresholds were chosen before the engine ran at
+all. **Measured against the engine that ships, the scale does not work**: 74 %
+of all runs land in the single top band, and the default 5-storey concrete
+building reads "Very large" at every shaking intensity from 0.10 g upward —
+including the app's own default of 0.3 g.
 
-Now that the engine runs, a default 5-storey concrete building at 0.3 g
-produces **drifts above 0.50 %**, which puts every story in the top band and
-makes the scale useless for the common case.
+### The measurement
 
-This is a design question, not a physics one, so it is flagged rather than
-silently retuned:
+`npm run analysis:drift` runs the shipping `simulate()` over all 7 building
+templates at 12 shaking intensities (0.05 g to the app's maximum of 0.6 g) —
+84 runs, all through the same function the app calls, not a re-implementation.
+The intensity range deliberately stops at the app's own maximum: bands tuned to
+values a student cannot produce would answer a question nobody asked.
 
-- The bands should probably be **logarithmic**, or rescaled to whatever range
-  the model actually produces across the template set.
-- They must keep using **non-judgemental wording** ("very small" → "very
-  large"). Whatever values are chosen, the legend must never imply a verdict.
-- The top band must be open-ended so an extreme case still renders.
+| Statistic | Peak interstory drift ratio |
+| --- | --- |
+| min | 0.065 % |
+| p10 | 0.262 % |
+| p25 | 0.461 % |
+| median | 0.917 % |
+| p75 | 1.884 % |
+| p90 | 3.392 % |
+| p99 | 5.183 % |
+| max | 5.568 % |
 
-Please advise on thresholds that are meaningful to read, and confirm the
-wording.
+The spread matters as much as the numbers: **p90 is 12.9x p10**. Drift is
+roughly log-distributed across the range the app can produce, which is why a
+linear set of thresholds cannot divide it evenly.
 
----
+### How the candidates spread the same 84 runs
 
+| Scale | Cuts (%) | Band 1 | 2 | 3 | 4 | 5 |
+| --- | --- | --- | --- | --- | --- | --- |
+| **current** | 0.10 / 0.20 / 0.35 / 0.50 | 2 % | 6 % | 10 % | 8 % | **74 %** |
+| even-spread | 0.50 / 1.00 / 1.50 / 2.00 | 26 % | 30 % | 12 % | 8 % | 24 % |
+| **log (recommended)** | 0.25 / 0.50 / 1.00 / 2.00 | 10 % | 17 % | 30 % | 20 % | 24 % |
+
+### Recommendation: the logarithmic scale
+
+0.25 %, 0.50 %, 1.00 %, 2.00 %, open-ended.
+
+- It is the only candidate where **no band swallows the data**. The current
+  scale puts nearly three quarters of every run in one colour.
+- The halving ratio matches the 12.9x spread the model actually produces, so
+  the bands grow with the quantity rather than against it.
+- It keeps the existing non-judgemental wording (very small → very large) and
+  the open-ended top band, so an extreme case still renders and nothing in the
+  legend implies a verdict.
+- At the app's default 0.3 g the 5-storey building would read "Large" instead
+  of "Very large", which is a far more useful thing to show someone on their
+  first run.
+
+Even the recommended scale puts the gentlest shaking in band 3 rather than
+band 1, which is worth checking against expectation: at 0.05 g the default
+building already drifts 0.314 %. That may be a property of the placeholder
+material stiffness rather than of the bands, and is exactly why the stiffness
+values need review before the bands are finalised — the two interact.
+
+### Status
+
+**Unchanged in the app, deliberately.** The bands still ship as placeholders.
+This section supplies the data that was missing from the previous version, so
+the review is a decision between two specific scales rather than a request to
+invent numbers. It does not settle the question: band wording is a reading
+decision as much as a numerical one, and whether these thresholds are
+appropriate depends on stiffness coefficients that are themselves placeholders.
+Please confirm the scale and the wording.
 ## 8. Design decisions taken in Phase 0
 
 Not engineering assumptions — product and accessibility decisions, recorded so
