@@ -443,7 +443,7 @@ Run from the repository root.
 | `npm test` | Vitest unit + component tests — **407 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests — **72 specs** |
+| `npm run e2e` | Playwright end-to-end tests — **77 specs** |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
 | `npm run web:audit` | Audit every viewport in a browser — 6 widths × 6 views, no device needed |
 | `npm run analysis:drift` | Measure where story drift actually lands, for the colour bands |

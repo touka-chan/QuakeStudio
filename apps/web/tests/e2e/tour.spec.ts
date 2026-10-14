@@ -234,6 +234,114 @@ test.describe('guided tour', () => {
 });
 
 /*
+ * The highlighted control is live.
+ *
+ * Everything here is about the hole in the blocker. Previously the scrim ate
+ * every click, so a user told to "set the floors" could not scroll the panel
+ * they were being shown, let alone drag anything in it — the worst version of a
+ * tutorial. jsdom cannot see any of this, so it has to be a real browser.
+ */
+test.describe('the highlighted control is live', () => {
+  test.beforeEach(async ({ page }) => {
+    await asFirstTimer(page);
+    await page.goto('/');
+    await expect(card(page)).toBeVisible();
+  });
+
+  test('the highlighted panel scrolls while the tour is showing', async ({ page }) => {
+    const panel = page.locator('[data-tour-active]');
+    const box = await settledBox(panel);
+    expect(box).not.toBeNull();
+
+    // Put the pointer over the panel, then turn the wheel.
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.mouse.wheel(0, 400);
+    await page.waitForTimeout(200);
+
+    const moved = await panel.evaluate((el) => {
+      /*
+       * Look DOWN through the panel, not up from it.
+       *
+       * The scrolling element is a ScrollArea inside the panel, so it is a
+       * descendant. An earlier version walked up from the panel and found
+       * nothing, and reported "did not scroll" for a panel that had scrolled.
+       * Measuring the wrong element is the same mistake whichever way it points.
+       */
+      for (const node of el.querySelectorAll<HTMLElement>('*')) {
+        if (node.scrollTop > 0) return node.scrollTop;
+      }
+      return 0;
+    });
+
+    expect(moved, 'the highlighted panel did not scroll').toBeGreaterThan(0);
+  });
+
+  test('a control inside the highlight can actually be used', async ({ page }) => {
+    // Step 1 highlights the whole controls panel, so the material buttons are
+    // inside the hole and should be live.
+    const steel = page.getByRole('radio', { name: /steel/i });
+    await steel.click();
+
+    await expect(steel).toBeChecked();
+  });
+
+  test('everything outside the highlight is still blocked', async ({ page }) => {
+    /*
+     * Proved by what is on top, not by clicking and hoping.
+     *
+     * `click()` cannot express this. It waits for the element to be actionable,
+     * so a correctly blocked control does not fail — it times out. The first
+     * version of this test did exactly that and read as a bug.
+     */
+    const covered = await page.evaluate(() => {
+      const toggle = document.querySelector<HTMLElement>('[aria-label^="Switch to"]');
+      if (!toggle) return { reachable: null };
+      const r = toggle.getBoundingClientRect();
+      const hit = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2);
+      return { reachable: hit ? toggle === hit || toggle.contains(hit) : false };
+    });
+
+    expect(covered.reachable, 'a control outside the highlight was reachable').toBe(false);
+
+    // And the click really does nothing, forced past the actionability wait.
+    const toggle = page.getByRole('button', { name: /switch to .* theme/i });
+    const box = await toggle.boundingBox();
+    const before = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+
+    await page.mouse.click(box!.x + box!.width / 2, box!.y + box!.height / 2);
+    await page.waitForTimeout(150);
+
+    const after = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+    expect(after, 'a click outside the highlight got through').toBe(before);
+  });
+
+  /*
+   * Once the user reaches into the page, focus leaves the card. Escape has to
+   * keep working from there, or there is no way out of a tutorial that has the
+   * user reaching into the app.
+   */
+  test('Escape still works after using a control inside the highlight', async ({ page }) => {
+    await page.getByRole('radio', { name: /steel/i }).click();
+    await page.waitForTimeout(100);
+
+    await page.keyboard.press('Escape');
+    await expect(card(page)).toHaveCount(0);
+  });
+
+  test('the tour survives a control being changed underneath it', async ({ page }) => {
+    await page.getByRole('radio', { name: /steel/i }).click();
+    await page.waitForTimeout(200);
+
+    // Still showing step 1, still pointing at the same thing, still on screen.
+    await expect(card(page).getByText(/step 1 of 4/i)).toBeVisible();
+    const outline = await settledBox(page.locator('[data-tour-outline]'));
+    const size = page.viewportSize()!;
+    expect(outline!.x).toBeGreaterThanOrEqual(-10);
+    expect(outline!.y + outline!.height).toBeLessThanOrEqual(size.height + 10);
+  });
+});
+
+/*
  * The narrow-screen presentation, which is a real dialog and therefore the one
  * case where the two overlays genuinely could have been stacked.
  */

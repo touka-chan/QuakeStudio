@@ -63,6 +63,33 @@ export function Tour({ forceDesktopLayout }: Props = {}) {
   const handleSkip = useCallback(() => end(skip), [end, skip]);
 
   /*
+   * Escape, anywhere.
+   *
+   * The spotlight card traps focus, but the highlighted control is now live —
+   * click a slider and focus leaves the card and goes to the page. From there
+   * the card's own key handler never sees the keypress, and Escape would do
+   * nothing. That is the one way out of a tutorial being unreachable, so it is
+   * handled at the document.
+   *
+   * The card still handles Escape for itself, and this checks the store before
+   * acting because both handlers are on the document and either may run first.
+   * `skip()` closes the tour synchronously, so whoever gets there second finds
+   * `open` false and stops. Same reason it is safe alongside Radix, which also
+   * listens for Escape and routes to `onSkip`.
+   */
+  useEffect(() => {
+    if (!open) return;
+    function onEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      if (!useTourStore.getState().open) return;
+      event.preventDefault();
+      handleSkip();
+    }
+    document.addEventListener('keydown', onEscape);
+    return () => document.removeEventListener('keydown', onEscape);
+  }, [open, handleSkip]);
+
+  /*
    * Android's back button.
    *
    * The narrow-screen tour is a Radix dialog and `backButton.ts` already

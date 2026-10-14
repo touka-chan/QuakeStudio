@@ -21,13 +21,19 @@ import type { TourStep } from './tourSteps';
    also means this component owns its own focus management (see useFocusTrap)
    and its own keyboard handling, which is the cost of that choice.
 
-   WHY THE SCRIM BLOCKS CLICKS BUT DOES NOT DISMISS
-   A click on the scrim falls through to the app behind, which would mean the
-   user could start a simulation mid-tour by aiming at the page they cannot
-   clearly see. So the scrim swallows the click. But it does not close the
-   tour: dismissing on an outside click is easy to do by accident, and losing
-   the tour half way through is worse than the click doing nothing. Only "Skip
-   tour" and Escape end it.
+   WHY THE PAGE IS BLOCKED — EXCEPT THE PART BEING TALKED ABOUT
+   Everything outside the highlight is covered by a transparent blocker, so a
+   click cannot land on a control the user was not shown. That was originally
+   everything, including the highlight itself: the scrim ate every click, which
+   meant a user could not scroll the panel the step was describing, let alone
+   drag its sliders. Being told "set the floors" and then being unable to try it
+   is the worst version of a tutorial.
+
+   So the blocker carries the same hole as the blur. The control is live —
+   scrollable, clickable, draggable — and the rest of the app is not.
+
+   The blur and dim are explicitly pointer-events-none, so the blocker is the
+   only thing eating clicks and the hole is guaranteed to reach the page.
    ========================================================================= */
 
 type Props = {
@@ -194,10 +200,12 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
 
   return (
     <>
-      {/* ---- The blur, with the target cut out of it ---- */}
+      {/* ---- The blur, with the target cut out of it ----
+          `pointer-events-none` so this layer is purely visual; the blocker
+          further down is the one that stops clicks. */}
       <div
         aria-hidden="true"
-        className="fixed inset-0 z-50"
+        className="pointer-events-none fixed inset-0 z-50"
         style={{
           backdropFilter: `blur(${BLUR_PX}px)`,
           WebkitBackdropFilter: `blur(${BLUR_PX}px)`,
@@ -209,8 +217,11 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
         }}
       />
 
-      {/* ---- The dim, with the target cut out of it ---- */}
-      <div className="fixed inset-0 z-50">
+      {/* ---- The dim, with the target cut out of it ----
+          Also pointer-events-none. An SVG mask affects what is painted, and
+          what is painted is not a reliable answer to what receives a click
+          across engines, so this layer is told outright not to take any. */}
+      <div aria-hidden="true" className="pointer-events-none fixed inset-0 z-50">
         <svg className="absolute inset-0 size-full" aria-hidden="true">
           <defs>
             {/*
@@ -260,6 +271,21 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
           style={outline}
         />
       )}
+
+      {/* ---- The blocker.
+
+          Sits last among the z-50 layers so it is the topmost thing at any
+          point inside the hole's surroundings, and carries the same clip as
+          the blur. Inside the hole it is not painted and so not hit; outside
+          it swallows the click without doing anything with it.
+
+          No background on purpose — this is an area that should feel dead, not
+          one that should look different from the dim already behind it. */}
+      <div
+        aria-hidden="true"
+        className="fixed inset-0 z-50"
+        style={{ clipPath: holeClip, WebkitClipPath: holeClip }}
+      />
 
       {/* ---- The card ----
           `role="dialog"` without `aria-modal`: the page behind is still real
