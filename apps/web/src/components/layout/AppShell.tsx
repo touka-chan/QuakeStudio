@@ -63,8 +63,8 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
             <aside
               className={
                 isDesktop
-                  ? 'w-80 shrink-0 border-r border-line bg-surface'
-                  : 'min-h-0 min-w-0 flex-1 bg-surface'
+                  ? 'flex min-h-0 w-80 shrink-0 flex-col border-r border-line bg-surface'
+                  : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
               }
               aria-label="Building and earthquake controls"
             >
@@ -87,8 +87,8 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
             <aside
               className={
                 isDesktop
-                  ? 'w-96 shrink-0 border-l border-line bg-surface'
-                  : 'min-h-0 min-w-0 flex-1 bg-surface'
+                  ? 'flex min-h-0 w-96 shrink-0 flex-col border-l border-line bg-surface'
+                  : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
               }
               aria-label="Simulation results"
             >

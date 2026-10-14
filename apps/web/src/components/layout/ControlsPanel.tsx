@@ -59,7 +59,17 @@ export function ControlsPanel() {
         </div>
       ) : null}
 
-      <ScrollArea className="h-full">
+      {/*
+        `min-h-0 flex-1`, not `h-full`.
+
+        Comparison mode puts a `shrink-0` "Editing A/B" header above this, and
+        `h-full` is 100% of the whole panel — so the scroll area was one header
+        taller than its container and the bottom of the panel (Site & ground,
+        and the Phase 7 controls) was pushed out of view and clipped. That only
+        showed up once comparison was switched on, which is why it looked like a
+        comparison bug rather than a layout one.
+      */}
+      <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-6 p-4">
           {compareEnabled ? (
             <CompareSwitcher

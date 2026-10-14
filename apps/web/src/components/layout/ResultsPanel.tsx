@@ -56,7 +56,7 @@ export function ResultsPanel() {
   const isLoading = status === 'computing' && result.time.length === 0;
 
   return (
-    <ScrollArea className="h-full">
+    <ScrollArea className="min-h-0 flex-1">
       <div className="space-y-4 p-4">
         <header className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase">Results</h2>

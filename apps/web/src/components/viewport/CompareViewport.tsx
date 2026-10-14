@@ -1,11 +1,12 @@
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 import { buildingHeight } from '@/lib/camera';
 import { describeBuilding } from '@/lib/describeBuilding';
-import { useCssVar } from '@/lib/useCssVar';
+import { driftBand } from '@/lib/driftScale';
+import { useCssVar, useCssVars } from '@/lib/useCssVar';
 import { sampleDisplacement } from '@/lib/time';
 import { useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
@@ -192,22 +193,55 @@ function SwayingBuilding({
   ghost?: boolean;
 }) {
   const result = useConfigStore((s) => (resultKey === 'a' ? s.result : s.resultB));
-  const colorA = useCssVar('--series-a');
-  const colorB = useCssVar('--series-b');
+
+  /*
+   * Floors are coloured by story drift, on the SAME scale the bar chart uses.
+   *
+   * This used to paint each building a flat A/B colour, on the reasoning that
+   * identity outranks the drift scale in a comparison. That was the wrong
+   * trade: it left the 3D view speaking a different visual language from the
+   * chart beside it, and it made colour useless for the one job comparison
+   * exists for. With both buildings on one shared scale, colour IS the
+   * comparison — two floors the same colour have the same drift, and you can
+   * see which building is worse without reading a single number.
+   *
+   * A/B identity moves to a label above each building instead of its hue,
+   * because position already distinguishes them in Side by side and
+   * translucency does it in Ghost overlay.
+   */
+  const palette = useCssVars([
+    '--drift-1',
+    '--drift-2',
+    '--drift-3',
+    '--drift-4',
+    '--drift-5',
+  ]);
 
   const floorRefs = useRef<(THREE.Group | null)[]>([]);
   const floors = building.floors;
   const floorHeightM = building.floorHeightM;
+
+  const floorColors = useMemo(
+    () =>
+      Array.from({ length: floors }, (_, index) => {
+        const drift = result?.driftRatio[index] ?? 0;
+        return palette[driftBand(drift).token] ?? palette['--drift-2']!;
+      }),
+    [floors, result, palette],
+  );
+
+  // Identity colour, used for the A/B tag above the building rather than for
+  // the floors themselves. Both hooks are called unconditionally — selecting
+  // one with a ternary would call a hook conditionally.
+  const colorA = useCssVar('--series-a');
+  const colorB = useCssVar('--series-b');
+  const identityColor = tint === 'a' ? colorA : colorB;
   const slabHeight = floorHeightM * 0.86;
 
   const geometry = useMemo(() => {
     const box = new THREE.BoxGeometry(building.widthM, slabHeight, building.depthM);
     return { box, outline: new THREE.EdgesGeometry(box) };
   }, [building.widthM, building.depthM, slabHeight]);
-
-  // In comparison the A/B colour IS the identity, so it takes precedence over
-  // the drift scale — the drift numbers are in the table instead.
-  const fill = tint === 'a' ? colorA : colorB;
 
   // Written inline rather than in a shared helper: useFrame mutating Three.js
   // transforms is the point, and keeping it in the component (as BuildingMesh
@@ -238,7 +272,7 @@ function SwayingBuilding({
           >
             <mesh geometry={geometry.box} renderOrder={ghost ? 2 : 0}>
               <meshLambertMaterial
-                color={fill}
+                color={floorColors[index]}
                 transparent={ghost}
                 opacity={ghost ? 0.32 : 0.85}
                 depthWrite={!ghost}
@@ -246,7 +280,7 @@ function SwayingBuilding({
             </mesh>
             <lineSegments geometry={geometry.outline}>
               <lineBasicMaterial
-                color={fill}
+                color={identityColor}
                 transparent
                 opacity={ghost ? 0.9 : 0.55}
                 depthTest={!ghost}
@@ -255,6 +289,29 @@ function SwayingBuilding({
           </group>
         );
       })}
+
+      {/*
+       * The A/B tag, which is where identity lives now that the floors are
+       * coloured by drift.
+       *
+       * It uses the same series colour as the "Editing A/B" badge in the
+       * controls panel and the comparison table headers, so the three agree.
+       * `distanceFactor` keeps it the same readable size however far the
+       * camera is pulled back.
+       */}
+      <Html
+        position={[0, floors * floorHeightM + floorHeightM * 0.6, 0]}
+        center
+        distanceFactor={26}
+        zIndexRange={[40, 0]}
+      >
+        <span
+          className="grid size-7 place-items-center rounded-full text-xs font-semibold text-white"
+          style={{ backgroundColor: identityColor }}
+        >
+          {tint.toUpperCase()}
+        </span>
+      </Html>
     </group>
   );
 }
