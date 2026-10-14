@@ -31,7 +31,7 @@ async function asFirstTimer(page: Page) {
     try {
       localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
       if (!localStorage.getItem('__tourSeeded')) {
-        localStorage.removeItem('quakestudio.tourCompleted');
+        localStorage.removeItem('quakestudio.tourSuppressed');
         localStorage.setItem('__tourSeeded', 'true');
       }
     } catch {
@@ -49,7 +49,7 @@ async function asCompleteFirstTimer(page: Page) {
   await page.addInitScript(() => {
     try {
       if (!localStorage.getItem('__tourSeeded')) {
-        localStorage.removeItem('quakestudio.tourCompleted');
+        localStorage.removeItem('quakestudio.tourSuppressed');
         localStorage.removeItem('quakestudio.firstRunAcknowledged');
         localStorage.setItem('__tourSeeded', 'true');
       }
@@ -201,12 +201,24 @@ test.describe('guided tour', () => {
     await expect(card(page)).toHaveCount(0);
   });
 
-  test('Escape leaves it, and it does not come back', async ({ page }) => {
+  /*
+   * No memory at all. This is the client's "every restart, every visit" and it
+   * is asserted rather than described: the obvious way to write this test was
+   * "dismiss it, reload, expect it gone", which is now the wrong expectation.
+   */
+  test('comes back on the next visit, every time', async ({ page }) => {
     await card(page).press('Escape');
     await expect(card(page)).toHaveCount(0);
 
-    await page.reload();
-    await expect(card(page)).toHaveCount(0);
+    for (const visit of [1, 2, 3]) {
+      await page.reload();
+      await expect(card(page), `visit ${visit}`).toBeVisible();
+      await expect(card(page).getByText(/step 1 of 4/i), `visit ${visit}`).toBeVisible();
+      await card(page)
+        .getByRole('button', { name: /skip tour/i })
+        .click();
+      await expect(card(page)).toHaveCount(0);
+    }
   });
 
   test('skips it and returns to the workspace', async ({ page }) => {

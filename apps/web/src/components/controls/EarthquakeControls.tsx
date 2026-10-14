@@ -30,7 +30,7 @@ const RELEVANT_FIELDS: Record<GroundMotionPresetId, Array<'frequency' | 'seed'>>
 };
 
 export function EarthquakeControls() {
-  const motion = useConfigStore((s) => s.motion);
+  const motion = useConfigStore((s) => s.displayMotion);
   const setMotion = useConfigStore((s) => s.setMotion);
   const id = useId();
 

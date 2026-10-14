@@ -33,7 +33,9 @@ const FRAME_HELP: Record<FrameTypeId, string> = {
  * so the same sliders drive both buildings without duplicating the UI.
  */
 export function BuildingControls({ side = 'A' }: { side?: 'A' | 'B' }) {
-  const building = useConfigStore((s) => (side === 'B' ? s.compareBuilding : s.building));
+  const building = useConfigStore((s) =>
+    side === 'B' ? s.displayCompareBuilding : s.displayBuilding,
+  );
   const setBuilding = useConfigStore((s) => s.setBuilding);
   const setCompareBuilding = useConfigStore((s) => s.setCompareBuilding);
 

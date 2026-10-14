@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '@/App';
 import { AppShell } from '@/components/layout/AppShell';
 import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
-import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
+import { DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
 import { useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
@@ -47,7 +47,7 @@ function skipFirstRun() {
 
 /** Get past the guided tour only, leaving the disclaimer gate in place. */
 function skipTour() {
-  localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+  localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
   tourTesting.reset();
 }
 
@@ -59,6 +59,21 @@ beforeEach(() => {
     compareBuilding: DEFAULT_BUILDING_CONFIG,
     templateId: DEFAULT_BUILDING_CONFIG.id,
     activeFloor: null,
+    /*
+     * The display copies too — and the originals they shadow.
+     *
+     * They are the same object references as `building`, `compareBuilding` and
+     * `motion` except while the tour is on screen, and the controls build every
+     * edit on top of the display copy. Resetting one without the other leaves
+     * the pair drifting apart, and the next thing to read them disagrees:
+     * a slider press applied to whatever the previous test left behind, and a
+     * preset description looked up from `motion` while the panel was showing
+     * `displayMotion`.
+     */
+    motion: DEFAULT_MOTION_CONFIG,
+    displayBuilding: DEFAULT_BUILDING_CONFIG,
+    displayCompareBuilding: DEFAULT_BUILDING_CONFIG,
+    displayMotion: DEFAULT_MOTION_CONFIG,
   });
   // Zustand stores are module-level singletons, so a test that switches
   // comparison on leaks into the next one. Without this reset the comparison

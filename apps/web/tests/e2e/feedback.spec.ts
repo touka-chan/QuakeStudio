@@ -24,7 +24,7 @@ async function openDialog(page: Page) {
       // The guided tour also runs before the workspace is reachable, and it holds
       // the disclaimer gate closed while it is on screen. This is the storage a user
       // who has already seen the tour has.
-      localStorage.setItem('quakestudio.tourCompleted', 'true');
+      localStorage.setItem('quakestudio.tourSuppressed', 'true');
     } catch {
       /* storage unavailable — the dialog will show and block these tests */
     }

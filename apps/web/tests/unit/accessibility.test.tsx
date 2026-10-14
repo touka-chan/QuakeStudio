@@ -93,7 +93,7 @@ beforeEach(() => {
    * `reset` as well as the key: the tour store reads storage once, when its
    * module is imported, so writing the key here is otherwise too late.
    */
-  localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+  localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
   tourTesting.reset();
   useConfigStore.setState({ result: seedResult() });
 });

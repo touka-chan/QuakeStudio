@@ -2,7 +2,8 @@ import { useCallback, useEffect } from 'react';
 
 import { useIsDesktop } from '@/lib/useMediaQuery';
 import { BACK_REQUESTED } from '@/pwa/backButton';
-import { rememberTourCompleted, useTourStore } from '@/store/tourStore';
+import { useConfigStore } from '@/store/configStore';
+import { useTourStore } from '@/store/tourStore';
 import { SpotlightTour } from './SpotlightTour';
 import { TourModal } from './TourModal';
 import { TOUR_STEPS } from './tourSteps';
@@ -49,7 +50,16 @@ export function Tour({ forceDesktopLayout }: Props = {}) {
    */
 
   const end = useCallback((settle: () => void) => {
-    rememberTourCompleted();
+    /*
+     * Apply whatever was changed while the tour was up.
+     *
+     * The controls are live during the tour but frozen — editing moves the
+     * slider without moving the model. This is where the edit is handed over,
+     * once, so the 3D catches up exactly as the overlay that was hiding the
+     * difference goes away. Skip and finish are the only two ways out of a
+     * tour, so there is no path that leaves an edit stranded in the draft.
+     */
+    useConfigStore.getState().commitTourEdits();
     settle();
   }, []);
 

@@ -7,6 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { TOUR_STEPS } from '@/components/tutorial/tourSteps';
 import { placeCard } from '@/components/tutorial/placeCard';
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
+import { useConfigStore } from '@/store/configStore';
 import { __testing as tourTesting, useTourStore } from '@/store/tourStore';
 
 /* ==========================================================================
@@ -40,8 +42,20 @@ beforeEach(() => {
 });
 
 /** Put the browser in the state of a user who has never seen the tour. */
+/**
+ * The floors slider.
+ *
+ * Queried by label rather than by role-and-name: while the tour is up as a
+ * modal it marks the workspace aria-hidden, and an aria-hidden element has no
+ * accessible name to compute, so a role query cannot match it at all. Same wall
+ * the "How to use" button hit.
+ */
+function floorsSlider(): HTMLElement {
+  return screen.getByLabelText('Floors');
+}
+
 function asFirstTimer() {
-  localStorage.removeItem(STORAGE_KEYS.tourCompleted);
+  localStorage.removeItem(STORAGE_KEYS.tourSuppressed);
   tourTesting.reset();
 }
 
@@ -52,8 +66,13 @@ describe('guided tour — first run', () => {
     expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
   });
 
-  it('does not appear again once it has been seen', async () => {
-    localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+  /*
+   * Not a first run. The tour has no memory at all — it shows on every visit
+   * — so the only way to be without it is to suppress it explicitly, which is
+   * what the automated checks do to measure the plain workspace.
+   */
+  it('stays away when it has been suppressed', async () => {
+    localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     tourTesting.reset();
     render(<App />);
     await waitFor(() => {
@@ -61,19 +80,27 @@ describe('guided tour — first run', () => {
     });
   });
 
-  /*
-   * The regression this whole design exists to prevent.
-   *
-   * The tour's completion is tracked under its own key. Keying it off the
-   * disclaimer instead would mean every existing user — anyone who already
-   * ticked the acknowledgement box — had also, invisibly, marked the tour as
-   * seen, and it would never show for them.
-   */
   it('still appears to a user who already acknowledged the disclaimer', async () => {
     localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
     asFirstTimer();
     render(<App />);
     expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+  });
+
+  /*
+   * The tour leaves nothing behind.
+   *
+   * It runs on every visit, so a key recording that it had been seen would be
+   * a lie — and would be one more thing for a reader to puzzle over. Asserted
+   * directly rather than inferred: a future "remember the user dismissed it"
+   * feature would break this on purpose.
+   */
+  it('writes nothing to storage when it ends', async () => {
+    asFirstTimer();
+    render(<App />);
+    await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
+
+    expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
   });
 });
 
@@ -117,7 +144,7 @@ describe('guided tour — and the disclaimer gate', () => {
 
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
-    expect(localStorage.getItem(STORAGE_KEYS.tourCompleted)).toBe('true');
+    expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
     expect(localStorage.getItem(STORAGE_KEYS.firstRunAcknowledged)).toBeNull();
   });
 
@@ -133,14 +160,14 @@ describe('guided tour — and the disclaimer gate', () => {
     }
 
     expect(await screen.findByRole('button', { name: /start exploring/i })).toBeInTheDocument();
-    expect(localStorage.getItem(STORAGE_KEYS.tourCompleted)).toBe('true');
+    expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
   });
 });
 
 describe('guided tour — re-entry', () => {
   it('can be reopened from the top bar after it has been seen', async () => {
     localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
-    localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+    localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     tourTesting.reset();
     render(<App />);
 
@@ -212,7 +239,7 @@ describe('guided tour — navigation', () => {
     await waitFor(() => {
       expect(screen.queryByText(/step 1 of 4/i)).not.toBeInTheDocument();
     });
-    expect(localStorage.getItem(STORAGE_KEYS.tourCompleted)).toBe('true');
+    expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
   });
 });
 
@@ -248,7 +275,7 @@ describe('guided tour — the spotlight', () => {
   });
 
   it('keeps focus inside the card and gives it back on close', async () => {
-    localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
+    localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
     tourTesting.reset();
     render(<AppShell forceDesktopLayout />);
@@ -287,6 +314,80 @@ describe('guided tour — the spotlight', () => {
 
     await userEvent.keyboard('{ArrowLeft}');
     expect(await screen.findByText(TOUR_STEPS[0]!.title)).toBeInTheDocument();
+  });
+});
+
+/*
+ * THE MODEL BEHIND THE TOUR STAYS STILL
+ *
+ * The controls are live during the tour — that was asked for — but editing them
+ * must not move the 3D model, the charts or the numbers. Otherwise the tour is
+ * describing one building while a different one grows behind the glass, which
+ * is worse than not explaining anything.
+ *
+ * The edit is not thrown away: it is handed over when the tour closes, so the
+ * model catches up exactly as the overlay goes away.
+ */
+describe('guided tour — the model behind stays put', () => {
+  beforeEach(() => {
+    useConfigStore.setState({
+      building: DEFAULT_BUILDING_CONFIG,
+      displayBuilding: DEFAULT_BUILDING_CONFIG,
+    });
+  });
+
+  it('moves the control but not the building while the tour is showing', async () => {
+    const user = userEvent.setup();
+    asFirstTimer();
+    render(<AppShell forceDesktopLayout />);
+    await screen.findByText(/step 1 of 4/i);
+
+    const slider = floorsSlider();
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    const state = useConfigStore.getState();
+    expect(state.displayBuilding.floors).toBe(DEFAULT_BUILDING_CONFIG.floors + 1);
+    expect(state.building.floors, 'the 3D model changed behind the tour').toBe(
+      DEFAULT_BUILDING_CONFIG.floors,
+    );
+  });
+
+  it('applies the edit once the tour closes', async () => {
+    const user = userEvent.setup();
+    asFirstTimer();
+    render(<AppShell forceDesktopLayout />);
+    await screen.findByText(/step 1 of 4/i);
+
+    const slider = floorsSlider();
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+    await user.keyboard('{ArrowRight}');
+
+    await user.click(screen.getByRole('button', { name: /skip tour/i }));
+
+    expect(useConfigStore.getState().building.floors).toBe(DEFAULT_BUILDING_CONFIG.floors + 2);
+  });
+
+  it('changes the building straight away when there is no tour', async () => {
+    const user = userEvent.setup();
+    /*
+     * Both suppressions are needed. Without the tour the disclaimer gate takes
+     * the screen instead, and it is a Radix dialog whose focus scope pulls
+     * focus straight back into it — so the slider never receives a keypress and
+     * the test fails for a reason that has nothing to do with freezing.
+     */
+    localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
+    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    tourTesting.reset();
+    render(<AppShell forceDesktopLayout />);
+
+    const slider = floorsSlider();
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    // No draft, no wait: the building is the display copy.
+    expect(useConfigStore.getState().building.floors).toBe(DEFAULT_BUILDING_CONFIG.floors + 1);
   });
 });
 

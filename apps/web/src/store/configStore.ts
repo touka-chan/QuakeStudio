@@ -8,7 +8,23 @@ import {
 } from '@/config/templates';
 import { SolverClient } from '@/engine/client';
 import { useCompareStore } from '@/store/compareStore';
+import { useTourStore } from '@/store/tourStore';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
+
+/**
+ * Is the guided tour on screen right now?
+ *
+ * Read at the moment of a write rather than held as its own flag. A flag would
+ * be a second thing that has to be kept in step with the tour, and the failure
+ * mode when it is not is a model quietly changing behind the spotlight.
+ *
+ * Same pattern as the `useCompareStore.getState()` reads below: reaching into a
+ * sibling store at the point of use, never subscribing, so there is no cycle
+ * and no re-render.
+ */
+function tourOpen(): boolean {
+  return useTourStore.getState().open;
+}
 
 /* =========================================================================
    Config store — the single source of truth for what is being simulated
@@ -78,6 +94,37 @@ type ConfigState = {
   activeFloor: number | null;
   error: string | null;
 
+  /*
+   * THE DISPLAY COPIES
+   *
+   * These are what the controls read. They are the same objects as `building`,
+   * `compareBuilding` and `motion` — the very same references — except while
+   * the guided tour is on screen. Then edits land here only: the slider moves,
+   * the number next to it changes, and nothing else does. The 3D model, the
+   * charts and the numbers all stay on the building the tour is describing.
+   *
+   * Keeping them as whole objects rather than a merged partial matters: a
+   * selector that built `{ ...building, ...draft }` on every read would return
+   * a new reference each time and re-render forever. These only change
+   * identity when the value really changes.
+   *
+   * The tour is explicitly about telling someone how the app works. Having it
+   * explain one building while a different one grows behind the glass is worse
+   * than not explaining anything.
+   */
+  displayBuilding: BuildingConfig;
+  displayCompareBuilding: BuildingConfig;
+  displayMotion: GroundMotionConfig;
+
+  /**
+   * Apply whatever was changed during the tour, and solve once.
+   *
+   * Called when the tour closes. Discarding instead would throw away an edit
+   * the user made on purpose, and watching the building jump to a shape they
+   * had already tried feels like the app losing their work.
+   */
+  commitTourEdits: () => void;
+
   setBuilding: (patch: Partial<BuildingConfig>) => void;
   setCompareBuilding: (patch: Partial<BuildingConfig>) => void;
   setMotion: (patch: Partial<GroundMotionConfig>) => void;
@@ -89,6 +136,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   building: DEFAULT_BUILDING_CONFIG,
   compareBuilding: { ...DEFAULT_BUILDING_CONFIG },
   motion: DEFAULT_MOTION_CONFIG,
+  // The same references, not copies. See the display-copy note above.
+  displayBuilding: DEFAULT_BUILDING_CONFIG,
+  displayCompareBuilding: { ...DEFAULT_BUILDING_CONFIG },
+  displayMotion: DEFAULT_MOTION_CONFIG,
   templateId: DEFAULT_BUILDING_CONFIG.id,
   result: EMPTY_RESULT,
   resultB: null,
@@ -97,32 +148,38 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   error: null,
 
   setBuilding: (patch) => {
-    const building = { ...get().building, ...patch };
-    set({
-      building,
-      // Editing any field by hand means we are no longer on a named template.
-      templateId: 'custom',
-    });
-    resolve(
-      building,
-      useCompareStore.getState().enabled ? get().compareBuilding : null,
-      get().motion,
-    );
+    // Patches stack on the display copy, so a tour that is reopened mid-edit
+    // keeps what the user already did.
+    const next = { ...get().displayBuilding, ...patch };
+    if (tourOpen()) {
+      set({ displayBuilding: next, templateId: 'custom' });
+      return;
+    }
+    set({ building: next, displayBuilding: next, templateId: 'custom' });
+    resolve(next, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
   },
 
   setCompareBuilding: (patch) => {
-    const compareBuilding = { ...get().compareBuilding, ...patch };
-    set({ compareBuilding });
+    const next = { ...get().displayCompareBuilding, ...patch };
+    if (tourOpen()) {
+      set({ displayCompareBuilding: next });
+      return;
+    }
+    set({ compareBuilding: next, displayCompareBuilding: next });
     const compareEnabled = useCompareStore.getState().enabled;
-    resolve(get().building, compareEnabled ? compareBuilding : null, get().motion);
+    resolve(get().building, compareEnabled ? next : null, get().motion);
   },
 
   setMotion: (patch) => {
-    const motion = { ...get().motion, ...patch };
-    set({ motion });
+    const next = { ...get().displayMotion, ...patch };
+    if (tourOpen()) {
+      set({ displayMotion: next });
+      return;
+    }
+    set({ motion: next, displayMotion: next });
     // The earthquake is shared by both sides, so both are re-solved together.
     const compareEnabled = useCompareStore.getState().enabled;
-    resolve(get().building, compareEnabled ? get().compareBuilding : null, motion);
+    resolve(get().building, compareEnabled ? get().compareBuilding : null, next);
   },
 
   applyTemplate: (templateId) => {
@@ -135,11 +192,43 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       ...found.building,
       dampingRatio: undefined,
     };
-    set({ templateId, building, activeFloor: null });
+
+    if (tourOpen()) {
+      // Picked a different starting building: the controls should show it, the
+      // model behind should not move.
+      set({ templateId, displayBuilding: building, activeFloor: null });
+      return;
+    }
+
+    set({ templateId, building, displayBuilding: building, activeFloor: null });
     resolve(
       building,
       useCompareStore.getState().enabled ? get().compareBuilding : null,
       get().motion,
+    );
+  },
+
+  commitTourEdits: () => {
+    const { displayBuilding, displayCompareBuilding, displayMotion } = get();
+    // Reference equality: the display copies are only re-created when a value
+    // actually changed, so this is a sound "nothing was edited" test and skips
+    // a pointless solve on every tour close.
+    if (
+      displayBuilding === get().building &&
+      displayCompareBuilding === get().compareBuilding &&
+      displayMotion === get().motion
+    ) {
+      return;
+    }
+    set({
+      building: displayBuilding,
+      compareBuilding: displayCompareBuilding,
+      motion: displayMotion,
+    });
+    resolve(
+      displayBuilding,
+      useCompareStore.getState().enabled ? displayCompareBuilding : null,
+      displayMotion,
     );
   },
 

@@ -224,16 +224,19 @@ export const STORAGE_KEYS = {
   runs: 'quakestudio.runs',
   firstRunAcknowledged: 'quakestudio.firstRunAcknowledged',
   /*
-   * Deliberately NOT shared with `firstRunAcknowledged`.
+   * Suppresses the guided tour. The app NEVER writes this.
    *
-   * The guided tour is skippable and teaches the interface. The disclaimer is
-   * a gate that must not be skippable. Keying "has the tour run?" off the
-   * disclaimer would mean every existing user - anyone who already ticked the
-   * acknowledgement box - silently never saw the tour, and it would look broken
-   * on release. Two keys, two meanings, so neither can quietly suppress the
-   * other.
+   * The tour shows on every visit now — the client wants a user to meet it each
+   * time they open the app, not once and then never again. So there is nothing
+   * for the app to remember, and a key called "tourCompleted" that it never sets
+   * would be a lie to the next person reading it.
+   *
+   * It exists so automated checks can turn the tour off: the responsive audit,
+   * the end-to-end specs and the component tests all need the plain workspace,
+   * and the tour is an overlay across the whole app. Setting this key is how
+   * they say "no tour, just the app".
    */
-  tourCompleted: 'quakestudio.tourCompleted',
+  tourSuppressed: 'quakestudio.tourSuppressed',
   appVersion: 'quakestudio.appVersion',
 } as const;
 

@@ -47,24 +47,33 @@ export type TourState = {
 };
 
 /**
- * Has the guided tour already run in this browser?
+ * Has the tour been switched off?
  *
- * If storage is unavailable we answer `false` — show the tour again. Same
- * fail-safe direction `FirstRunDialog` uses for the disclaimer: when we cannot
- * tell whether someone has seen something important, showing it again is the
- * safer mistake.
+ * The app never sets this — the tour runs on every visit by design. It is read
+ * only so automated checks can suppress the overlay and measure the plain
+ * workspace instead. See STORAGE_KEYS.tourSuppressed.
+ *
+ * If storage is unavailable we answer `false` — show the tour. When we cannot
+ * tell whether someone has seen something, showing it is the safer mistake.
  */
-function shouldShowTour(): boolean {
+function tourSuppressed(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEYS.tourCompleted) !== 'true';
+    return localStorage.getItem(STORAGE_KEYS.tourSuppressed) === 'true';
   } catch {
     return false;
   }
 }
 
-/** The starting state, and the reason `open` and `settled` can never disagree. */
+/**
+ * The starting state.
+ *
+ * With no memory to consult, this is always "show". The shape stays — `open`
+ * and `settled` still have to be decided together — because the gate sequencing
+ * below depends on both being right before the first paint, and a version of
+ * this that decided them in two places is the lockout described above.
+ */
 function initial(): { open: boolean; step: number; settled: boolean } {
-  const show = shouldShowTour();
+  const show = !tourSuppressed();
   return { open: show, step: 0, settled: !show };
 }
 
@@ -78,27 +87,16 @@ export const useTourStore = create<TourState>((set) => ({
   skip: () => set({ open: false, settled: true }),
 }));
 
-/** Remember that the tour has run. A failure here only means we ask again. */
-export function rememberTourCompleted(): void {
-  try {
-    localStorage.setItem(STORAGE_KEYS.tourCompleted, 'true');
-  } catch {
-    // Non-fatal. The tour is a convenience; the disclaimer is the gate.
-  }
-}
-
 /**
  * Test-only handle.
  *
  * The initial state is read once, when this module is first imported. A test
- * that seeds `tourCompleted` in its own `beforeEach` is therefore too late —
+ * that seeds `tourSuppressed` in its own `beforeEach` is therefore too late —
  * the store has already decided. `reset` re-runs the same read, so tests
  * exercise the real code path rather than a hand-built state that could drift
  * from it.
  *
  * Exported as a single read-only handle rather than a `reset` action so
- * production code has no way to wipe a real user's tour history.
+ * production code has no way to clear a real user's suppression.
  */
 export const __testing = { reset: () => useTourStore.setState(initial()) };
-
-export { shouldShowTour };

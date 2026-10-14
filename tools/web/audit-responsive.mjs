@@ -536,7 +536,7 @@ async function auditView(page, viewport, view) {
       // The guided tour also runs before the workspace is reachable, and it holds
       // the disclaimer gate closed while it is on screen. This is the storage a user
       // who has already seen the tour has.
-      localStorage.setItem('quakestudio.tourCompleted', 'true');
+      localStorage.setItem('quakestudio.tourSuppressed', 'true');
     });
     // Re-applied on every load: the reload below would otherwise keep whatever
     // the app wrote back on its own schedule.
