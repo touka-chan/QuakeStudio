@@ -78,8 +78,15 @@ export function ResultsPanel() {
 
         {isLoading ? <ResultsSkeleton /> : null}
 
-        {/* ---- Metric cards ---- */}
-        <div className="grid grid-cols-3 gap-2">
+        {/* ---- Metric cards ----
+            One column on a phone, three from `sm` up.
+
+            Measured at 360px: three columns left each card 102px of content,
+            and "DISPLACEMENT" needs about 96px before padding. That is not a
+            font-size problem — there is no size at which three of these
+            labels read well on a narrow screen. Stacking is the fix: the
+            numbers stay at full size instead of shrinking to survive. */}
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
           <MetricCard
             label="Peak displacement"
             value={formatMm(peakAtTop * M2S_TO_MM)}
@@ -139,7 +146,9 @@ export function ResultsPanel() {
 function ResultsSkeleton() {
   return (
     <div className="space-y-3" aria-hidden="true">
-      <div className="grid grid-cols-3 gap-2">
+      {/* Same breakpoints as the real cards above. If these disagree the whole
+          panel jumps the moment results land, which looks like a glitch. */}
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {[0, 1, 2].map((i) => (
           <div
             key={i}

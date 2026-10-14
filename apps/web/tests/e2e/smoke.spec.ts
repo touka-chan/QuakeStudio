@@ -162,6 +162,71 @@ test.describe('responsive layout', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test('no metric card clips its own label at 360px', async ({ page }) => {
+    /*
+     * The page-wide overflow check above cannot see this bug.
+     *
+     * A card whose label is wider than the card overflows INSIDE its own
+     * border and is clipped by the rounded corner. The document does not grow,
+     * so scrollWidth still matches clientWidth and the previous test passes.
+     * A user sees "DISPLACEMEN" with no T.
+     *
+     * `scrollWidth > clientWidth` on an element is what catches it, and only a
+     * real browser can measure that — jsdom does no layout at all.
+     */
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto('/');
+    await page.getByRole('tab', { name: /results/i }).click();
+
+    const clipped = await page.evaluate(() => {
+      const cards = [
+        ...document.querySelectorAll('[data-testid^="metric-"][data-testid$="-value"]'),
+      ];
+      return cards
+        .map((value) => value.closest('div.rounded-card') ?? value)
+        .filter((card) => card.scrollWidth - card.clientWidth > 1)
+        .map((card) => card.getAttribute('data-testid') ?? card.className);
+    });
+
+    expect(clipped, `cards clipping their text: ${clipped.join(', ')}`).toEqual([]);
+  });
+
+  test('metric cards stack on a phone and sit side by side when there is room', async ({
+    page,
+  }) => {
+    /*
+     * Replaces an earlier "cards share one height" test that could not fail.
+     *
+     * Removing `h-full` from MetricCard left it passing, because grid's
+     * default `align-items: stretch` already equalises the row — it was
+     * testing the framework, not this repo. This version asserts the thing we
+     * actually own: the `grid-cols-1 sm:grid-cols-3` breakpoints in
+     * ResultsPanel, which are the real fix for the clipped label.
+     *
+     * Rows are counted by distinct `top` edges. Three distinct tops means
+     * stacked; one means side by side.
+     */
+    const rowCount = async () => {
+      await page.waitForSelector('[data-testid="metric-peak-disp"]');
+      return page.evaluate(
+        () =>
+          new Set(
+            [...document.querySelectorAll('div.rounded-card[data-testid^="metric-"]')].map((card) =>
+              Math.round(card.getBoundingClientRect().top),
+            ),
+          ).size,
+      );
+    };
+
+    await page.setViewportSize({ width: 360, height: 900 });
+    await page.goto('/');
+    await page.getByRole('tab', { name: /results/i }).click();
+    expect(await rowCount(), 'at 360px the cards should each be their own row').toBe(3);
+
+    await page.setViewportSize({ width: 768, height: 900 });
+    expect(await rowCount(), 'at 768px the cards should sit side by side').toBe(1);
+  });
+
   test('does not scroll sideways at 1920px', async ({ page }) => {
     await page.setViewportSize({ width: 1920, height: 1080 });
     await page.goto('/');
