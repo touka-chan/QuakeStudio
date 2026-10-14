@@ -59,6 +59,37 @@ import { chromium } from 'playwright';
 
 /* ---- configuration ----------------------------------------------------- */
 
+/**
+ * Theme, from `--theme light|dark`. Defaults to light.
+ *
+ * Dark is opt-in rather than a second default pass, and the reason is worth
+ * recording so nobody "fixes" it by doubling the run time.
+ *
+ * Everything this audit measures is geometry: what overflows, what is covered,
+ * how big a target is. None of that changes with the theme, so a dark pass
+ * repeats every result identically.
+ *
+ * What DOES differ in dark mode is colour contrast, and that is already
+ * covered where it belongs: `tests/unit/contrast.test.ts` parses both the
+ * `:root` and `.dark` token blocks and checks each pair in its own scope. What
+ * is covered nowhere is axe's rendered-DOM contrast check, which jsdom cannot
+ * do because it performs no layout or paint.
+ *
+ * So sweep dark when you want to see it - and do not pretend it is finding new
+ * geometry when you do.
+ */
+function readThemeArg() {
+  const index = process.argv.indexOf('--theme');
+  const value = index === -1 ? undefined : process.argv[index + 1];
+  if (value === undefined) return 'light';
+  if (value !== 'light' && value !== 'dark') {
+    throw new Error(`--theme must be "light" or "dark", got "${value}"`);
+  }
+  return value;
+}
+
+const THEME = readThemeArg();
+
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const DIST = join(ROOT, 'apps', 'web', 'dist');
 const SHOTS = join(ROOT, 'apps', 'web', 'responsive-audit');
@@ -503,7 +534,36 @@ async function auditView(page, viewport, view) {
     await page.evaluate(() => {
       localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
     });
+    // Re-applied on every load: the reload below would otherwise keep whatever
+    // the app wrote back on its own schedule.
+    await page.evaluate((theme) => {
+      localStorage.setItem('quakestudio.theme', theme);
+    }, THEME);
     await page.reload({ waitUntil: 'networkidle' });
+
+    /*
+     * Confirm dark actually applied rather than assuming it.
+     *
+     * The first version of this asked whether the class list contained 'dark'
+     * when dark was wanted and 'light' when it was not — a condition that can
+     * only ever be false for the light theme — and then swallowed the timeout
+     * with `.catch(() => {})`. So it proved nothing while reading like
+     * verification. A check that cannot pass is worse than no check.
+     */
+    if (THEME === 'dark') {
+      const applied = await page
+        .waitForFunction(() => document.documentElement.classList.contains('dark'), undefined, {
+          timeout: 5_000,
+        })
+        .then(() => true)
+        .catch(() => false);
+
+      if (!applied) {
+        throw new Error(
+          'asked for the dark theme, but the document never received the `dark` class',
+        );
+      }
+    }
 
     if (view.tab) {
       const switched = await selectTab(page, view.tab);
@@ -621,7 +681,7 @@ async function main() {
   mkdirSync(SHOTS, { recursive: true });
 
   console.log(
-    `\n  Auditing the production build at ${WIDTHS.length} widths × ${VIEWS.length} views`,
+    `\n  Auditing the production build at ${WIDTHS.length} widths × ${VIEWS.length} views, ${THEME} theme`,
   );
   console.log(`  Screenshots of anything wrong: apps/web/responsive-audit/\n`);
 
@@ -683,7 +743,8 @@ async function main() {
 
   console.log(
     fails.length === 0
-      ? `\n  PASS — nothing cut off, truncated or throwing at any of the ${WIDTHS.length} widths.`
+      ? `\n  PASS — nothing cut off, truncated or throwing at any of the ${WIDTHS.length} widths.` +
+          (warns.length > 0 ? `\n  ${warns.length} warning(s) — see the table above.` : '')
       : `\n  ${fails.length} failure(s), ${warns.length} warning(s).\n`,
   );
 

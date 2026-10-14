@@ -20,11 +20,22 @@ const buttonVariants = cva(
       size: {
         default: 'h-9 px-4 py-2 has-[>svg]:px-3',
         xs: "h-6 gap-1 rounded-md px-2 text-xs has-[>svg]:px-1.5 [&_svg:not([class*='size-'])]:size-3",
-        sm: 'h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5',
+        /*
+         * `pointer-coarse:h-11` on the small button.
+         *
+         * h-8 is 32px, which the responsive audit reports on every small button
+         * — the top bar's Save, Export, About and Feedback controls — and 32px
+         * is well under the 44px that is comfortable with a thumb.
+         *
+         * It is applied only where the pointer is coarse, so a mouse keeps the
+         * denser row. A width breakpoint would have been the wrong question
+         * again: a touchscreen laptop is wide and still touch-driven.
+         */
+        sm: 'pointer-coarse:h-11 h-8 gap-1.5 rounded-md px-3 has-[>svg]:px-2.5',
         lg: 'h-10 rounded-md px-6 has-[>svg]:px-4',
-        icon: 'size-9',
+        icon: 'pointer-coarse:size-11 size-9',
         'icon-xs': "size-6 rounded-md [&_svg:not([class*='size-'])]:size-3",
-        'icon-sm': 'size-8',
+        'icon-sm': 'pointer-coarse:size-11 size-8',
         'icon-lg': 'size-10',
       },
     },

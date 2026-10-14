@@ -175,7 +175,15 @@ function ChoiceGroup({
               // The row now fits by construction and wraps only when the labels
               // genuinely cannot - decided by the space available rather than by
               // a breakpoint guess about the viewport.
-              className={`min-w-0 grow basis-auto rounded-app px-2 py-1.5 text-center text-sm transition-colors ${
+              // `min-h-11` on a coarse pointer.
+              //
+              // These measured 31px tall, just under the 40px floor the audit
+              // reports. A segmented control is allowed to be chunky, so rather
+              // than shrugging at it, the height goes to the 44px standard
+              // only where a finger is actually the input. `pointer: coarse`
+              // rather than a width breakpoint, because a touchscreen laptop is
+              // wide and still touch-driven.
+              className={`min-w-0 grow basis-auto rounded-app px-2 py-1.5 text-center text-sm transition-colors pointer-coarse:min-h-11 ${
                 selected
                   ? 'bg-primary font-medium text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
