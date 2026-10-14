@@ -1,6 +1,6 @@
 # Validation report
 
-Generated 2026-10-13 by `python/reference/python/compare.py`. Every number below is measured, not typed in by hand — re-running the comparison regenerates this file.
+Generated 2026-10-14 by `python/reference/python/compare.py`. Every number below is measured, not typed in by hand — re-running the comparison regenerates this file.
 
 > ⚠️ **This validates the software, not the engineering.** Read
 > [What this does and does not prove](#what-this-does-and-does-not-prove)
@@ -122,7 +122,7 @@ Agreeing on the default model proves very little. The matrix is built around the
 
 ## Engine performance
 
-Wall clock for all 16 cases: 53 ms total, 7 ms worst single case.
+Wall clock for all 16 cases: 63 ms total, 8 ms worst single case.
 
 ## What would make this stronger
 
