@@ -45,19 +45,13 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
     document.addEventListener(BACK_REQUESTED, onBack);
     return () => document.removeEventListener(BACK_REQUESTED, onBack);
   }, []);
-  const [panelOpen, setPanelOpen] = useState(false);
   const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const isDesktop = useIsDesktop(forceDesktopLayout);
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
-        <TopBar
-          onTogglePanel={() => setPanelOpen((open) => !open)}
-          panelOpen={panelOpen}
-          assumptionsOpen={assumptionsOpen}
-          onAssumptionsOpenChange={setAssumptionsOpen}
-        />
+        <TopBar assumptionsOpen={assumptionsOpen} onAssumptionsOpenChange={setAssumptionsOpen} />
 
         {/* Desktop: three zones side by side.
             Mobile: stacked, with exactly ONE zone visible at a time. They

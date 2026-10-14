@@ -88,15 +88,7 @@ export function AssumptionsDialog() {
       <Tabs defaultValue="about" className="flex min-h-0 flex-1 flex-col">
         <TabsList>
           <TabsTrigger value="about">About</TabsTrigger>
-          <TabsTrigger value="assumptions">
-            Assumptions
-            <Badge
-              variant="outline"
-              className="ml-1.5 border-accent-yellow/40 text-[10px] text-accent-yellow-text"
-            >
-              {placeholderCount()} to review
-            </Badge>
-          </TabsTrigger>
+          <TabsTrigger value="assumptions">Assumptions</TabsTrigger>
           <TabsTrigger value="glossary">Glossary</TabsTrigger>
         </TabsList>
 
@@ -216,12 +208,28 @@ function AssumptionsTab() {
   return (
     <ScrollArea className="h-full pr-3">
       <div className="space-y-4">
+        {/*
+         * The "26 to review" count lived in the tab LABEL until the
+         * responsive audit found the third tab off-screen at 320px. It
+         * belongs here anyway: a count describes the contents of this panel,
+         * and a tab label is the worst place for something that wide.
+         *
+         * On its own line, not inline, because the sentence below reads
+         * "Read straight from <filename>, so these are ..." and a badge
+         * dropped into the middle of it broke the sentence in half.
+         */}
+        <Badge
+          variant="outline"
+          className="w-fit border-accent-yellow/40 text-[10px] text-accent-yellow-text"
+        >
+          {placeholderCount()} to review
+        </Badge>
         <p className="text-sm text-muted-foreground">
           Read straight from{' '}
           <code className="rounded bg-surface-2 px-1 py-0.5 font-mono text-xs">
             engineeringAssumptions.ts
           </code>
-          , so these are the values the simulation actually runs on — not a summary that could drift
+          , so these are the values the simulation actually runs on - not a summary that could drift
           away from them.
         </p>
 

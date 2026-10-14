@@ -1,14 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  ClipboardList,
-  Download,
-  Info,
-  PanelLeftClose,
-  PanelLeftOpen,
-  Save,
-  Sun,
-  Moon,
-} from 'lucide-react';
+import { ClipboardList, Download, Info, Save, Sun, Moon } from 'lucide-react';
 
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import { LazyFeedback } from '@/feedback/LazyFeedback';
@@ -39,13 +30,9 @@ import { DisclaimerBadge } from './DisclaimerBadge';
    ========================================================================= */
 
 export function TopBar({
-  onTogglePanel,
-  panelOpen,
   assumptionsOpen,
   onAssumptionsOpenChange,
 }: {
-  onTogglePanel: () => void;
-  panelOpen: boolean;
   /**
    * The About & Assumptions dialog is owned by the shell rather than here,
    * because the first-run dialog also opens it. The TRIGGER stays in this
@@ -91,9 +78,7 @@ export function TopBar({
       setExported(filename);
     } catch (error) {
       setExported(null);
-      setExportError(
-        error instanceof Error ? error.message : 'The CSV could not be exported.',
-      );
+      setExportError(error instanceof Error ? error.message : 'The CSV could not be exported.');
     }
   };
 
@@ -113,7 +98,7 @@ export function TopBar({
         <DisclaimerBadge />
       </div>
 
-      <div className="ml-auto flex items-center gap-2">
+      <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
         <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -143,7 +128,14 @@ export function TopBar({
               aria-label="Export this run as a CSV file"
             >
               <Download aria-hidden="true" />
-              Export CSV
+              {/*
+               * Same responsive shortening as Save and Assumptions.
+               *
+               * "Export CSV" is the widest label in the bar and was the
+               * single biggest reason a 360px phone could not fit the row.
+               */}
+              <span className="hidden md:inline">Export CSV</span>
+              <span className="md:hidden">Export</span>
             </Button>
           </TooltipTrigger>
           <TooltipContent className="max-w-xs text-xs">
@@ -218,16 +210,20 @@ export function TopBar({
 
         <ThemeToggle />
 
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onTogglePanel}
-          aria-label={panelOpen ? 'Hide controls panel' : 'Show controls panel'}
-          aria-expanded={panelOpen}
-          className="lg:hidden"
-        >
-          {panelOpen ? <PanelLeftClose /> : <PanelLeftOpen />}
-        </Button>
+        {/*
+          A "show controls panel" toggle used to sit here.
+
+          It was removed rather than repositioned, because it could not do
+          anything. It set `panelOpen`, and nothing in the layout ever read
+          that state — AppShell shows one zone at a time on a phone and
+          switches between them with the tab bar at the bottom. The button was
+          also invisible in practice: it is `lg:hidden`, so it rendered below
+          `lg`, and the audit measured it at x=395..431 on a 360px screen —
+          entirely off the right edge, unreachable and inert.
+
+          If a collapsible controls panel on a phone is wanted, that is a
+          feature to build against AppShell's layout, not a button to un-hide.
+        */}
       </div>
     </header>
   );
