@@ -191,6 +191,69 @@ test.describe('responsive layout', () => {
     expect(clipped, `cards clipping their text: ${clipped.join(', ')}`).toEqual([]);
   });
 
+  test('no option button loses its label to a percentage column width', async ({ page }) => {
+    /*
+     * The Material and Frame type groups used to be laid out with
+     * `basis-[calc(50%-2px)] sm:basis-[calc(25%-3px)]`, which picks a column
+     * count from the viewport. On the desktop layout they sit in a fixed 287px
+     * sidebar, so a 640px+ viewport forced four columns of 67px into 287px.
+     * "Composite" needs 66px of text plus 16px of padding, so it overflowed,
+     * and the group's `overflow-hidden` cut the last label at the edge.
+     *
+     * 320px is included because that is where the sidebar is narrowest relative
+     * to the labels, and 1440 because that is where the fixed sidebar applies.
+     */
+    for (const width of [320, 1024, 1440]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.goto('/');
+      await page.getByRole('radio', { name: 'Composite' }).waitFor();
+
+      const damaged = await page.evaluate(() => {
+        const problems: string[] = [];
+
+        for (const group of document.querySelectorAll('[role="radiogroup"]')) {
+          const name = group.getAttribute('aria-label') ?? '?';
+
+          // The group clips, so anything past its box is gone.
+          if (group.scrollWidth - group.clientWidth > 1) {
+            problems.push(`${name}: group clipped by ${group.scrollWidth - group.clientWidth}px`);
+          }
+
+          for (const button of group.querySelectorAll('[role="radio"]')) {
+            const label = button.querySelector('.truncate');
+            if (!label) continue;
+
+            /*
+             * Measure against the button's CONTENT box, not `scrollWidth`.
+             *
+             * The obvious check here does not work, which was found by
+             * putting the old classes back and watching this test still pass.
+             * `truncate` sets `overflow: hidden`, and that has no effect on an
+             * inline `<span>` - so the label's scrollWidth always equals its
+             * clientWidth and reports "nothing lost" while the text is in fact
+             * spilling over the button's padding and being sliced by its
+             * rounded corner.
+             */
+            const style = getComputedStyle(button);
+            const padding = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+            const room = button.clientWidth - padding;
+            const needed = label.getBoundingClientRect().width;
+
+            if (needed > room + 1) {
+              problems.push(
+                `${name} / ${button.textContent?.trim()}: label needs ${Math.round(needed)}px of a ${Math.round(room)}px content box`,
+              );
+            }
+          }
+        }
+
+        return problems;
+      });
+
+      expect(damaged, `at ${width}px: ${damaged.join(' | ')}`).toEqual([]);
+    }
+  });
+
   test('metric cards stack on a phone and sit side by side when there is room', async ({
     page,
   }) => {

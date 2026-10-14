@@ -155,9 +155,27 @@ function ChoiceGroup({
               aria-checked={selected}
               title={optionHelp?.[option.value]}
               onClick={() => onChange(option.value)}
-              // 2-up on a phone, 4-up once there is room, so the group never
-              // overflows and never wastes a row on desktop.
-              className={`min-w-0 flex-1 basis-[calc(50%-2px)] rounded-app px-2 py-1.5 text-center text-sm transition-colors sm:basis-[calc(25%-3px)] ${
+              // Sized to its own label, then given a share of whatever is
+              // left over.
+              //
+              // This used to be `basis-[calc(50%-2px)] sm:basis-[calc(25%-3px)]`,
+              // which picks a column count from the VIEWPORT width. That is the
+              // wrong question: on the desktop layout this group sits in a fixed
+              // 287px sidebar, so `sm:` (a 640px viewport) forced 4 columns of
+              // 67px into 287px. "Composite" alone needs 66px of text plus 16px
+              // of padding, so it overflowed - and since the group clips with
+              // `overflow-hidden`, the last label was cut off at the edge.
+              //
+              // `grow` with `basis-auto`, NOT `flex-1`: `flex-1` is
+              // `flex: 1 1 0%`, a basis of zero, so every button still grows to
+              // exactly the same width and the labels still do not fit. With
+              // `basis-auto` each button starts at its own label width and
+              // `grow` hands out the remainder.
+              //
+              // The row now fits by construction and wraps only when the labels
+              // genuinely cannot - decided by the space available rather than by
+              // a breakpoint guess about the viewport.
+              className={`min-w-0 grow basis-auto rounded-app px-2 py-1.5 text-center text-sm transition-colors ${
                 selected
                   ? 'bg-primary font-medium text-primary-foreground'
                   : 'text-muted-foreground hover:text-foreground'
