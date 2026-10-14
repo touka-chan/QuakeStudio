@@ -190,8 +190,18 @@ export function TopBar({
           <Tooltip>
             <TooltipTrigger asChild>
               <DialogTrigger asChild>
-                <Button variant="ghost" size="sm">
+                <Button variant="ghost" size="sm" aria-label="Usability feedback">
                   <ClipboardList aria-hidden="true" />
+                  {/*
+                    The visible label is hidden below `lg` and this button has
+                    no short fallback, so without the aria-label it has NO
+                    accessible name on a phone or a tablet - a screen reader
+                    announces a bare "button" next to three others.
+
+                    Found by the responsive audit timing out trying to click it:
+                    Playwright locates by accessible name, so a control with
+                    none of them is one this tool cannot even see.
+                  */}
                   <span className="hidden lg:inline">Feedback</span>
                 </Button>
               </DialogTrigger>

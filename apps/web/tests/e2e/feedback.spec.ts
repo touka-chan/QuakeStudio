@@ -28,7 +28,7 @@ async function openDialog(page: Page) {
   await page.setViewportSize(DESKTOP);
 
   await page.goto('/');
-  await page.getByRole('button', { name: /^feedback$/i }).click();
+  await page.getByRole('button', { name: /usability feedback/i }).click();
   return page.getByRole('dialog');
 }
 
@@ -115,6 +115,6 @@ test.describe('the usability feedback dialog', () => {
 
     await page.keyboard.press('Escape');
     await expect(page.getByRole('dialog')).toBeHidden();
-    await expect(page.getByRole('button', { name: /^feedback$/i })).toBeFocused();
+    await expect(page.getByRole('button', { name: /usability feedback/i })).toBeFocused();
   });
 });

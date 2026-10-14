@@ -55,7 +55,20 @@ export function CompareViewport() {
   const frameHeight = Math.max(buildingHeight(buildingA), buildingHeight(buildingB));
 
   return (
-    <div className="relative h-full w-full overflow-hidden" style={{ backgroundColor: viewportBg }}>
+    /*
+     * A container, because the building names have to fit the VIEWPORT COLUMN,
+     * not the window. At 1024px the desktop layout leaves the 3D column about
+     * 320px wide, and a name like "5-storey concrete · moment frame" does not
+     * fit two of them side by side - it was truncating to "5-story conc…".
+     *
+     * A media query would have answered the wrong question here, the same way
+     * the material buttons' `sm:basis-calc(25%)` did: they asked how wide the
+     * window was when what mattered was how wide the box was.
+     */
+    <div
+      className="@container relative h-full w-full overflow-hidden"
+      style={{ backgroundColor: viewportBg }}
+    >
       <Canvas
         camera={{ position: [13, 24, 54], fov: 45, near: 0.1, far: 500 }}
         dpr={[1, 2]}
@@ -344,7 +357,7 @@ function IdentityTag({
 }) {
   return (
     <span
-      className={`flex max-w-[45%] items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 backdrop-blur ${
+      className={`flex items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 backdrop-blur ${
         align === 'right' ? 'flex-row-reverse' : ''
       }`}
     >
@@ -354,7 +367,12 @@ function IdentityTag({
       >
         {letter}
       </span>
-      <span className="truncate text-[11px] text-muted-foreground">{name}</span>
+      {/*
+        The name appears only when the viewport column is wide enough for it.
+        The letter is the part that is load-bearing - it is what tells the two
+        buildings apart - so it is never the thing that gets dropped.
+      */}
+      <span className="hidden truncate text-[11px] text-muted-foreground @xl:inline">{name}</span>
     </span>
   );
 }

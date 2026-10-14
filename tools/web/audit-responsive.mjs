@@ -92,6 +92,33 @@ const VIEWS = [
   { name: 'build' },
   { name: 'simulate', tab: /simulate/i },
   { name: 'results', tab: /results/i },
+  /*
+   * Comparison mode was never audited, which is how the cut-off Site & ground
+   * panel and the twenty-storey bar-chart crowding both survived: neither
+   * exists until a second building is added. Comparison also puts a header
+   * above the controls and a second column of bars in the chart, so it is a
+   * different layout rather than the same one with more data.
+   */
+  {
+    name: 'compare',
+    open: async (page) => {
+      const toggle = page.getByRole('button', { name: /compare with another building/i });
+      if ((await toggle.count()) === 0) return;
+      await toggle.first().click();
+      // The second building has to be solved before the charts mean anything.
+      await page.waitForTimeout(900);
+    },
+  },
+  {
+    name: 'feedback dialog',
+    open: async (page) => {
+      await page
+        .getByRole('button', { name: /feedback/i })
+        .first()
+        .click();
+      await page.getByRole('dialog').waitFor({ state: 'visible' });
+    },
+  },
   {
     name: 'about dialog',
     open: async (page) => {
@@ -368,6 +395,88 @@ function inspectPage({ minTap, touch }) {
         });
       }
     }
+  }
+
+  // 5. Controls that cannot actually be clicked.
+  /*
+   * This is the check whose absence let a real bug ship.
+   *
+   * The About dialog's tab list was made taller than its box, and the panel
+   * below drew straight over it. Nothing about that is overflow: the list
+   * fitted itself, the panel fitted itself, and check 2 measured both as fine.
+   * The audit called that view CLEAN while the Glossary tab was buried under
+   * the disclaimer. A screenshot caught it; measurement did not.
+   *
+   * So this does not ask "do two boxes intersect" - plenty of intersections are
+   * deliberate. It asks the question a user would: if I click the middle of
+   * this control, does the click reach it? `elementFromPoint` answers exactly
+   * that, and it accounts for stacking, opacity and pointer-events for free.
+   *
+   * THE FIRST ATTEMPT AT THIS WAS USELESS, and the output said so: 12 false
+   * positives on the very first run, all of them controls resting under the
+   * sticky top bar because the panel happened to be scrolled. Content passing
+   * behind a sticky header on its way somewhere is normal, not a defect.
+   *
+   * So a covered control is scrolled to the middle of its scroll container and
+   * re-tested. Only if it is STILL covered at the most visible position the
+   * layout offers is it reported - because that is a control the user cannot
+   * bring into the clear, whatever they try.
+   */
+  const openDialog = document.querySelector('[role="dialog"], [role="alertdialog"]');
+  const clickable = [
+    ...document.querySelectorAll(
+      'button, a[href], input, select, textarea, [role="button"], [role="tab"], [role="radio"], [role="slider"], [role="switch"]',
+    ),
+  ];
+
+  /** What `elementFromPoint` finds at the centre of this control. */
+  const blockerAt = (el) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) return null;
+
+    const hit = document.elementFromPoint(
+      Math.round(rect.left + rect.width / 2),
+      Math.round(rect.top + rect.height / 2),
+    );
+
+    // The element itself, or something inside it, took the click. Fine.
+    if (!hit) return null;
+    if (el.contains(hit) || hit.contains(el)) return null;
+
+    return hit;
+  };
+
+  for (const el of clickable) {
+    if (!visible(el)) continue;
+    if (el instanceof HTMLInputElement && el.type === 'hidden') continue;
+
+    /*
+     * A modal makes everything behind it inert on purpose, so `elementFromPoint`
+     * reporting the page behind the dialog as covered is correct behaviour and
+     * not a defect. When a dialog is open, only the dialog is checked.
+     */
+    if (openDialog && !openDialog.contains(el)) continue;
+
+    const rect = el.getBoundingClientRect();
+    if (rect.width === 0 || rect.height === 0) continue;
+
+    let hit = blockerAt(el);
+    if (!hit) continue;
+
+    // Scrolled into the middle of its scroll container, the most visible place
+    // the layout offers. `block: 'nearest'` scrolls ancestors but not the page.
+    el.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+    const afterScroll = blockerAt(el);
+    if (!afterScroll) continue; // it could be scrolled clear, so it is reachable
+
+    hit = afterScroll;
+    problems.push({
+      kind: 'control cannot be clicked',
+      detail: `${label(el)} - "${label(hit)}" is on top of it even when scrolled into view`,
+      selector: path(el),
+      severity: 'fail',
+    });
   }
 
   return problems;

@@ -161,7 +161,7 @@ describe('accessibility', () => {
     const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
 
-    await user.click(screen.getByRole('button', { name: /feedback/i }));
+    await user.click(screen.getByRole('button', { name: /usability feedback/i }));
     const dialog = await screen.findByRole('dialog');
 
     const results = await audit(dialog);
