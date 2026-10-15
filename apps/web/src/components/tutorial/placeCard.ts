@@ -151,3 +151,71 @@ function clamp(value: number, cardSize: number, viewportSize: number): number {
   if (max < EDGE) return 0;
   return Math.min(Math.max(EDGE, value), max);
 }
+
+/* =========================================================================
+   The hole in the blur.
+
+   Same shape as `placeCard` above and for the same reason: pure arithmetic, so
+   it can be asked about instead of inferred from a screenshot.
+
+   THE BUG THIS WAS WRITTEN AFTER
+   The hole used to be built from the outline's numbers straight through, with
+   no regard for whether they fit on screen. They usually do not.
+
+   The outline carries OUTLINE_PAD of slack around the target, and two of the
+   four tour steps point at a full-height side panel. At 1920x1080 that panel's
+   outline came out 400 wide by 1043 tall at x 1528 — so its right edge was at
+   1928 and its bottom at 1088, both outside a 1920x1080 window.
+
+   Percentages outside 0..100 are legal in `polygon()`, and the resulting ring
+   self-intersects. Under the nonzero fill rule a self-intersecting ring does
+   not make a neat hole; it leaves whole regions wound once instead of twice, so
+   they are filled when they should be empty. The 3D view stayed blurred and
+   everything to the LEFT of the hole stopped being blurred — the exact shape
+   the client reported, on precisely the two steps whose target overflows.
+
+   Clamping first is not a cosmetic tidy-up. A hole that hangs outside the box
+   it is cut from is not a hole.
+   ========================================================================= */
+
+/**
+ * A `clip-path` polygon that leaves one rectangle of a full-bleed layer alone.
+ *
+ * Returns `undefined` when there is nothing on screen to cut out, which is the
+ * safe reading for a layer: no hole, so everything is blurred. A half-clipped
+ * hole would be the worst of both.
+ *
+ * `viewport` is passed in rather than read from `window`, for the same reason
+ * `placeCard` does it: these rules should be testable at sizes no test runner
+ * happens to be running at.
+ */
+export function holePolygon(outline: Box, viewport: Viewport): string | undefined {
+  // Clamp to the window FIRST — that is the whole fix, and everything below
+  // assumes 0 <= x0 < x1 <= 100 and must not be asked to cope otherwise.
+  const box = holePolygonPoints(outline, viewport);
+  if (!box) return undefined;
+  const { x0, y0, x1, y1 } = box;
+
+  return [
+    'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%',
+    `${x0}% ${y1}%`,
+    `${x1}% ${y1}%`,
+    `${x1}% ${y0}%`,
+    `${x0}% ${y0}%)`,
+  ].join(', ');
+}
+
+/** The coordinates inside a `holePolygon`, for reading in a test failure. */
+export function holePolygonPoints(outline: Box, viewport: Viewport) {
+  const left = Math.max(0, outline.left);
+  const top = Math.max(0, outline.top);
+  const right = Math.min(viewport.width, outline.left + outline.width);
+  const bottom = Math.min(viewport.height, outline.top + outline.height);
+  if (right - left < 1 || bottom - top < 1) return null;
+  return {
+    x0: (left / viewport.width) * 100,
+    y0: (top / viewport.height) * 100,
+    x1: (right / viewport.width) * 100,
+    y1: (bottom / viewport.height) * 100,
+  };
+}

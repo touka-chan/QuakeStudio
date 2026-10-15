@@ -619,6 +619,192 @@ test.describe('the background behind the tour', () => {
   });
 
   /*
+   * THE BLUR LAYER MUST NOT BE CLIPPED, OR NOTHING BEHIND IT IS BLURRED.
+   *
+   * This is the whole of the bug the client reported three times. The tour put
+   * a `clip-path` with a hole around the highlighted control on the layer that
+   * carries the `backdrop-filter`, and Chromium does not give a backdrop filter
+   * to an element that is also clipped or masked. So the hole did not make the
+   * control sharp — it made the entire page stop being blurred, and the
+   * untouched page showing through the "hole" read as the hole working.
+   *
+   * Measured on the controls panel at step 3, where the target is the results
+   * panel on the far side: 7.2% of edges left with the clip, 2.7% without it,
+   * 7.1% with the tour closed. An SVG mask behaves the same way.
+   *
+   * So the layer must carry a backdrop filter and NO clip, and the highlighted
+   * control is painted above it instead. Both halves are asserted: a check that
+   * only looked for the filter would have passed the entire time this was
+   * broken.
+   */
+  test('the blur layer is not clipped, or nothing behind it is blurred', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await asPlainUser(page);
+    await page.goto('/');
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const layer = await page.evaluate(() => {
+      const el = document.querySelector<HTMLElement>('[data-tour-backdrop]')!;
+      const style = getComputedStyle(el);
+      return {
+        filter: style.backdropFilter,
+        clip: style.clipPath,
+        mask: style.maskImage,
+        webkitMask: (style as unknown as { webkitMaskImage: string }).webkitMaskImage,
+      };
+    });
+
+    expect(layer.filter, 'the layer has no backdrop filter').toContain('blur');
+    expect(layer.clip, 'the blur layer is clipped, so Chromium drops its blur entirely').toBe(
+      'none',
+    );
+    expect(layer.mask, 'the blur layer is masked, so Chromium drops its blur entirely').toBe(
+      'none',
+    );
+    expect(layer.webkitMask ?? 'none', 'the blur layer is masked').not.toContain('url(');
+  });
+
+  /*
+   * And the page actually goes soft, measured where the tour is not pointing.
+   *
+   * This is the check whose absence let the bug through. The canvas has its own
+   * `filter` and was passing its tests throughout, so every reading taken there
+   * was a reading about something else. This one reads the panel on the far side
+   * of the window, which is only ever the blur's job.
+   */
+  test('the far side of the window is blurred on the step that points at the other panel', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1920, height: 1080 });
+    await asPlainUser(page);
+    await page.goto('/');
+    await page.waitForSelector('canvas', { timeout: 20_000 });
+    await page.waitForTimeout(700);
+
+    // Step 3 targets the results panel on the right, so the left is background.
+    const farSide = { x: 20, y: 180, width: 260, height: 160 };
+    const before = await measureLook(page, farSide);
+
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(700);
+    for (let i = 0; i < 2; i += 1) {
+      await card(page)
+        .getByRole('button', { name: /^next$/i })
+        .click();
+      await page.waitForTimeout(900);
+    }
+    await expect(card(page).getByText(/step 3 of 4/i)).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const during = await measureLook(page, farSide);
+    expect(
+      during.edges,
+      `the far side of the window still has ${during.edges}% of its edges (was ${before.edges}%) — it is not blurred`,
+    ).toBeLessThan(before.edges * 0.75);
+  });
+
+  /*
+   * The highlighted control is painted ABOVE the blur, which is what replaced
+   * the hole. If it were not, the tour would point at a soft, dimmed control.
+   */
+  test('the thing it is pointing at is painted above the blur, not cut out of it', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await asFirstTimer(page);
+    await page.goto('/');
+    await expect(card(page)).toBeVisible();
+
+    for (let step = 1; step <= 4; step += 1) {
+      await expect
+        .poll(() =>
+          page.evaluate(() => {
+            const el = document.querySelector<HTMLElement>('[data-tour-active]');
+            if (!el) return -1;
+            return getComputedStyle(el).zIndex;
+          }),
+        )
+        .toBe('60');
+
+      // And it is genuinely above the layer, not merely numbered higher.
+      //
+      // Polled, because step 4 scrolls its target into view and the reading
+      // taken the instant the step changed lands mid-scroll, on the scrolling
+      // panel rather than on the control. Read once it failed on step 4 and
+      // passed on steps 1 to 3, which is a test timing rather than a bug.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const target = document.querySelector<HTMLElement>('[data-tour-active]')!;
+              const r = target.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + 24);
+              const layer = document.querySelector('[data-tour-backdrop]');
+              return Boolean(hit && hit !== layer && !layer?.contains(hit));
+            }),
+          { timeout: 6000 },
+        )
+        .toBe(true);
+
+      const next = card(page).getByRole('button', { name: /^next$/i });
+      if (await next.count()) await next.click();
+    }
+  });
+
+  /*
+   * The blocker keeps its hole, and the hole stays inside the window.
+   *
+   * It is the tour's only clipped layer now — the blur could not keep one, and
+   * the dim's SVG mask is not the same thing. A hole that hangs outside the
+   * window is not a hole: the polygon self-intersects and clicks land on the
+   * wrong side of it, so a control the tour is describing becomes unclickable.
+   *
+   * POLLED, because the outline is measured on a later frame than the card
+   * appears. Reading once on arrival found `clip-path: none` often enough to
+   * look like a bug in the tour rather than in the test.
+   */
+  for (const width of [1024, 1280, 1440, 1920]) {
+    test(`keeps the blocker's hole inside the window at ${width}px`, async ({ page }) => {
+      await page.setViewportSize({ width, height: 900 });
+      await asFirstTimer(page);
+      await page.goto('/');
+      await expect(card(page)).toBeVisible();
+
+      for (let step = 1; step <= 4; step += 1) {
+        await expect
+          .poll(
+            async () => {
+              const clip = await page.evaluate(
+                () => getComputedStyle(document.querySelector('[data-tour-blocker]')!).clipPath,
+              );
+              const points = [...clip.matchAll(/(-?[\d.]+)%\s+(-?[\d.]+)%/g)];
+              if (points.length !== 8) return `step ${step} cut no hole yet (${clip.slice(0, 20)})`;
+              return [...points.slice(4)]
+                .filter(
+                  (m) =>
+                    Number(m[1]) < 0 ||
+                    Number(m[1]) > 100 ||
+                    Number(m[2]) < 0 ||
+                    Number(m[2]) > 100,
+                )
+                .map((m) => `${m[1]}%,${m[2]}%`)
+                .join(' ');
+            },
+            { timeout: 6000 },
+          )
+          .toBe('');
+
+        const next = card(page).getByRole('button', { name: /^next$/i });
+        if (await next.count()) await next.click();
+      }
+    });
+  }
+
+  /*
+   * The other half of the claim: the thing the tour is pointing at is NOT  /*
    * The other half of the claim: the thing the tour is pointing at is NOT
    * blurred. A background that has gone soft while the target has not is what
    * the whole effect is for, and it is possible to get the first without the

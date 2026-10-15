@@ -231,4 +231,37 @@
   html[data-tour-open] canvas {
     filter: blur(3px) saturate(0.55);
   }
+
+  /*
+     THE THING BEING DESCRIBED, LIFTED ABOVE THE BLUR
+
+     The tour softens the page with a `backdrop-filter` layer over the whole
+     window. That layer used to carry a `clip-path` with a hole cut around the
+     highlighted control, so the control would show through unblurred while
+     everything else went soft.
+
+     Chromium drops `backdrop-filter` entirely on an element that also has a
+     clip or a mask. Measured, at every width, on both themes: with the hole the
+     page came back with 7.2% of its edges where it has 7.1% closed — nothing was
+     blurred anywhere — and with the hole removed the same patch read 2.7%, so
+     the blur does work. An SVG `mask` in place of the `clip-path` behaves the
+     same way and is no better.
+
+     A layer that blurs everything cannot also have a hole in it, here. So the
+     hole moved: the highlighted control is painted ABOVE the blur instead of
+     being cut out of it. `position: relative` does not move it — there are no
+     offsets — and `z-index` only applies to a positioned element, which is the
+     whole reason for the `position` half of this rule.
+
+     `data-tour-active` is set on the one element the current step is about, and
+     nothing else, so this is the single place that decides what stays sharp.
+
+     The reason the whole class of fix was available: the canvas blur above had
+     been passing its tests the entire time while the page around it was never
+     blurred at all, because those tests measured the canvas.
+  */
+  html[data-tour-open] [data-tour-active] {
+    position: relative;
+    z-index: 60;
+  }
 }

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { useFocusTrap } from './useFocusTrap';
 import { useTargetRect } from './useTargetRect';
-import { CARD_WIDTH, OUTLINE_PAD, placeCard } from './placeCard';
+import { CARD_WIDTH, holePolygon, OUTLINE_PAD, placeCard } from './placeCard';
 import { TOUR_BACKDROP_FILTER } from './tourBackdrop';
 import type { TourStep } from './tourSteps';
 
@@ -212,22 +212,19 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
    * `polygon()` fills with the nonzero rule, so opposite winding is what makes
    * it a hole rather than a notch bitten out of one side.
    */
+  /*
+   * The hole, from `placeCard.ts`, which clamps it to the window first.
+   *
+   * It used to be built here from the outline's numbers straight through, and
+   * two of the four steps point at a full-height side panel whose outline runs
+   * past the right and bottom edges. A ring whose inner rectangle hangs outside
+   * its outer one self-intersects, and under the nonzero fill rule whole
+   * regions stop being clipped — which is what left the controls panel sharp
+   * on the steps that report the numbers. The arithmetic and the reason for the
+   * clamp are both in `placeCard.ts`; see `holePolygon`.
+   */
   const holeClip = outline
-    ? (() => {
-        const vw = window.innerWidth;
-        const vh = window.innerHeight;
-        const x0 = (outline.left / vw) * 100;
-        const x1 = ((outline.left + outline.width) / vw) * 100;
-        const y0 = (outline.top / vh) * 100;
-        const y1 = ((outline.top + outline.height) / vh) * 100;
-        return [
-          'polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%',
-          `${x0}% ${y1}%`,
-          `${x1}% ${y1}%`,
-          `${x1}% ${y0}%`,
-          `${x0}% ${y0}%)`,
-        ].join(', ');
-      })()
+    ? holePolygon(outline, { width: window.innerWidth, height: window.innerHeight })
     : undefined;
 
   return (
@@ -247,6 +244,24 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
           why, and for why no tour step points at the canvas — the invariant a
           test holds.
 
+          NO HOLE IN THIS LAYER, AND THAT IS THE POINT.
+
+          It used to carry a `clip-path` with the target cut out of it, so the
+          highlighted control would show through unblurred. Chromium drops
+          `backdrop-filter` altogether on an element that also has a clip or a
+          mask, so that hole did not make the control sharp — it made the whole
+          page stop being blurred, which is what the client reported three times
+          and what no assertion about the filter itself would ever have found.
+
+          So nothing is cut here. Everything behind is softened, and the target
+          is painted above this layer instead — `html[data-tour-open]
+          [data-tour-active]` in index.css, which is the single place that says
+          what stays sharp. Measured: 7.2% of edges left in the page with the
+          hole, 2.7% without it, 7.1% with the tour closed.
+
+          The dim below still cuts a hole, because an SVG mask on a plain fill
+          is not the same thing as a mask on a backdrop filter and works fine.
+
           `pointer-events-none` so this layer is purely visual; the blocker
           further down is the one that stops clicks. */}
       <div
@@ -260,11 +275,6 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
         style={{
           backdropFilter: TOUR_BACKDROP_FILTER,
           WebkitBackdropFilter: TOUR_BACKDROP_FILTER,
-          // No clip means no hole, which is the right fallback while the target
-          // has not been measured: everything softened, rather than a hard
-          // unblurred window over the wrong element.
-          clipPath: holeClip,
-          WebkitClipPath: holeClip,
         }}
       />
 
@@ -320,7 +330,7 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
             instead of failing.
           */
           data-tour-outline=""
-          className={`pointer-events-none fixed z-[51] rounded-2xl ring-2 ring-primary ${
+          className={`pointer-events-none fixed z-[70] rounded-2xl ring-2 ring-primary ${
             reduced ? '' : 'transition-all duration-200'
           }`}
           style={outline}
@@ -329,17 +339,18 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
 
       {/* ---- The blocker.
 
-          Carries the same clip as the blur and the dim, and for the same reason:
-          the hole is where the user is meant to be able to act. Inside it this
-          layer is not painted and so not hit; outside it swallows the click
-          without doing anything with it. Without it a user told to "set the
-          floors" could not drag the slider or scroll the panel they were being
-          shown, which is the worst version of a tutorial.
+          THE ONLY LAYER WITH A HOLE IN IT ANY MORE, and for the same reason it
+          always had one: the hole is where the user is meant to be able to act.
+          Inside it this layer is not painted and so not hit; outside it swallows
+          the click without doing anything with it. Without it a user told to
+          "set the floors" could not drag the slider or scroll the panel they
+          were being shown, which is the worst version of a tutorial.
 
-          Three layers cut with the same shape — the blur, the dim, and this —
-          and the reason they are three rather than one is that what each does
-          is different: blur and dim paint, this stops clicks. Folding them
-          together would quietly make the highlighted control unclickable.
+          The blur lost its hole — a clipped element is not given a backdrop
+          filter — and the target is now painted above the blur instead, so this
+          layer carries the only clip in the tour. A `clip-path` with no
+          backdrop filter on it behaves exactly as intended, which is why it is
+          the one that keeps it.
 
           Sits last among the z-50 layers so it is the topmost thing at any
           point inside the hole's surroundings.
@@ -348,6 +359,10 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
           one that should look different from the dim already behind it. */}
       <div
         aria-hidden="true"
+        // Named for the end-to-end tests, for the same reason the outline is:
+        // the clip on this layer is the tour's only remaining hole, and a test
+        // that could not find it would quietly measure nothing.
+        data-tour-blocker=""
         className="fixed inset-0 z-50"
         style={{ clipPath: holeClip, WebkitClipPath: holeClip }}
       />
@@ -363,7 +378,7 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
         aria-describedby={bodyId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className={`fixed z-[60] w-[22rem] max-w-[calc(100%-2rem)] rounded-app border border-line bg-surface p-4 shadow-xl ${
+        className={`fixed z-[80] w-[22rem] max-w-[calc(100%-2rem)] rounded-app border border-line bg-surface p-4 shadow-xl ${
           reduced ? '' : 'transition-all duration-200'
         }`}
         style={placement}
