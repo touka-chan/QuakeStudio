@@ -71,7 +71,9 @@
   /*
      The floating "How to use" button.
 
-     A ring that expands and fades, repeating every 2.8s. The button itself does
+     A ring that expands and fades, repeating every 1.8s. The spread was cut
+     from 1.55 to 1.35 at the same time: faster is easier to read as a pulse,
+     but a wider ring covers more of whatever sits beside the button. The button itself does
      not animate: it carries a drop shadow, and animating `box-shadow` would
      have to re-state that shadow in every keyframe or the button would visibly
      lose it on the first frame. A pseudo-element keeps the two apart.
@@ -87,11 +89,11 @@
   @keyframes qs-attention-ring {
     0% {
       transform: scale(1);
-      opacity: 0.65;
+      opacity: 0.7;
     }
     70%,
     100% {
-      transform: scale(1.55);
+      transform: scale(1.35);
       opacity: 0;
     }
   }
@@ -103,7 +105,7 @@
     border-radius: 9999px;
     border: 2px solid var(--primary);
     pointer-events: none;
-    animation: qs-attention-ring 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+    animation: qs-attention-ring 1.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   }
 }
 

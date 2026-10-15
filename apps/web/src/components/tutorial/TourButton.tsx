@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { CircleHelp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -14,15 +14,24 @@ import { useTourStore } from '@/store/tourStore';
    reached seven controls and had already cut two of them off at 360px once.
 
    COLOUR
-   It is filled with --primary, so it is the same green in both themes rather
-   than a pale surface with a border that reads as a smudge. The icon colour
-   comes from --primary-fg, which is white in light and near-black green in
-   dark, so the contrast inside the circle is the app's own and does not need
-   deciding here.
+   Filled with --primary, so it is the same green in both themes rather than a
+   pale surface with a border that reads as a smudge. The icon colour comes
+   from --primary-fg: white in light, near-black green in dark. The contrast
+   inside the circle is the app's own and does not need deciding here.
 
    The panels it floats over reserve a gutter for it — see ResultsPanel.tsx and
    ControlsPanel.tsx — and the button can be dragged out of the way if the user
    would rather it were not there at all.
+
+   WHY THE DRAG DOES NOT USE STATE
+   The first version called setState on every pointermove. A drag emits those
+   far faster than a render, a reconciliation and a style recalculation can be
+   finished, and the button visibly trailed the finger.
+
+   So the committed position lives in React and is written once, and the live
+   position is a transform written straight onto the node. The compositor
+   applies that without asking React anything, and it is the same property
+   whether the button has moved one pixel or four hundred.
 
    DRAGGING IS A POINTER CONVENIENCE, NOT THE ONLY WAY IN
    What the button *does* — open the tour — is a normal button, reachable by
@@ -43,9 +52,12 @@ const EDGE = 8;
  * Pointer travel before a press counts as a drag rather than a click.
  *
  * Small, because a finger is imprecise and a large threshold reads as "it did
- * not move". Large enough that a tap does not get mistaken for one.
+ * not move". Large enough that a tap is not mistaken for one.
  */
 const DRAG_THRESHOLD_PX = 4;
+
+/** How long the button takes to settle back after being released. */
+const SETTLE_MS = 180;
 
 function readSpot(): Spot | null {
   try {
@@ -90,10 +102,15 @@ export function TourButton() {
 
   /** null means "the CSS default, bottom right". */
   const [spot, setSpot] = useState<Spot | null>(readSpot);
+  const [settling, setSettling] = useState(false);
+
   const boxRef = useRef<HTMLButtonElement>(null);
-  // Mirrors `spot` for the pointerup handler, which must not read a value the
+  // Mirrors `spot`, for the pointerup handler, which must not read a value the
   // last pointermove has set but React has not re-rendered yet.
   const spotRef = useRef<Spot | null>(null);
+  // Where the current drag started from. The live transform is measured against
+  // this, which is what lets `left`/`top` stay put during the drag.
+  const originRef = useRef<Spot | null>(null);
   const drag = useRef<{
     grabX: number;
     grabY: number;
@@ -122,6 +139,23 @@ export function TourButton() {
     return () => window.removeEventListener('resize', reclamp);
   }, []);
 
+  /*
+   * Fold the live drag transform back into the committed position.
+   *
+   * A layout effect, not an effect, and that is the whole point. React writes
+   * the new `left`/`top` and this reset has to land in the *same* paint: the
+   * button is currently drawn at (old position + transform), and the new
+   * `left`/`top` already describe where the user let go. Clearing the transform
+   * a frame later shows the old position for that frame, and clearing it a
+   * frame earlier never applies the new one at all.
+   *
+   * Guarded, because `spot` also changes on pointerdown, before any transform
+   * has been written.
+   */
+  useLayoutEffect(() => {
+    const el = boxRef.current;
+    if (el && el.style.transform) el.style.transform = '';
+  }, [spot]);
   function onPointerDown(event: React.PointerEvent<HTMLButtonElement>) {
     if (event.button !== 0) return;
     const el = event.currentTarget;
@@ -129,11 +163,12 @@ export function TourButton() {
     // which it will almost immediately.
     el.setPointerCapture(event.pointerId);
     const r = el.getBoundingClientRect();
-    // Turn the CSS default into an explicit position, so the drag continues
-    // from where the button actually is rather than jumping.
+    // Turn the CSS default into an explicit position, so the drag starts from
+    // where the button actually is rather than jumping.
     const from = spotRef.current ?? { x: r.left, y: r.top };
     const start = clampToWindow(from, r.width, r.height);
     spotRef.current = start;
+    originRef.current = start;
     setSpot(start);
     drag.current = {
       grabX: event.clientX - r.left,
@@ -160,7 +195,10 @@ export function TourButton() {
       el.offsetHeight,
     );
     spotRef.current = next;
-    setSpot(next);
+    // Straight onto the node — no React, no render, no reconciliation. See the
+    // note at the top of this file for why this matters.
+    const origin = originRef.current ?? next;
+    el.style.transform = `translate3d(${next.x - origin.x}px, ${next.y - origin.y}px, 0)`;
   }
 
   function onPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
@@ -169,10 +207,31 @@ export function TourButton() {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
-    if (d?.moved) {
-      swallowClick.current = true;
-      if (spotRef.current) writeSpot(spotRef.current);
+    const final = spotRef.current;
+    if (!d?.moved || !final) return;
+
+    swallowClick.current = true;
+    writeSpot(final);
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      setSpot(final);
+      return;
     }
+
+    /*
+     * Fold the live transform into `left`/`top`, then hand back a settle.
+     *
+     * Two frames: one for React to write the new `left`/`top`, and one for the
+     * class to come off. If it came off in the same frame there would be
+     * nothing to animate and the button would stop dead.
+     */
+    setSettling(true);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSpot(final);
+        setSettling(false);
+      });
+    });
   }
 
   function onClick(event: React.MouseEvent<HTMLButtonElement>) {
@@ -202,18 +261,14 @@ export function TourButton() {
           aria-label="How to use"
           aria-hidden={tourOpen || undefined}
           tabIndex={tourOpen ? -1 : undefined}
-          /*
-           * Made invisible rather than removed while the tour is up. This is
-           * usually what had focus when the tour opened, and unmounting it
-           * would leave the focus trap handing focus to an element that no
-           * longer exists. `tabIndex: -1` is what makes the `aria-hidden`
-           * legal — axe checks for exactly that pairing.
-           */
           className={cn(
             // `touch-none` or a finger drag scrolls the page instead of moving
             // the button.
             'qs-attention fixed z-40 size-12 touch-none rounded-full p-0 text-primary-foreground shadow-lg lg:size-14',
             spot ? undefined : 'right-3 bottom-20 lg:right-5 lg:bottom-5',
+            // No transition while the pointer is down — the drag has to track
+            // the finger exactly, and easing it does that worse, not better.
+            settling ? 'transition-[left,top] duration-150 ease-out' : 'transition-none',
             tourOpen && 'pointer-events-none opacity-0',
           )}
           style={
@@ -231,3 +286,5 @@ export function TourButton() {
     </Tooltip>
   );
 }
+
+export { SETTLE_MS };
