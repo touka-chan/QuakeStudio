@@ -106,9 +106,12 @@ function SceneContent() {
     <>
       <group>
         <BuildingMesh />
-        <ShakeArrow widthM={building.widthM} depthM={building.depthM} />
+        {/* The single building is its own scale reference, so the arrow is
+            measured against exactly what it used to be. */}
+        <ShakeArrow referenceWidthM={building.widthM} depthM={building.depthM} />
       </group>
-      <GroundSlab />
+      {/* The slab covers this one building's own footprint. */}
+      <GroundSlab widthM={building.widthM} depthM={building.depthM} />
     </>
   );
 }

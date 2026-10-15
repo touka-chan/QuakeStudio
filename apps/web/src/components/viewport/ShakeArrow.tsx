@@ -1,3 +1,4 @@
+import { ARROW_HEAD_RATIO, arrowLengthM } from '@/lib/sceneScale';
 import { useCssVar } from '@/lib/useCssVar';
 
 /* =========================================================================
@@ -10,16 +11,41 @@ import { useCssVar } from '@/lib/useCssVar';
    Placed IN FRONT of the building rather than at the origin — at the origin it
    runs straight through the building and only the near end is visible.
 
-   The label is NOT drawn in 3D. drei's <Html> does not render inside <Bounds>
+   THE LABEL IS NOT DRAWN IN 3D. drei's <Html> does not render inside <Bounds>
    (which owns the camera fit), and the client mockup shows this caption as an
    ordinary overlay under the viewport anyway. See ShakeArrowLabel in Viewport.
+
+   WHAT ITS LENGTH IS MEASURED AGAINST, AND WHY IT IS NOT THE FRAME
+   It used to be `widthM * 1.25`, and the comparison view passed the width of the
+   whole framed row. At two buildings that was a sensible 30 m arrow. At four the
+   row runs to about 70 m, so the arrow became 87 m — it ran off both edges of
+   the viewport and the heads were the only part of it left on screen. Reported
+   by the client: "too long when there are many buildings".
+
+   The arrow shows a DIRECTION. Its length only has to be big enough to read as
+   a direction and to sit against something for scale, and one building is that
+   something. So it is measured against the widest single building, which is what
+   the single-building view always passed, and it stays the same size as
+   buildings are added. Scaling it with the row meant the picture changed
+   meaning every time a building was added, for no gain in legibility.
    ========================================================================= */
 
-export function ShakeArrow({ widthM, depthM }: { widthM: number; depthM: number }) {
+export function ShakeArrow({
+  referenceWidthM,
+  depthM,
+}: {
+  /**
+   * The width the arrow is drawn against — one building's, never the whole row.
+   * See the note above. The caller owns this choice.
+   */
+  referenceWidthM: number;
+  /** Depth of the slab it stands in front of, to clear the front face. */
+  depthM: number;
+}) {
   const arrowColor = useCssVar('--shaking-arrow');
 
-  const length = Math.max(12, widthM * 1.25);
-  const head = length * 0.11;
+  const length = arrowLengthM(referenceWidthM);
+  const head = length * ARROW_HEAD_RATIO;
   const shaft = length / 2 - head / 2;
 
   // Sit just clear of the front face. Pushing it further out drags the whole

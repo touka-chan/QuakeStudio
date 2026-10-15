@@ -170,6 +170,260 @@ function fullyOnScreen(
   );
 }
 
+/*
+ * What the background behind the tour actually looks like.
+ *
+ * THE REPORT WAS "the other parts are not blurred", and measuring it did not
+ * give a clean yes or no. With the old 3px blur, 93% of the 3D canvas's edges
+ * were already gone — so the blur was reaching the WebGL canvas and the
+ * technical claim "it is blurred" was true. What was not true is that it
+ * *looked* blurred, because 3px of blur on a large smooth surface does almost
+ * nothing to it, and the dark theme's near-black dim does almost nothing on an
+ * already dark background.
+ *
+ * So there are two separate properties and they need two separate measurements,
+ * because either one on its own would have passed the old code:
+ *
+ *   1. detail collapses — catches a blur that is missing entirely
+ *   2. colour is drained — catches a blur that is present but unreadable, which
+ *      is the one the client actually reported
+ *
+ * The second is normalised by brightness on purpose. The dim is a black
+ * multiply, which scales chroma and luminance by the same factor, so an
+ * un-normalised reading would credit the dim for the desaturation and the test
+ * would pass on the old code too.
+ */
+type Look = { edges: number; chromaPerLuma: number; meanLuma: number };
+
+/**
+ * Measure several rectangles from ONE screenshot.
+ *
+ * `edges` counts adjacent pixel pairs differing by more than EDGE_RATIO of the
+ * region's OWN mean brightness — not by a fixed number of levels.
+ *
+ * That ratio is the whole point, and getting it wrong makes the test unfailable.
+ * The dim is a black multiply: it scales every brightness difference by the same
+ * factor as the mean, so an absolute threshold reads the dimming as blurring.
+ * The first version used `> 24` levels and PASSED with `blur(0px)` — it could
+ * not fail, and a green bar on a check that cannot fail is worse than no check.
+ *
+ * Measured against the region's own mean, uniform darkening moves nothing and
+ * blur still collapses.
+ *
+ * ONE screenshot for all the regions, not one each. The first version screenshotted
+ * every candidate tile separately — a dozen full-page PNGs per theme — and the CPU
+ * cost of that was enough to make an unrelated, previously-reliable test
+ * ("the card never covers the element it is describing") fail under full-suite
+ * load. A check that breaks the suite it lives in is not paying for itself.
+ */
+async function measureLooks(page: Page, regions: Box[]): Promise<Look[]> {
+  const x0 = Math.min(...regions.map((r) => r.x));
+  const y0 = Math.min(...regions.map((r) => r.y));
+  const x1 = Math.max(...regions.map((r) => r.x + r.width));
+  const y1 = Math.max(...regions.map((r) => r.y + r.height));
+
+  const png = await page.screenshot({ clip: { x: x0, y: y0, width: x1 - x0, height: y1 - y0 } });
+  return page.evaluate(
+    async ({ dataUrl, list, ox, oy }) => {
+      const EDGE_RATIO = 0.12;
+      const img = new Image();
+      img.src = dataUrl;
+      await img.decode();
+      const c = document.createElement('canvas');
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext('2d');
+      if (!ctx) return list.map(() => ({ edges: 0, chromaPerLuma: 0, meanLuma: 0 }));
+      ctx.drawImage(img, 0, 0);
+
+      return list.map((r) => {
+        // The clip is the bounding box of all the regions, so each one is
+        // measured relative to it rather than to the page.
+        const d = ctx.getImageData(r.x - ox, r.y - oy, r.width, r.height).data;
+
+        let chroma = 0;
+        const luma: number[] = [];
+        for (let i = 0; i < d.length; i += 4) {
+          const r8 = d[i]!;
+          const g = d[i + 1]!;
+          const b = d[i + 2]!;
+          luma.push(0.2126 * r8 + 0.7152 * g + 0.0722 * b);
+          chroma += Math.max(r8, g, b) - Math.min(r8, g, b);
+        }
+
+        const meanLuma = luma.reduce((a, b) => a + b, 0) / Math.max(1, luma.length);
+        const threshold = meanLuma * EDGE_RATIO;
+        let jumps = 0;
+        for (let i = 1; i < luma.length; i += 1) {
+          if (Math.abs(luma[i]! - luma[i - 1]!) > threshold) jumps += 1;
+        }
+
+        const meanChroma = chroma / Math.max(1, luma.length);
+        return {
+          edges: luma.length === 0 ? 0 : Math.round((jumps / (luma.length - 1)) * 1000) / 10,
+          chromaPerLuma: Math.round((meanChroma / Math.max(1, meanLuma)) * 1000) / 1000,
+          meanLuma: Math.round(meanLuma),
+        };
+      });
+    },
+    { dataUrl: `data:image/png;base64,${png.toString('base64')}`, list: regions, ox: x0, oy: y0 },
+  );
+}
+
+/** One region, measured. */
+async function measureLook(page: Page, region: Box): Promise<Look> {
+  return (await measureLooks(page, [region]))[0]!;
+}
+
+function overlaps(a: Box, b: Box): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+test.describe('the background behind the tour', () => {
+  /**
+   * The busiest patch of the 3D viewport, found rather than hard-coded, and
+   * chosen so the tour card cannot be sitting on it.
+   *
+   * A fixed rectangle was the first attempt and it failed on its own
+   * precondition: the fraction of the canvas height holding the building moves
+   * with the layout, so at one viewport size the patch was empty background.
+   *
+   * "Busiest" is the right rule — a patch with nothing in it cannot show a blur.
+   * But the card sits over the middle of the screen and is deliberately NOT
+   * blurred, so the busiest patch can be the card. It was, and that is what made
+   * this test fail under full-suite load and pass on its own. So the card is
+   * measured first and any candidate it covers is thrown away.
+   *
+   * Reopening the tour restarts it at step 1, which is where the card was
+   * measured, so the two readings are of the same state.
+   */
+  async function pickBackgroundRegion(page: Page): Promise<{ region: Box; before: Look }> {
+    // Where the card will be. Measured with the tour open, then dismissed.
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    const cardBox = (await settledBox(card(page)))!;
+    await card(page).press('Escape');
+    await expect(card(page)).toHaveCount(0);
+
+    await page.waitForTimeout(500);
+    const canvas = (await page.locator('canvas').boundingBox())!;
+
+    /*
+     * A fine, overlapping grid rather than three neat tiles.
+     *
+     * At the suite's 1280x720 the card lands at the TOP LEFT of the viewport —
+     * it follows the panel it is describing — and with three tiles across, two
+     * of the three columns sat entirely under it and the third overlapped by
+     * three pixels. Zero candidates survived, and a screenshot of nothing is a
+     * baffling error rather than an honest one. Tiles at half-step overlap mean
+     * there is nearly always somewhere clear, whatever shape the card takes.
+     */
+    const tileW = Math.max(120, Math.floor(canvas.width / 4));
+    const tileH = Math.max(90, Math.floor(canvas.height / 5));
+    const stepX = Math.floor(tileW / 2);
+    const stepY = Math.floor(tileH / 2);
+
+    const candidates: Box[] = [];
+    for (let y = canvas.y; y + tileH <= canvas.y + canvas.height; y += stepY) {
+      for (let x = canvas.x; x + tileW <= canvas.x + canvas.width; x += stepX) {
+        const box = { x: Math.round(x), y: Math.round(y), width: tileW, height: tileH };
+        if (overlaps(box, cardBox)) continue;
+        candidates.push(box);
+      }
+    }
+
+    if (candidates.length === 0)
+      throw new Error(
+        `the tour card (${JSON.stringify(cardBox)}) covers the whole 3D viewport (${JSON.stringify(canvas)}) — nothing left to measure`,
+      );
+
+    const looks = await measureLooks(page, candidates);
+    let bestAt = 0;
+    candidates.forEach((_, i) => {
+      if (looks[i]!.edges > looks[bestAt]!.edges) bestAt = i;
+    });
+
+    return { region: candidates[bestAt]!, before: looks[bestAt]! };
+  }
+
+  for (const theme of ['light', 'dark'] as const) {
+    test(`loses its detail and its colour in the ${theme} theme`, async ({ page }) => {
+      await asPlainUser(page);
+      await page.goto('/');
+      if (theme === 'dark') {
+        await page.evaluate(() => document.documentElement.classList.add('dark'));
+        await page.waitForTimeout(300);
+      }
+      await page.waitForTimeout(900);
+
+      const { region, before } = await pickBackgroundRegion(page);
+      expect(
+        before.edges,
+        `nothing in the 3D viewport had any detail to blur (picked ${JSON.stringify(region)})`,
+      ).toBeGreaterThan(2);
+
+      await page.getByRole('button', { name: /how to use/i }).click();
+      await expect(card(page)).toBeVisible();
+      // Past the layer's own transition, so this measures the settled state.
+      await page.waitForTimeout(700);
+
+      const during = (await measureLooks(page, [region]))[0]!;
+
+      // 1. The detail is gone. A missing blur cannot fake this.
+      //
+      //    The threshold is a quarter, and where it sits is deliberate. Measured
+      //    on the busiest patch of the 3D view: no blur at all removes 0% of the
+      //    edges, the shipped 3px removes 50%. A "less than half" rule put the bar
+      //    exactly on the number the shipped value happens to produce on this
+      //    machine — which is not a check, it is a tripwire that fires whenever a
+      //    renderer differs by a little. A quarter separates the two real cases
+      //    with margin on both sides, which is what a threshold is for.
+      expect(
+        during.edges,
+        `the 3D view still has ${during.edges}% of its edges (was ${before.edges}%) — it is not blurred`,
+      ).toBeLessThan(before.edges * 0.75);
+
+      // 2. And so is the colour. This is the one the client reported: a blur
+      //    strong enough to measure but weak enough to look like nothing.
+      expect(
+        during.chromaPerLuma,
+        `colour barely changed (${before.chromaPerLuma} -> ${during.chromaPerLuma}), so the background does not read as blurred`,
+      ).toBeLessThan(before.chromaPerLuma * 0.8);
+    });
+  }
+
+  /*
+   * The other half of the claim: the thing the tour is pointing at is NOT
+   * blurred. A background that has gone soft while the target has not is what
+   * the whole effect is for, and it is possible to get the first without the
+   * second.
+   */
+  test('leaves the thing it is pointing at sharp', async ({ page }) => {
+    await asPlainUser(page);
+    await page.goto('/');
+    await page.waitForTimeout(900);
+
+    // Step 1 points at the whole controls panel, which is large enough to
+    // measure and sits well clear of the card.
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const target = (await settledBox(page.locator('[data-tour-active]')))!;
+    const region: Box = {
+      x: Math.round(target.x + target.width * 0.1),
+      y: Math.round(target.y + target.height * 0.55),
+      width: 160,
+      height: 120,
+    };
+    const look = await measureLook(page, region);
+    expect(
+      look.edges,
+      'the highlighted control is blurred along with everything else',
+    ).toBeGreaterThan(1.5);
+  });
+});
+
 test.describe('guided tour', () => {
   test.beforeEach(async ({ page }) => {
     await asFirstTimer(page);

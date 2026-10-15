@@ -27,6 +27,17 @@ export default defineConfig({
   use: {
     baseURL,
     trace: 'on-first-retry',
+    /*
+     * A picture of every failure, kept whether or not a trace is.
+     *
+     * `trace` only records on a retry, and there is no retry outside CI, so on a
+     * developer machine a local failure leaves nothing to look at. A screenshot
+     * costs nothing when the suite is green and settles arguments when it is
+     * not: the tour card sitting on top of the Play button it was describing
+     * was visible in one of these and invisible in every number this repo had
+     * collected about it.
+     */
+    screenshot: 'only-on-failure',
   },
   projects: [
     {

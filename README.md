@@ -213,6 +213,12 @@ available at every count**:
   rest translucent over it; best for spotting that differently-shaped buildings
   happen to sway almost the same amount.
 
+The ground plane under them is sized to the whole row rather than to building A,
+so at four buildings it still reaches under the last one instead of stopping
+about a third of the way along. The ground-shaking arrow is measured against a
+single building, so it stays the same size however many are being compared — it
+is a direction indicator, not a scale bar for the row.
+
 **Every building wears a badge over its roof** saying which of A, B, C or D it
 is. The badge is positioned by projecting the roof through the camera on every
 frame, and the anchor carries that floor's own displacement - so the badge

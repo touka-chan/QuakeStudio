@@ -157,9 +157,35 @@ export function useTargetRect(
     // panels scrolling underneath the spotlight is invisible to us.
     window.addEventListener('scroll', measure, true);
 
-    const observer =
-      find() && typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    observer?.observe(find()!);
+    /*
+     * Watch the target AND every ancestor up to the body.
+     *
+     * A ResizeObserver reports SIZE, never position — and an ancestor changing
+     * size moves its descendants without changing their size. That is not a
+     * corner case here, it is the normal start-up order:
+     *
+     *   The 3D viewport is lazily mounted. When it lands, the column it sits in
+     *   changes height, the playback bar moves down, and step 2's Play button —
+     *   44 pixels square before and after — moves with it. ResizeObserver on
+     *   the button sees nothing at all, because nothing about the button changed
+     *   except where it was. The card stays exactly where it was placed, and the
+     *   user is told to press Play by a card sitting on top of Play.
+     *
+     * That was not found by reading this code. It was found by an end-to-end
+     * check failing about one run in three, only under full-suite load, while
+     * passing eight times out of eight on its own — a slow machine, and nothing
+     * else.
+     *
+     * Cheap, despite the number of elements: `measure` is called on each
+     * callback and does nothing when the numbers are unchanged, which is the
+     * common case and skips the setState entirely.
+     */
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
+    if (observer) {
+      for (let node: HTMLElement | null = find(); node; node = node.parentElement) {
+        observer.observe(node);
+      }
+    }
 
     /*
      * The first measurement happens on the next animation frame rather than

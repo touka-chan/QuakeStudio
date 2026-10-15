@@ -46,8 +46,33 @@ type Props = {
   onSkip: () => void;
 };
 
-/** How much the page behind is softened. Enough to isolate, not enough to hide. */
+/**
+ * How much the page behind is softened.
+ *
+ * NOT 3px ANY MORE, AND NOT 6px EITHER — the third was `saturate`.
+ *
+ * With the old `blur(3px)` alone, 93% of the 3D canvas's high-contrast edges
+ * were already gone. The blur was reaching the WebGL canvas all along, and
+ * "it is blurred" was technically true. What was not true is that it *looked*
+ * blurred, because 3px does almost nothing to a large smooth surface, and the
+ * dark theme's near-black dim does almost nothing on an already dark
+ * background. That is the report this came back with.
+ *
+ * `saturate` is what fixes it. Darkening cannot make an inactive area read as
+ * inactive on a dark background — there is nowhere darker to go. Draining the
+ * colour can, and it costs a fraction of what a wider blur costs.
+ *
+ * 6px was tried and photographed against 3px, with the desaturation on both.
+ * They are not distinguishable to the eye, and a full-viewport backdrop-filter
+ * is not free: at 6px an unrelated card-position test failed on 1 run in 3,
+ * and at 3px on none of 3. Three runs is not enough to call that, so it is not
+ * the reason on its own — but there is no reason to pay for a difference
+ * nobody can see.
+ */
 const BLUR_PX = 3;
+
+/** Colour left in the background. See the note above — this is the real fix. */
+const BLUR_SATURATE = 0.55;
 
 export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSkip }: Props) {
   const reduced = usePrefersReducedMotion();
@@ -118,18 +143,52 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
    * A layout effect, not a passive one, so the corrected position is applied
    * before the browser paints. The first pass uses the declared max width and
    * an unknown height, and lands wherever the clamp puts it.
+   *
+   * WATCHED RATHER THAN MEASURED ONCE PER STEP.
+   *
+   * The deps were `[index]`, so the card was measured when the step changed and
+   * never again. The app webfont arrives after first paint, so the card grows by
+   * a line of height some time AFTER it was measured, and placement goes on
+   * using the old number. The card is then positioned to sit neatly above its
+   * target using a height it no longer has, and its bottom edge lands on top of
+   * the very control it is describing. At step 2 that is the Play button.
+   *
+   * It looked like a flaky test rather than a bug: it failed about one run in
+   * three under full-suite load and passed every time on its own, because a slow
+   * machine is what makes the font late. The screenshot Playwright keeps on
+   * failure is what actually settled it.
+   *
+   * A ResizeObserver does not care what moved the height, which is the whole
+   * point — font swap, a longer word, a reader's own zoom.
    */
   const [cardSize, setCardSize] = useState({ width: CARD_WIDTH, height: 0 });
+
   useLayoutEffect(() => {
     const el = cardRef.current;
     if (!el) return;
-    const box = el.getBoundingClientRect();
-    setCardSize((prev) =>
-      prev.width === box.width && prev.height === box.height
-        ? prev
-        : { width: box.width, height: box.height },
-    );
-  }, [index]);
+
+    const record = () => {
+      const box = el.getBoundingClientRect();
+      setCardSize((prev) =>
+        prev.width === box.width && prev.height === box.height
+          ? prev
+          : { width: box.width, height: box.height },
+      );
+    };
+
+    if (typeof ResizeObserver === 'undefined') {
+      record();
+      return;
+    }
+
+    const observer = new ResizeObserver(record);
+    observer.observe(el);
+    // The observer's first callback is asynchronous, so take one reading now as
+    // well — otherwise the very first paint has no height to place against.
+    record();
+
+    return () => observer.disconnect();
+  }, []);
 
   const onKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
@@ -207,8 +266,8 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 z-50"
         style={{
-          backdropFilter: `blur(${BLUR_PX}px)`,
-          WebkitBackdropFilter: `blur(${BLUR_PX}px)`,
+          backdropFilter: `blur(${BLUR_PX}px) saturate(${BLUR_SATURATE})`,
+          WebkitBackdropFilter: `blur(${BLUR_PX}px) saturate(${BLUR_SATURATE})`,
           // No clip means no hole, which is the right fallback while the target
           // has not been measured: everything softened, rather than a hard
           // unblurred window over the wrong element.

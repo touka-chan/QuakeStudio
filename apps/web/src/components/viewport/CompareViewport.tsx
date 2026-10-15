@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { buildingHeight } from '@/lib/camera';
 import { layoutSideBySide, type Layout } from '@/lib/layout';
 import { describeBuilding } from '@/lib/describeBuilding';
+import { arrowReferenceWidthM, SIDE_CLEARANCE_RATIO } from '@/lib/sceneScale';
 import { driftBand } from '@/lib/driftScale';
 import { useCssVar, useCssVars } from '@/lib/useCssVar';
 import { sampleDisplacement } from '@/lib/time';
@@ -110,8 +111,11 @@ export function CompareViewport() {
   const depths = subjects.map((s) => s.building.depthM);
   const heights = subjects.map((s) => buildingHeight(s.building));
 
+  /** The widest single building. The scale reference for the shake arrow. */
+  const widestWidthM = arrowReferenceWidthM(widths);
+
   /** Gap between neighbouring buildings: a third of a width reads as a street. */
-  const clearance = Math.max(0, ...widths) * 0.35;
+  const clearance = widestWidthM * SIDE_CLEARANCE_RATIO;
 
   /*
    * WHAT HAS TO FIT IN THE FRAME, AND FROM WHERE.
@@ -283,12 +287,26 @@ export function CompareViewport() {
           callout={calloutNode}
         />
 
-        <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
+        {/*
+         * The arrow is measured against ONE building, never the row.
+         * Passed the framed width before, which at four buildings made it about
+         * 87 m long and it ran off both edges of the viewport. See ShakeArrow.
+         */}
+        <ShakeArrow referenceWidthM={widestWidthM} depthM={frameDepth} />
 
-        {/* Outside the framing on purpose: the slab is deliberately
-              oversized, and fitting to it would push the camera so far back
-              that a 10-storey tower became a thin line. */}
-        <GroundSlab />
+        {/*
+         * The slab covers the whole footprint the buildings occupy — which in
+         * ghost overlay is just the widest one, since they all stand on the same
+         * spot. Before, the slab sized itself from building A alone, so with four
+         * in a line it stopped about a third of the way along and the last two
+         * buildings stood on nothing at all, with the grid lines ending in
+         * mid-air between them.
+
+         * Deliberately outside the camera framing: the slab carries 25% margin
+         * on top of the footprint, and fitting to it would push the camera far
+         * enough back that a 10-storey tower became a thin line.
+         */}
+        <GroundSlab widthM={frameWidth} depthM={frameDepth} />
       </Canvas>
 
       <ViewToggle view={view} onChange={setView} />
