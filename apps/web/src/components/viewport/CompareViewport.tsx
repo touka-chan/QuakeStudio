@@ -4,6 +4,7 @@ import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 import { buildingHeight } from '@/lib/camera';
+import { layoutSideBySide, type Layout } from '@/lib/layout';
 import { describeBuilding } from '@/lib/describeBuilding';
 import { driftBand } from '@/lib/driftScale';
 import { useCssVar, useCssVars } from '@/lib/useCssVar';
@@ -21,26 +22,41 @@ import { ShakeArrow } from './ShakeArrow';
    -------------------------------------------------------------------------
    Two presentations of the same set of buildings:
 
-     • SIDE BY SIDE — each on one ground slab, separated along X. Easiest to
-       read when the buildings are very different.
-     • GHOST OVERLAY — all drawn in the same place, each translucent over A.
-       Best for spotting that differently-shaped buildings happen to sway
-       almost the same amount, which side-by-side makes hard to see.
+     • SIDE BY SIDE — packed edge to edge, two per row once there are more than
+       two. Easiest to read when the buildings are very different.
+     • GHOST OVERLAY — all drawn in the same place, the one being edited solid
+       and the rest translucent over it. Best for spotting that
+       differently-shaped buildings happen to sway almost the same amount,
+       which side-by-side makes hard to see.
 
-   THREE OR FOUR BUILDINGS ARE ALWAYS GHOSTED, AND THE TOGGLE SAYS SO
-   Four buildings side by side need four footprints and three gaps, so at any
-   camera distance that keeps a building legible the frame is several screens
-   wide and each building is a few pixels across. The comparison stops being a
-   comparison and becomes a plan of a street. Rather than ship a view that
-   cannot work at 3 or 4, the view is chosen for the user and the reason is
-   printed on screen.
+   BOTH ARE AVAILABLE AT EVERY COUNT, AND SIDE BY SIDE IS THE DEFAULT.
+   Crossing from two buildings to three changes the shape of the scene enough
+   that starting on the view which stacks them into a mush is the wrong first
+   impression — see `addSide` in compareStore, which is where that happens.
+   Choosing Ghost at three or four is then entirely the user's own decision.
 
    Both sample displacement from the same playback clock as the single-building
    view, and from each building's own `floorDisp`. There is no second clock.
    ========================================================================= */
 
-/** Above this many buildings, side by side cannot be made to work. */
-const MAX_SIDE_BY_SIDE = 2;
+/**
+ * Near head-on, for buildings in a single row.
+ *
+ * The X separation then reads as left/right, and both buildings sit at the same
+ * distance from the lens, so the shorter one is not made to look shorter than it
+ * is. A three-quarter camera did both of those things badly.
+ */
+const ROW_DIRECTION: [number, number, number] = [0.2, 0.38, 0.9];
+
+/**
+ * Lifted, for a second row.
+ *
+ * Head-on, the front row hides the back row — at four buildings that is half
+ * the comparison gone. About 42 degrees of pitch looks down the rows enough to
+ * see both, at the cost of the back row being further from the lens and so
+ * looking smaller. Perspective does that; the table carries the exact figures.
+ */
+const GRID_DIRECTION: [number, number, number] = [0.18, 0.95, 1.05];
 
 /** One building in the comparison, with everything the scene needs. */
 type Subject = {
@@ -72,23 +88,57 @@ export function CompareViewport() {
     }),
   );
 
-  const ghostForced = subjects.length > MAX_SIDE_BY_SIDE;
-  const ghost = ghostForced || view === 'ghost';
+  const ghost = view === 'ghost';
 
-  /* What has to fit in the frame, and from where.
+  const widths = subjects.map((s) => s.building.widthM);
+  const depths = subjects.map((s) => s.building.depthM);
+  const heights = subjects.map((s) => buildingHeight(s.building));
 
-   * Side by side, the camera has to hold every building AND the gap between
+  /** Gap between neighbouring buildings: a third of a width reads as a street. */
+  const clearance = Math.max(0, ...widths) * 0.35;
+
+  /*
+   * WHAT HAS TO FIT IN THE FRAME, AND FROM WHERE.
+   *
+   * Side by side, the camera has to hold every building AND the gaps between
    * them — keying the fit on A alone cropped the taller building off the top.
    * In ghost overlay they all occupy the same space, so only one footprint
-   * needs fitting, and the widest of them counts for all.
+   * needs fitting and the widest of them counts for all.
+   *
+   * The numbers come from `layoutSideBySide`, the same function that places
+   * the buildings. The camera being framed from different arithmetic than the
+   * geometry it frames is how a building ends up cropped at one floor count
+   * and miles away at another.
    */
-  const clearance = Math.max(...subjects.map((s) => s.building.widthM)) * 0.35;
-  const widths = subjects.map((s) => s.building.widthM);
-  const frameWidth = ghost
-    ? Math.max(...widths)
-    : widths.reduce((sum, w) => sum + w, 0) + clearance * (subjects.length - 1);
-  const frameDepth = Math.max(...subjects.map((s) => s.building.depthM));
-  const frameHeight = Math.max(...subjects.map((s) => buildingHeight(s.building)));
+  const layout = layoutSideBySide(
+    subjects.map((s) => ({ width: s.building.widthM, depth: s.building.depthM })),
+    clearance,
+  );
+
+  const frameWidth = ghost ? Math.max(...widths) : layout.width;
+  const frameDepth = ghost ? Math.max(...depths) : layout.depth;
+  const frameHeight = Math.max(...heights);
+
+  /*
+   * TWO CAMERA ANGLES, AND THE REASON IS NOT AESTHETIC.
+   *
+   * With two buildings in one row the camera sits nearly head-on, so the
+   * horizontal separation reads as left/right and both buildings are the same
+   * distance from the lens. That was a deliberate choice: a three-quarter
+   * camera put the far building in front of the near one — exactly the
+   * comparison this view exists to make easy — and made the shorter building
+   * look smaller than it was.
+   *
+   * That reasoning does not survive a second row. Head-on, the front row
+   * simply hides the back row, which for four buildings is half of them gone.
+   * So above two the camera lifts to about 42 degrees, which looks down the
+   * rows enough to see both.
+   *
+   * The cost is real and worth naming: buildings in the back row are further
+   * from the lens and so appear smaller. Perspective does that. The table and
+   * the charts carry the exact figures, and the 3D is for shape and sway.
+   */
+  const direction = ghost || layout.perRow < 2 ? ROW_DIRECTION : GRID_DIRECTION;
 
   return (
     /*
@@ -139,25 +189,22 @@ export function CompareViewport() {
           maxPolarAngle={Math.PI / 2.05}
         />
 
-        {/* Nearly head-on, so the X separation in SideBySide reads as
-              left/right on screen. A three-quarter camera put the far building
-              in front of the near one — exactly the comparison this view exists
-              to make easy — and put them at different distances from the lens,
-              so the shorter building looked smaller than it was. */}
+        {/* The direction, and why it changes above two buildings, is explained where
+              `direction` is computed — this is the same decision, handed over. */}
         <CameraFrame
           width={frameWidth}
           height={frameHeight}
           depth={frameDepth}
-          directionX={0.2}
-          directionY={0.38}
-          directionZ={0.9}
+          directionX={direction[0]}
+          directionY={direction[1]}
+          directionZ={direction[2]}
           margin={1.25}
         />
 
         {ghost ? (
           <GhostOverlay subjects={subjects} />
         ) : (
-          <SideBySide subjects={subjects} clearance={clearance} />
+          <SideBySide subjects={subjects} layout={layout} />
         )}
 
         <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
@@ -168,46 +215,28 @@ export function CompareViewport() {
         <GroundSlab />
       </Canvas>
 
-      {ghostForced ? null : <ViewToggle view={view} onChange={setView} />}
-      <CompareTags subjects={subjects} ghost={ghost} />
+      <ViewToggle view={view} onChange={setView} />
+      <CompareTags subjects={subjects} ghost={ghost} perRow={layout.perRow} />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
-function SideBySide({ subjects, clearance }: { subjects: Subject[]; clearance: number }) {
-  /* Place the buildings side by side, adjacent, with the GROUP centred.
-
-   * Placing them symmetrically about the origin instead — first at −gap/2, last
-   * at +gap/2 — leaves a large empty stretch whenever the widths differ much: a
-   * 14 m building next to a 40 m one ends up 25 m from anything. Measuring the
-   * actual widths and packing them edge to edge keeps the framing stable no
-   * matter how different they are.
-   */
-  const totalWidth =
-    subjects.reduce((sum, s) => sum + s.building.widthM, 0) + clearance * (subjects.length - 1);
-
-  // Each building's centre: the leftmost edge of the packed row, plus whatever
-  // has already been laid down, plus half of this building's own width.
-  //
-  // Written as a sum over the ones before it rather than a running cursor,
-  // because a running total is a variable reassigned during render — something
-  // React does not promise to keep stable, and the linter rightly objects to.
-  // With at most four buildings the repeated sum costs nothing, and it says
-  // what it means.
-  const positions = subjects.map((_, i) => {
-    const laidBefore = subjects
-      .slice(0, i)
-      .reduce((sum, s) => sum + s.building.widthM + clearance, 0);
-    return -totalWidth / 2 + laidBefore + subjects[i]!.building.widthM / 2;
-  });
-
+/**
+ * The buildings, packed edge to edge in rows.
+ *
+ * The positions come from `layout` rather than being worked out again here —
+ * the same numbers the camera was framed from. See lib/layout.ts for why those
+ * two must not be separate calculations.
+ */
+function SideBySide({ subjects, layout }: { subjects: Subject[]; layout: Layout }) {
   return (
     <group>
-      {subjects.map((s, i) => (
-        <SwayingBuilding key={s.side} subject={s} x={positions[i]!} ghost={false} />
-      ))}
+      {subjects.map((s, i) => {
+        const spot = layout.spots[i] ?? [0, 0];
+        return <SwayingBuilding key={s.side} subject={s} x={spot[0]} z={spot[1]} ghost={false} />;
+      })}
     </group>
   );
 }
@@ -263,11 +292,14 @@ function GhostOverlay({ subjects }: { subjects: Subject[] }) {
 function SwayingBuilding({
   subject,
   x,
+  z = 0,
   ghost = false,
   order = 0,
 }: {
   subject: Subject;
   x: number;
+  /** Row position. Ghost overlay puts everything at 0; the grid does not. */
+  z?: number;
   ghost?: boolean;
   order?: number;
 }) {
@@ -336,7 +368,7 @@ function SwayingBuilding({
   });
 
   return (
-    <group position={[x, 0, 0]}>
+    <group position={[x, 0, z]}>
       {Array.from({ length: floors }, (_, index) => {
         const y = index * floorHeightM + slabHeight / 2;
         return (
@@ -388,16 +420,36 @@ function SwayingBuilding({
  * camera. In exchange they are always on screen, always legible, and readable
  * by a screen reader — which an in-scene HTML label is not.
  *
- * Side by side puts them left to right, matching where the buildings stand.
- * Ghost overlay stacks them down the left, because there they all occupy the
- * same space and claiming otherwise would be a lie.
+ * THEY MIRROR THE ARRANGEMENT, THEY DO NOT TRACK THE CAMERA
+ *
+ * With two buildings in one row the tags go left and right, which does match
+ * where they stand. Above two they become a grid of the same shape — two
+ * across, a short row below — so the tag order and the building order agree
+ * even though nothing is pinned to a mesh.
+ *
+ * Claiming to point at a building would be the lie to avoid. These are a
+ * legend: they name the buildings and carry their letters, and the switcher,
+ * the table and the chart legends carry the same information in a place a
+ * screen reader can reach.
  */
-function CompareTags({ subjects, ghost }: { subjects: Subject[]; ghost: boolean }) {
+function CompareTags({
+  subjects,
+  ghost,
+  perRow,
+}: {
+  subjects: Subject[];
+  ghost: boolean;
+  perRow: number;
+}) {
+  // One row of tags for two or fewer, a grid above that.
+  const grid = !ghost && perRow > 0 && subjects.length > perRow;
+
   return (
     <div
-      className={`pointer-events-none absolute inset-x-3 top-12 flex gap-2 ${
-        ghost ? 'flex-col items-start' : 'items-start justify-between'
+      className={`pointer-events-none absolute inset-x-3 top-12 gap-2 ${
+        grid ? 'grid' : ghost ? 'flex flex-col items-start' : 'flex items-start justify-between'
       }`}
+      style={grid ? { gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` } : undefined}
       aria-hidden="true"
     >
       {subjects.map((s, i) => (
@@ -406,7 +458,7 @@ function CompareTags({ subjects, ghost }: { subjects: Subject[]; ghost: boolean 
           letter={s.side}
           name={describeBuilding(s.building)}
           color={seriesColor(s.side)}
-          align={ghost ? 'left' : i === 0 ? 'left' : 'right'}
+          align={!ghost && !grid && i > 0 ? 'right' : 'left'}
         />
       ))}
     </div>

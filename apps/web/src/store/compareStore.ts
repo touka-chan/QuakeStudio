@@ -47,6 +47,16 @@ export type CompareSide = (typeof COMPARE_SIDES)[number];
 /** The most buildings that can be in play at once. */
 export const MAX_BUILDINGS = COMPARE_SIDES.length;
 
+/**
+ * Above this many, side by side lays out two per row rather than one long one.
+ *
+ * Four footprints and three gaps in a single row need several screens of width
+ * before each building is more than a few pixels across, and a plan of a street
+ * is not a comparison. Exported because `layoutSideBySide` asks the same
+ * question, and two answers to it is how they drift.
+ */
+export const MAX_SIDE_BY_SIDE = 2;
+
 /** Zero-based position of a side. A is 0. */
 export function sideIndex(side: CompareSide): number {
   return COMPARE_SIDES.indexOf(side);
@@ -107,7 +117,21 @@ export const useCompareStore = create<CompareState>((set) => ({
       const count = s.count + 1;
       // Move the editing hand to the building just added, so it is obvious that
       // something appeared and that the controls now belong to it.
-      return { count, editing: sideAt(count - 1) };
+      //
+      // Crossing from two to three also resets the view. A second row changes
+      // the scene enough that starting on Ghost overlay — four translucent
+      // sheets over one another, which reads as a single red mass rather than
+      // four buildings — is the wrong first impression of a feature the client
+      // asked for. Side by side is what they asked to see.
+      //
+      // Only on the crossing, and only from two to three. Above that a user
+      // who has deliberately chosen Ghost keeps it, because a store that
+      // keeps overriding their choice is a store they cannot rely on.
+      return {
+        count,
+        editing: sideAt(count - 1),
+        view: count === MAX_SIDE_BY_SIDE + 1 ? ('sideBySide' as const) : s.view,
+      };
     }),
 
   removeSide: (side) =>

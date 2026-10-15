@@ -201,17 +201,23 @@ comparison is the same building built four ways, which is the exercise worth
 doing before anyone touches a slider. Each one after A can be removed on its own;
 going all the way back to one is `Stop comparing`.
 
-Two presentations, switched at the top of the viewport:
+Two presentations, switched at the top of the viewport, and **both are available
+at every count**:
 
-- **Side by side** - easiest to read when the buildings are very different.
+- **Side by side** - packed edge to edge, two per row once there are more than
+  two. Easiest to read when the buildings are very different. Four buildings in
+  a single row need several screens of width before each is more than a few
+  pixels across, and a plan of a street is not a comparison, so above two they
+  go two-by-two and the camera lifts to look down the rows.
 - **Ghost overlay** - all in the same place, the one being edited solid and the
   rest translucent over it; best for spotting that differently-shaped buildings
   happen to sway almost the same amount.
 
-With **three or four** buildings the view is always Ghost overlay and the switch
-is hidden. Four footprints side by side need several screens of width before
-each building is more than a few pixels across, and a plan of a street is not a
-comparison.
+Adding a third building starts you on **Side by side**. A second row changes the
+scene enough that opening on Ghost puts four translucent sheets in front of each
+other, which reads as one building that is vaguely red rather than as four.
+Choosing Ghost at three or four is then your own decision, and nothing overrides
+it afterwards.
 
 The change column gives each building's difference from A as a percentage, with
 an arrow as well as a sign so the direction does not depend on colour. **Nothing
@@ -226,6 +232,10 @@ would race and leave one side showing numbers from different inputs.
 A persistent **"Editing A / B / C / D"** indicator sits outside the scrolling
 controls panel, so it stays visible however far you scroll down. The metric cards
 follow it, and say which building they belong to.
+
+`lib/layout.ts` is where the buildings are placed, and it is also where the
+camera is framed from - the same numbers, so the camera cannot end up framing a
+different shape to the one on screen.
 
 ### Saving and sharing runs
 

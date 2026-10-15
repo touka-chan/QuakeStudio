@@ -1,5 +1,8 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
 
+/** What `boundingBox()` gives back, or null. Named once so it is not re-derived. */
+type Box = Exclude<Awaited<ReturnType<Locator['boundingBox']>>, null>;
+
 /* ==========================================================================
    Guided tour, in a real browser.
 
@@ -97,6 +100,38 @@ async function settledBox(locator: Locator): Promise<Awaited<ReturnType<Locator[
   return locator.boundingBox();
 }
 
+/**
+ * Both boxes, sampled together, and only once neither has moved.
+ *
+ * These used to be measured by two independent settle loops, one after the
+ * other. Each returned as soon as two consecutive readings matched — which it
+ * can legitimately do while the *other* element is still sliding. The two sets
+ * of numbers were then compared even though they came from different frames,
+ * and the test failed about one run in three on step 2, whose card moves the
+ * furthest.
+ *
+ * One loop, both boxes, three consecutive identical samples. Same frame, same
+ * moment, so the comparison is about layout rather than about timing.
+ *
+ * Three rather than two: a 200 ms transition can produce two identical samples
+ * by coincidence while it is still easing.
+ */
+async function settledPair(a: Locator, b: Locator): Promise<[Box, Box] | null> {
+  let previous = '';
+  let stable = 0;
+  for (let i = 0; i < 60; i += 1) {
+    const [boxA, boxB] = await Promise.all([a.boundingBox(), b.boundingBox()]);
+    if (!boxA || !boxB) return null;
+    const key = `${JSON.stringify(boxA)}|${JSON.stringify(boxB)}`;
+    stable = key === previous ? stable + 1 : 0;
+    previous = key;
+    if (stable >= 2) return [boxA, boxB];
+    await a.page().waitForTimeout(50);
+  }
+  const [boxA, boxB] = await Promise.all([a.boundingBox(), b.boundingBox()]);
+  return boxA && boxB ? [boxA, boxB] : null;
+}
+
 /** True when the box is entirely within the viewport. */
 function fullyOnScreen(
   box: { x: number; y: number; width: number; height: number },
@@ -141,19 +176,19 @@ test.describe('guided tour', () => {
    */
   test('the card never covers the element it is describing', async ({ page }) => {
     for (let i = 0; i < 4; i += 1) {
-      const outline = await settledBox(page.locator('[data-tour-outline]'));
-      const cardBox = await settledBox(card(page));
+      const pair = await settledPair(page.locator('[data-tour-outline]'), card(page));
 
-      // Both are measured after the step has settled, so this is the layout
-      // the user actually reads rather than a frame mid-transition.
-      expect(outline, `step ${i + 1} drew no outline`).not.toBeNull();
-      expect(cardBox, `step ${i + 1} has no card`).not.toBeNull();
+      // Both are measured after the step has settled, in the same frame, so
+      // this is the layout the user actually reads rather than a frame
+      // mid-transition.
+      expect(pair, `step ${i + 1} drew no outline or no card`).not.toBeNull();
+      const [outline, cardBox] = pair!;
 
       const overlaps =
-        outline!.x < cardBox!.x + cardBox!.width &&
-        cardBox!.x < outline!.x + outline!.width &&
-        outline!.y < cardBox!.y + cardBox!.height &&
-        cardBox!.y < outline!.y + outline!.height;
+        outline.x < cardBox.x + cardBox.width &&
+        cardBox.x < outline.x + outline.width &&
+        outline.y < cardBox.y + cardBox.height &&
+        cardBox.y < outline.y + outline.height;
 
       expect(overlaps, `step ${i + 1}: the card covers what it points at`).toBe(false);
 

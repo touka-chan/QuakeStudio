@@ -413,6 +413,50 @@ describe('results panel', () => {
     expect(screen.getByText(/four is the limit/i)).toBeInTheDocument();
   });
 
+  it('offers both 3D views at four buildings, and starts on side by side', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    /*
+     * The client asked for this directly: three or four buildings must be able
+     * to sit side by side, not be forced into the ghost overlay.
+     *
+     * It also happens to be the better default — a second row changes the
+     * scene enough that opening on Ghost puts four translucent sheets in front
+     * of each other, which reads as one building that is vaguely red rather
+     * than as four.
+     */
+    await user.click(screen.getByRole('button', { name: /compare with another building/i }));
+    // Two buildings in one row: the plain head-on view.
+    expect(useCompareStore.getState().view).toBe('sideBySide');
+
+    await user.click(screen.getByRole('button', { name: /add a building/i }));
+    expect(useCompareStore.getState().count).toBe(3);
+    expect(useCompareStore.getState().view).toBe('sideBySide');
+
+    await user.click(screen.getByRole('button', { name: /add a building/i }));
+    expect(useCompareStore.getState().count).toBe(4);
+
+    // The toggle is still there at four. Hiding it was the previous behaviour
+    // and it took away a view the client wants.
+    const viewToggle = screen.getByRole('radiogroup', { name: /comparison view/i });
+    expect(within(viewToggle).getByRole('radio', { name: /side by side/i })).toBeInTheDocument();
+    expect(within(viewToggle).getByRole('radio', { name: /ghost overlay/i })).toBeInTheDocument();
+
+    // And choosing Ghost at four sticks, even when another building is added
+    // on top of it: the reset happens on the two-to-three crossing and nowhere
+    // else, because a store that keeps overriding a choice the user has made
+    // is a store they cannot rely on.
+    await user.click(within(viewToggle).getByRole('radio', { name: /ghost overlay/i }));
+    expect(useCompareStore.getState().view).toBe('ghost');
+
+    await user.click(screen.getByRole('button', { name: /remove building C/i }));
+    expect(useCompareStore.getState().count).toBe(3);
+    await user.click(screen.getByRole('button', { name: /add a building/i }));
+    expect(useCompareStore.getState().count).toBe(4);
+    expect(useCompareStore.getState().view).toBe('ghost');
+  });
+
   it('removes a building above A and never removes A', () => {
     render(<AppShell forceDesktopLayout />);
 
