@@ -297,7 +297,11 @@ test.describe('the background behind the tour', () => {
    * Reopening the tour restarts it at step 1, which is where the card was
    * measured, so the two readings are of the same state.
    */
-  async function pickBackgroundRegion(page: Page): Promise<{ region: Box; before: Look }> {
+  async function pickBackgroundRegion(
+    page: Page,
+    /** Resolved inside, after the tour has been opened and closed: a canvas read too early is still 300x150. */
+    area: Box | (() => Promise<Box | null>),
+  ): Promise<{ region: Box; before: Look }> {
     // Where the card will be. Measured with the tour open, then dismissed.
     await page.getByRole('button', { name: /how to use/i }).click();
     await expect(card(page)).toBeVisible();
@@ -306,7 +310,7 @@ test.describe('the background behind the tour', () => {
     await expect(card(page)).toHaveCount(0);
 
     await page.waitForTimeout(500);
-    const canvas = (await page.locator('canvas').boundingBox())!;
+    const box = typeof area === 'function' ? (await area())! : area;
 
     /*
      * A fine, overlapping grid rather than three neat tiles.
@@ -318,14 +322,14 @@ test.describe('the background behind the tour', () => {
      * baffling error rather than an honest one. Tiles at half-step overlap mean
      * there is nearly always somewhere clear, whatever shape the card takes.
      */
-    const tileW = Math.max(120, Math.floor(canvas.width / 4));
-    const tileH = Math.max(90, Math.floor(canvas.height / 5));
+    const tileW = Math.max(120, Math.floor(box.width / 4));
+    const tileH = Math.max(90, Math.floor(box.height / 5));
     const stepX = Math.floor(tileW / 2);
     const stepY = Math.floor(tileH / 2);
 
     const candidates: Box[] = [];
-    for (let y = canvas.y; y + tileH <= canvas.y + canvas.height; y += stepY) {
-      for (let x = canvas.x; x + tileW <= canvas.x + canvas.width; x += stepX) {
+    for (let y = box.y; y + tileH <= box.y + box.height; y += stepY) {
+      for (let x = box.x; x + tileW <= box.x + box.width; x += stepX) {
         const box = { x: Math.round(x), y: Math.round(y), width: tileW, height: tileH };
         if (overlaps(box, cardBox)) continue;
         candidates.push(box);
@@ -334,7 +338,7 @@ test.describe('the background behind the tour', () => {
 
     if (candidates.length === 0)
       throw new Error(
-        `the tour card (${JSON.stringify(cardBox)}) covers the whole 3D viewport (${JSON.stringify(canvas)}) — nothing left to measure`,
+        `the tour card (${JSON.stringify(cardBox)}) covers all of ${JSON.stringify(box)} — nothing left to measure`,
       );
 
     const looks = await measureLooks(page, candidates);
@@ -344,6 +348,64 @@ test.describe('the background behind the tour', () => {
     });
 
     return { region: candidates[bestAt]!, before: looks[bestAt]! };
+  }
+
+  /*
+   * BOTH PRESENTATIONS, AND THE ONE THAT WAS MISSING.
+   *
+   * `SpotlightTour` above the desktop breakpoint, `TourModal` below it — two
+   * unrelated components with two unrelated overlays. The narrow one had no blur
+   * in it at all, and it stayed that way through a whole round of work on the
+   * blur, because every test of it ran at 1280px, which is desktop.
+   *
+   * So this runs at both, and the structural check comes first because it is the
+   * one that would have caught it on the first run: cheap, and it says "is there
+   * a blurred backdrop at all" without needing a single pixel of it to be
+   * measured correctly.
+   */
+  const PRESENTATIONS = [
+    { w: 1280, h: 720, name: 'desktop', kind: 'the spotlight' },
+    { w: 860, h: 1100, name: 'narrow', kind: 'the paged modal' },
+  ] as const;
+
+  for (const size of PRESENTATIONS) {
+    test(`${size.kind} puts a blurred backdrop over the app`, async ({ page }) => {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await asPlainUser(page);
+      await page.goto('/');
+      await page.waitForTimeout(700);
+      await page.getByRole('button', { name: /how to use/i }).click();
+      await expect(card(page)).toBeVisible();
+
+      const layers = await page.evaluate(() =>
+        [...document.querySelectorAll<HTMLElement>('[data-tour-backdrop]')].map((el) => {
+          const style = getComputedStyle(el);
+          const box = el.getBoundingClientRect();
+          return {
+            filter: style.backdropFilter,
+            coversViewport:
+              box.width >= window.innerWidth - 1 && box.height >= window.innerHeight - 1,
+            takesClicks: style.pointerEvents !== 'none',
+          };
+        }),
+      );
+
+      expect(layers.length, `${size.kind} rendered no blurred backdrop at all`).toBe(1);
+      expect(
+        layers[0]!.filter,
+        `${size.kind} rendered a backdrop layer that does not blur — "${layers[0]!.filter}"`,
+      ).toContain('blur');
+      // The desaturation is the half that makes it readable on a dark
+      // background, so its absence is not a detail either.
+      expect(layers[0]!.filter, `${size.kind} does not drain colour from the background`).toContain(
+        'saturate',
+      );
+      expect(layers[0]!.coversViewport, `${size.kind} does not cover the whole window`).toBe(true);
+      expect(
+        layers[0]!.takesClicks,
+        `${size.kind}'s backdrop swallows clicks; the scrim above it is what blocks them`,
+      ).toBe(false);
+    });
   }
 
   for (const theme of ['light', 'dark'] as const) {
@@ -356,7 +418,9 @@ test.describe('the background behind the tour', () => {
       }
       await page.waitForTimeout(900);
 
-      const { region, before } = await pickBackgroundRegion(page);
+      const { region, before } = await pickBackgroundRegion(page, () =>
+        page.locator('canvas').boundingBox(),
+      );
       expect(
         before.edges,
         `nothing in the 3D viewport had any detail to blur (picked ${JSON.stringify(region)})`,
@@ -392,6 +456,48 @@ test.describe('the background behind the tour', () => {
     });
   }
 
+  /*
+   * The same measurement, at the width where the tour is a modal and there is
+   * no spotlight at all.
+   *
+   * There is no 3D viewport to measure here — the narrow layout is tab-based,
+   * and the tab open on arrival is Build, so the canvas is not even mounted. So
+   * the search area is the whole window and "busiest patch" lands on the
+   * controls panel: all text and sliders, which is the thing a blur shows up on
+   * most clearly of anything in this app.
+   */
+  test('loses its detail and its colour in the narrow layout too', async ({ page }) => {
+    await page.setViewportSize({ width: 860, height: 1100 });
+    await asPlainUser(page);
+    await page.goto('/');
+    await page.waitForTimeout(900);
+
+    const { region, before } = await pickBackgroundRegion(page, {
+      x: 0,
+      y: 0,
+      width: 860,
+      height: 1100,
+    });
+    expect(
+      before.edges,
+      `nothing below the desktop breakpoint had any detail to blur (picked ${JSON.stringify(region)})`,
+    ).toBeGreaterThan(2);
+
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(700);
+
+    const during = (await measureLooks(page, [region]))[0]!;
+
+    expect(
+      during.edges,
+      `the app below the breakpoint still has ${during.edges}% of its edges (was ${before.edges}%) — it is not blurred`,
+    ).toBeLessThan(before.edges * 0.75);
+    expect(
+      during.chromaPerLuma,
+      `colour barely changed (${before.chromaPerLuma} -> ${during.chromaPerLuma}), so it does not read as blurred`,
+    ).toBeLessThan(before.chromaPerLuma * 0.8);
+  });
   /*
    * The other half of the claim: the thing the tour is pointing at is NOT
    * blurred. A background that has gone soft while the target has not is what

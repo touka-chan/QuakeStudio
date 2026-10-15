@@ -6,6 +6,7 @@ import { usePrefersReducedMotion } from '@/lib/useMediaQuery';
 import { useFocusTrap } from './useFocusTrap';
 import { useTargetRect } from './useTargetRect';
 import { CARD_WIDTH, OUTLINE_PAD, placeCard } from './placeCard';
+import { TOUR_BACKDROP_FILTER } from './tourBackdrop';
 import type { TourStep } from './tourSteps';
 
 /* =========================================================================
@@ -45,34 +46,6 @@ type Props = {
   onBack: () => void;
   onSkip: () => void;
 };
-
-/**
- * How much the page behind is softened.
- *
- * NOT 3px ANY MORE, AND NOT 6px EITHER — the third was `saturate`.
- *
- * With the old `blur(3px)` alone, 93% of the 3D canvas's high-contrast edges
- * were already gone. The blur was reaching the WebGL canvas all along, and
- * "it is blurred" was technically true. What was not true is that it *looked*
- * blurred, because 3px does almost nothing to a large smooth surface, and the
- * dark theme's near-black dim does almost nothing on an already dark
- * background. That is the report this came back with.
- *
- * `saturate` is what fixes it. Darkening cannot make an inactive area read as
- * inactive on a dark background — there is nowhere darker to go. Draining the
- * colour can, and it costs a fraction of what a wider blur costs.
- *
- * 6px was tried and photographed against 3px, with the desaturation on both.
- * They are not distinguishable to the eye, and a full-viewport backdrop-filter
- * is not free: at 6px an unrelated card-position test failed on 1 run in 3,
- * and at 3px on none of 3. Three runs is not enough to call that, so it is not
- * the reason on its own — but there is no reason to pay for a difference
- * nobody can see.
- */
-const BLUR_PX = 3;
-
-/** Colour left in the background. See the note above — this is the real fix. */
-const BLUR_SATURATE = 0.55;
 
 export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSkip }: Props) {
   const reduced = usePrefersReducedMotion();
@@ -264,10 +237,15 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
           further down is the one that stops clicks. */}
       <div
         aria-hidden="true"
+        // Named so one check can ask BOTH presentations the same question. The
+        // narrow-screen modal has its own layer under the same name, and the
+        // test below the desktop breakpoint is the one that would otherwise
+        // never run. See `tourBackdrop.ts`.
+        data-tour-backdrop=""
         className="pointer-events-none fixed inset-0 z-50"
         style={{
-          backdropFilter: `blur(${BLUR_PX}px) saturate(${BLUR_SATURATE})`,
-          WebkitBackdropFilter: `blur(${BLUR_PX}px) saturate(${BLUR_SATURATE})`,
+          backdropFilter: TOUR_BACKDROP_FILTER,
+          WebkitBackdropFilter: TOUR_BACKDROP_FILTER,
           // No clip means no hole, which is the right fallback while the target
           // has not been measured: everything softened, rather than a hard
           // unblurred window over the wrong element.
