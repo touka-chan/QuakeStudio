@@ -1,4 +1,4 @@
-import { Canvas, useFrame } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useMemo, useRef } from 'react';
 import * as THREE from 'three';
@@ -58,6 +58,17 @@ const ROW_DIRECTION: [number, number, number] = [0.2, 0.38, 0.9];
  */
 const GRID_DIRECTION: [number, number, number] = [0.18, 0.95, 1.05];
 
+/** How far above a roof its badge floats, in metres. */
+const BADGE_LIFT_M = 3.5;
+
+/**
+ * Vertical spacing between stacked badges in ghost overlay, in PIXELS.
+ *
+ * Screen space rather than metres, so the stack is the same size whatever the
+ * building is, and it grows into the picture instead of off the top of it.
+ */
+const BADGE_STACK_PX = 24;
+
 /** One building in the comparison, with everything the scene needs. */
 type Subject = {
   side: CompareSide;
@@ -98,6 +109,17 @@ export function CompareViewport() {
   const clearance = Math.max(0, ...widths) * 0.35;
 
   /*
+   * Rows are further apart than columns are, because of the camera rather than
+   * the buildings. Side by side reads as side by side even when one is partly
+   * in front of the other; one-behind-another only reads if the back building's
+   * roof is clear of the front one's, and at the same gap it was not — about a
+   * third of the back row disappeared behind the front row.
+   *
+   * Screenshot at 1440 and 1024, both four buildings. See lib/layout.ts.
+   */
+  const rowClearance = clearance * 1.8;
+
+  /*
    * WHAT HAS TO FIT IN THE FRAME, AND FROM WHERE.
    *
    * Side by side, the camera has to hold every building AND the gaps between
@@ -113,6 +135,7 @@ export function CompareViewport() {
   const layout = layoutSideBySide(
     subjects.map((s) => ({ width: s.building.widthM, depth: s.building.depthM })),
     clearance,
+    rowClearance,
   );
 
   const frameWidth = ghost ? Math.max(...widths) : layout.width;
@@ -139,6 +162,40 @@ export function CompareViewport() {
    * the charts carry the exact figures, and the 3D is for shape and sway.
    */
   const direction = ghost || layout.perRow < 2 ? ROW_DIRECTION : GRID_DIRECTION;
+
+  /*
+   * WHERE EACH BADGE SITS.
+   *
+   * Side by side, a badge floats over its own building's roof — which is the
+   * most visible part of it even when a nearer building is in the way.
+   *
+   * In ghost overlay every building occupies the same spot, so four badges would
+   * land on one pixel. They are stacked, in side order, so all four are readable
+   * and the reading order matches the switcher.
+   *
+   * THE STACK IS IN SCREEN SPACE, NOT WORLD SPACE.
+   *
+   * The first version raised each one by three metres, which is the obvious
+   * way and is wrong: the camera frames the tallest roof and nothing above it,
+   * so the stack climbed straight out of the top of the viewport and only the
+   * bottom sliver of one badge was left. A world-space offset cannot know where
+   * the edge of the frame is. A pixel offset is measured from an anchor that is
+   * already known to be on screen, so the stack always grows into the picture.
+   */
+  const badgePoints = subjects.map((s, i) => {
+    const spot = ghost ? [0, 0] : (layout.spots[i] ?? [0, 0]);
+    return {
+      x: spot[0],
+      y: buildingHeight(s.building) + BADGE_LIFT_M,
+      z: spot[1],
+      /** Pixels to push the badge down the screen, for the ghost stack. */
+      offsetPx: ghost ? i * BADGE_STACK_PX : 0,
+    };
+  });
+
+  // The badge nodes live OUTSIDE the canvas but are positioned from INSIDE it,
+  // where the camera is. They meet through this ref.
+  const badgeNodes = useRef<(HTMLSpanElement | null)[]>([]);
 
   return (
     /*
@@ -207,6 +264,10 @@ export function CompareViewport() {
           <SideBySide subjects={subjects} layout={layout} />
         )}
 
+        {/* Projects the badge anchors onto the screen every frame. Renders
+              nothing itself; it writes to the DOM nodes held by `badgeNodes`. */}
+        <RoofBadges points={badgePoints} nodes={badgeNodes} />
+
         <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
 
         {/* Outside the framing on purpose: the slab is deliberately
@@ -216,7 +277,130 @@ export function CompareViewport() {
       </Canvas>
 
       <ViewToggle view={view} onChange={setView} />
-      <CompareTags subjects={subjects} ghost={ghost} perRow={layout.perRow} />
+      <RoofBadgeLayer subjects={subjects} nodes={badgeNodes} />
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/** Reused between frames so the projector allocates nothing per frame. */
+const projected = new THREE.Vector3();
+
+/**
+ * Moves one badge to a screen position.
+ *
+ * Deliberately a module-level function rather than a few lines inside the
+ * frame loop. Writing to a node reached through a prop reads, to the React
+ * compiler lint, as "modifying a prop", and it is right to be cautious about
+ * that in general — but a DOM node's inline style is not component state and
+ * nothing about it can be made inconsistent by writing here. The function
+ * boundary says exactly where the exception lives.
+ */
+function placeBadge(
+  node: HTMLSpanElement | null | undefined,
+  x: number,
+  y: number,
+  behind: boolean,
+): void {
+  if (!node) return;
+  // `translate(-50%, -100%)` sits the badge just above the anchor rather than
+  // centred on it, so the roof it belongs to stays visible underneath instead
+  // of being covered by the thing naming it.
+  node.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0) translate(-50%, -100%)`;
+  node.style.visibility = behind ? 'hidden' : 'visible';
+}
+
+/**
+ * Projects each building's badge anchor onto the screen, every frame.
+ *
+ * WHY THIS AND NOT drei's <Html>
+ * <Html> was tried here first and was unreliable: with two of them mounted,
+ * building A's rendered as an empty container while B's rendered fine — same
+ * JSX, same component. A label that silently disappears for half the
+ * buildings is worse than no label, so it was replaced with this.
+ *
+ * WHY IT WRITES STRAIGHT TO THE DOM
+ * A badge that follows the camera has to be recomputed every frame. Routing
+ * that through React would re-render the whole viewport sixty times a second to
+ * move four small circles. The transform is written to the node instead, which
+ * is the same approach the playback cursor uses in DisplacementChart.
+ *
+ * The screen position changes; React does not need to know that.
+ */
+function RoofBadges({
+  points,
+  nodes,
+}: {
+  points: Array<{ x: number; y: number; z: number; offsetPx: number }>;
+  nodes: React.RefObject<(HTMLSpanElement | null)[]>;
+}) {
+  const camera = useThree((s) => s.camera);
+  const size = useThree((s) => s.size);
+
+  useFrame(() => {
+    const list = nodes.current;
+    if (!list) return;
+    for (let i = 0; i < points.length; i += 1) {
+      const point = points[i]!;
+      projected.set(point.x, point.y, point.z).project(camera);
+
+      // Normalised device coordinates run -1..1 across the frustum. Anything
+      // past 1 in z is behind the camera or beyond the far plane, where the
+      // projection inverts and the number means nothing.
+      const behind = projected.z > 1;
+      placeBadge(
+        list[i],
+        (projected.x * 0.5 + 0.5) * size.width,
+        // The ghost stack is a pixel offset from an anchor already on screen,
+        // so it can never climb out of the frame the way a world-space one did.
+        (-projected.y * 0.5 + 0.5) * size.height + point.offsetPx,
+        behind,
+      );
+    }
+  });
+
+  return null;
+}
+
+/**
+ * The badges themselves — ordinary DOM laid over the canvas.
+ *
+ * Ordinary DOM, not an in-scene label, for the reasons in `RoofBadges`. What
+ * this version adds over the overlay it replaces is that the position comes
+ * from the camera rather than from the top edge of the panel: the badge is on
+ * the roof, it follows an orbit, and it still says the same thing when a
+ * nearer building is standing in front of part of it.
+ *
+ * Decorative, and marked as such: the canvas is a `role="img"` whose
+ * accessible name already lists every building, so a screen reader is not
+ * missing anything these carry.
+ */
+function RoofBadgeLayer({
+  subjects,
+  nodes,
+}: {
+  subjects: Subject[];
+  nodes: React.RefObject<(HTMLSpanElement | null)[]>;
+}) {
+  return (
+    <div className="pointer-events-none absolute inset-0" aria-hidden="true">
+      {subjects.map((s, i) => (
+        <span
+          key={s.side}
+          ref={(node) => {
+            nodes.current[i] = node;
+          }}
+          // Named for the tests. A class name can be rewritten for a purely
+          // visual reason, and a test locating badges by class would then
+          // quietly measure nothing instead of failing.
+          data-roof-badge={s.side}
+          className="absolute top-0 left-0 grid size-5 place-items-center rounded-full text-[11px] font-semibold text-white shadow-sm ring-2 ring-surface"
+          style={{ backgroundColor: seriesColor(s.side) }}
+        >
+          {s.side}
+        </span>
+      ))}
     </div>
   );
 }
@@ -398,103 +582,9 @@ function SwayingBuilding({
           </group>
         );
       })}
-      {/* The identity tags are a DOM overlay instead of drei <Html> - see CompareTags. */}
+      {/* The identity badge is a DOM overlay driven from the camera — see
+          RoofBadges. */}
     </group>
-  );
-}
-
-/* ------------------------------------------------------------------------- */
-
-/**
- * The identity tags, which is where identity lives now that every building is
- * coloured by drift.
- *
- * These were first drawn inside the 3D scene with drei's `<Html>`, anchored
- * above each building. That was unreliable: with two of them mounted, building
- * A's tag rendered as an EMPTY container while B's rendered fine — same JSX,
- * same component. Rather than ship a label that silently disappears for half
- * the buildings, the tags are ordinary DOM laid over the canvas, the same way
- * the Side by side / Ghost overlay switch already is.
- *
- * The trade is that they no longer track the buildings if you orbit the
- * camera. In exchange they are always on screen, always legible, and readable
- * by a screen reader — which an in-scene HTML label is not.
- *
- * THEY MIRROR THE ARRANGEMENT, THEY DO NOT TRACK THE CAMERA
- *
- * With two buildings in one row the tags go left and right, which does match
- * where they stand. Above two they become a grid of the same shape — two
- * across, a short row below — so the tag order and the building order agree
- * even though nothing is pinned to a mesh.
- *
- * Claiming to point at a building would be the lie to avoid. These are a
- * legend: they name the buildings and carry their letters, and the switcher,
- * the table and the chart legends carry the same information in a place a
- * screen reader can reach.
- */
-function CompareTags({
-  subjects,
-  ghost,
-  perRow,
-}: {
-  subjects: Subject[];
-  ghost: boolean;
-  perRow: number;
-}) {
-  // One row of tags for two or fewer, a grid above that.
-  const grid = !ghost && perRow > 0 && subjects.length > perRow;
-
-  return (
-    <div
-      className={`pointer-events-none absolute inset-x-3 top-12 gap-2 ${
-        grid ? 'grid' : ghost ? 'flex flex-col items-start' : 'flex items-start justify-between'
-      }`}
-      style={grid ? { gridTemplateColumns: `repeat(${perRow}, minmax(0, 1fr))` } : undefined}
-      aria-hidden="true"
-    >
-      {subjects.map((s, i) => (
-        <IdentityTag
-          key={s.side}
-          letter={s.side}
-          name={describeBuilding(s.building)}
-          color={seriesColor(s.side)}
-          align={!ghost && !grid && i > 0 ? 'right' : 'left'}
-        />
-      ))}
-    </div>
-  );
-}
-
-function IdentityTag({
-  letter,
-  name,
-  color,
-  align = 'left',
-}: {
-  letter: string;
-  name: string;
-  color: string;
-  align?: 'left' | 'right';
-}) {
-  return (
-    <span
-      className={`flex items-center gap-1.5 rounded-full bg-surface/90 px-2 py-1 backdrop-blur ${
-        align === 'right' ? 'flex-row-reverse' : ''
-      }`}
-    >
-      <span
-        className="grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-semibold text-white"
-        style={{ backgroundColor: color }}
-      >
-        {letter}
-      </span>
-      {/*
-        The name appears only when the viewport column is wide enough for it.
-        The letter is the part that is load-bearing - it is what tells the
-        buildings apart - so it is never the thing that gets dropped.
-      */}
-      <span className="hidden truncate text-[11px] text-muted-foreground @xl:inline">{name}</span>
-    </span>
   );
 }
 
@@ -516,7 +606,19 @@ function ViewToggle({
     <div
       role="radiogroup"
       aria-label="Comparison view"
-      className="absolute top-3 left-1/2 flex -translate-x-1/2 rounded-app border border-line bg-surface/90 p-0.5 backdrop-blur"
+      /*
+        BOTTOM of the viewport, not the top.
+        *
+        In Ghost overlay every building stands in the same place, so their roof
+        badges have to stack — and the roof of the tallest building projects
+        near the TOP of the frame. With the switch up there, the second badge
+        in the stack landed squarely on the Ghost overlay button, so a control
+        was sitting under a label and neither could be read.
+        *
+        The switch is chrome; the badges are content. Chrome goes where content
+        will not be, and the bottom of the viewport is empty at every width.
+      */
+      className="absolute bottom-3 left-1/2 flex -translate-x-1/2 rounded-app border border-line bg-surface/90 p-0.5 backdrop-blur"
     >
       {options.map((option) => (
         <button

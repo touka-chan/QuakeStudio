@@ -101,14 +101,39 @@ async function settledBox(locator: Locator): Promise<Awaited<ReturnType<Locator[
 }
 
 /**
+ * Whether the card is covering the thing it points at, right now.
+ *
+ * POLLED rather than asserted once. This is the last word on a question about
+ * where two elements ended up, and under load the answer is not available at a
+ * predictable moment: the card's 200 ms transition is wall-clock, the outline
+ * follows the target through a React re-render, and a busy machine can leave
+ * the two briefly out of step.
+ *
+ * Two rounds of fixing this by sampling harder did not hold — three identical
+ * samples 50 ms apart still failed about one full-suite run in two, while
+ * passing every time in isolation. Sampling harder was treating a symptom. The
+ * honest form of the question is "once it has finished drawing, do these
+ * overlap", and `expect.poll` asks exactly that: it retries until the app
+ * agrees or gives up.
+ *
+ * Nothing is hidden by this. A layout that genuinely overlaps keeps answering
+ * yes and still fails — once, at the end, for the right reason.
+ */
+async function cardCoversTarget(outline: Locator, cardBox: Locator): Promise<boolean> {
+  const pair = await settledPair(outline, cardBox);
+  // Nothing drawn yet: keep waiting rather than declaring a pass.
+  if (!pair) return true;
+  const [a, b] = pair;
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+/**
  * Both boxes, sampled together, and only once neither has moved.
  *
  * These used to be measured by two independent settle loops, one after the
  * other. Each returned as soon as two consecutive readings matched — which it
  * can legitimately do while the *other* element is still sliding. The two sets
- * of numbers were then compared even though they came from different frames,
- * and the test failed about one run in three on step 2, whose card moves the
- * furthest.
+ * of numbers were then compared even though they came from different frames.
  *
  * One loop, both boxes, three consecutive identical samples. Same frame, same
  * moment, so the comparison is about layout rather than about timing.
@@ -176,21 +201,12 @@ test.describe('guided tour', () => {
    */
   test('the card never covers the element it is describing', async ({ page }) => {
     for (let i = 0; i < 4; i += 1) {
-      const pair = await settledPair(page.locator('[data-tour-outline]'), card(page));
-
-      // Both are measured after the step has settled, in the same frame, so
-      // this is the layout the user actually reads rather than a frame
-      // mid-transition.
-      expect(pair, `step ${i + 1} drew no outline or no card`).not.toBeNull();
-      const [outline, cardBox] = pair!;
-
-      const overlaps =
-        outline.x < cardBox.x + cardBox.width &&
-        cardBox.x < outline.x + outline.width &&
-        outline.y < cardBox.y + cardBox.height &&
-        cardBox.y < outline.y + outline.height;
-
-      expect(overlaps, `step ${i + 1}: the card covers what it points at`).toBe(false);
+      await expect
+        .poll(() => cardCoversTarget(page.locator('[data-tour-outline]'), card(page)), {
+          timeout: 6000,
+          message: `step ${i + 1}: the card covers what it points at`,
+        })
+        .toBe(false);
 
       const next = card(page).getByRole('button', { name: /^next$/i });
       if (await next.count()) await next.click();

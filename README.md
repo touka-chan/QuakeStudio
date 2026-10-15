@@ -201,23 +201,22 @@ comparison is the same building built four ways, which is the exercise worth
 doing before anyone touches a slider. Each one after A can be removed on its own;
 going all the way back to one is `Stop comparing`.
 
-Two presentations, switched at the top of the viewport, and **both are available
-at every count**:
+Two presentations, switched at the bottom of the viewport, and **both are
+available at every count**:
 
 - **Side by side** - packed edge to edge, two per row once there are more than
-  two. Easiest to read when the buildings are very different. Four buildings in
-  a single row need several screens of width before each is more than a few
-  pixels across, and a plan of a street is not a comparison, so above two they
-  go two-by-two and the camera lifts to look down the rows.
+  two. Easiest to read when the buildings are very different. Rows are set
+  further apart than columns are, because from any camera looking down at an
+  angle the front row hides the bottom of the row behind it.
 - **Ghost overlay** - all in the same place, the one being edited solid and the
   rest translucent over it; best for spotting that differently-shaped buildings
   happen to sway almost the same amount.
 
-Adding a third building starts you on **Side by side**. A second row changes the
-scene enough that opening on Ghost puts four translucent sheets in front of each
-other, which reads as one building that is vaguely red rather than as four.
-Choosing Ghost at three or four is then your own decision, and nothing overrides
-it afterwards.
+**Every building wears a badge over its roof** saying which of A, B, C or D it
+is. The badge is positioned by projecting the roof through the camera on every
+frame, so it sits on the building and follows when you orbit - which is also
+what keeps each building tellable apart when one stands in front of another. In
+Ghost overlay the roofs coincide, so the badges stack instead.
 
 The change column gives each building's difference from A as a percentage, with
 an arrow as well as a sign so the direction does not depend on colour. **Nothing
@@ -232,6 +231,12 @@ would race and leave one side showing numbers from different inputs.
 A persistent **"Editing A / B / C / D"** indicator sits outside the scrolling
 controls panel, so it stays visible however far you scroll down. The metric cards
 follow it, and say which building they belong to.
+
+Adding a third building starts you on **Side by side**. A second row changes the
+scene enough that opening on Ghost puts four translucent sheets in front of each
+other, which reads as one building that is vaguely red rather than as four.
+Choosing Ghost at three or four is then your own decision, and nothing overrides
+it afterwards.
 
 `lib/layout.ts` is where the buildings are placed, and it is also where the
 camera is framed from - the same numbers, so the camera cannot end up framing a

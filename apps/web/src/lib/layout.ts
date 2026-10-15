@@ -42,10 +42,27 @@ export type Layout = {
 /**
  * Lay the buildings out in rows, packed against one another.
  *
- * @param sizes     each building's footprint, in display order
- * @param clearance gap between neighbouring buildings, in metres
+ * @param sizes         each building's footprint, in display order
+ * @param clearance     gap between buildings in the same row, in metres
+ * @param rowClearance  gap between rows. Defaults to `clearance`.
+ *
+ * Rows need MORE room than columns, and the reason is the camera rather than
+ * the buildings. Two buildings side by side are separated horizontally, which
+ * the eye reads even when one is in front of the other. Two buildings one in
+ * front of the other are separated only in depth, and from any camera looking
+ * down at an angle the front one hides the bottom of the back one.
+ *
+ * At the same gap, the back row lost about a third of its height behind the
+ * front row and the comparison turned into two towers and two stumps. Doubling
+ * the row gap is what lets the back row stand clear of the front one, and it
+ * costs nothing: the camera is already backing off to frame the set, and the
+ * frame it frames is the one this reports.
  */
-export function layoutSideBySide(sizes: readonly Footprint[], clearance: number): Layout {
+export function layoutSideBySide(
+  sizes: readonly Footprint[],
+  clearance: number,
+  rowClearance: number = clearance,
+): Layout {
   const n = sizes.length;
   // An empty comparison has no layout, and dividing by zero here would be the
   // first thing to break.
@@ -72,7 +89,7 @@ export function layoutSideBySide(sizes: readonly Footprint[], clearance: number)
 
   const rowWidth = (count: number) => sum(columnWidth.slice(0, count)) + clearance * (count - 1);
   const totalWidth = rowWidth(perRow);
-  const totalDepth = sum(rowDepth) + clearance * (rows - 1);
+  const totalDepth = sum(rowDepth) + rowClearance * (rows - 1);
 
   const spots = sizes.map((size, i) => {
     const row = Math.floor(i / perRow);
@@ -91,7 +108,7 @@ export function layoutSideBySide(sizes: readonly Footprint[], clearance: number)
      * than walking away from the camera from row 0 — is what makes the order
      * of the switcher match the order on screen, top-left first.
      */
-    const depthBefore = sum(rowDepth.slice(0, row)) + clearance * row;
+    const depthBefore = sum(rowDepth.slice(0, row)) + rowClearance * row;
     const z = totalDepth / 2 - depthBefore - rowDepth[row]! / 2;
 
     return [x, z] as [number, number];
