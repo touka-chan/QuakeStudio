@@ -13,7 +13,7 @@ import { Viewport } from './Viewport';
    ========================================================================== */
 
 export function Viewport3D() {
-  const compareEnabled = useCompareStore((s) => s.enabled);
+  const compareEnabled = useCompareStore((s) => s.count > 1);
 
   return compareEnabled ? <CompareViewport /> : <Viewport />;
 }

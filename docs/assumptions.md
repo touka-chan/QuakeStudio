@@ -35,7 +35,7 @@ there and the app follows.
 | 7.1 | Rayleigh damping calibration | Modes 1 and 2 | ☐ | Standard choice; confirm |
 | 8.1 | Solver vs Python reference tolerance | ≤ 5% | ☐ | **Superseded** — validation runs at 1e-6, not 5%; see §9 |
 | 9.1 | Drift colour band thresholds | 0.10 %, 0.20 %, 0.35 %, 0.50 % | ☐ | **Measured and unusable as they stand** — 74 % of runs land in the top band. Recommendation and distribution in §7a and Group 3a of the review packet |
-| 10.1 | A/B series colours | `#0072B2` / `#E69F00` | ☐ | Client spec; deuteranopia check outstanding — §8a |
+| 10.1 | Building series colours (A–D) | `#0072B2` / `#C46A00` / `#3D8B00` / `#9B5DE5` | ☐ | **Changed from the client spec** — the amber `#E69F00` scored 2.25:1 on the light surface, below the 3:1 non-text minimum. All four now clear 3:1 on both surfaces and sit at least 45° apart in hue — §8a |
 | 11.1 | Comparison change column | `% change from A` | ☐ | Product decision — §8a |
 | 12.1 | localStorage fallback may thin history | thinned, peaks exact | ☐ | **Acceptable? — §8a**, and Group 4 of the review packet |
 
@@ -250,8 +250,8 @@ Dark theme needed no changes — both pairs already cleared AA comfortably.
   and persists. Applied by an inline script in `index.html` before first paint,
   so there is no flash of the wrong theme.
 - **Data-visualisation colours do not change between themes.** Hue carries
-  meaning in the drift scale and the A/B series, so shifting it with the theme
-  would be a lie about the data. The one exception is Config A's blue, which
+  meaning in the drift scale and the building series, so shifting it with the theme
+  would be a lie about the data. The one exception is building A's blue, which
   needs a lighter shade to stay visible on the dark surface.
 - **shadcn/ui variables are aliases, not a second palette.** `--card` points at
   `--surface` and so on, so there is exactly one place a colour is defined.
@@ -270,12 +270,13 @@ results are *read*, so they are recorded here rather than in the code history.
 
 ### The comparison's only shared quantity is the earthquake
 
-Both buildings are solved in a single worker request from one `GroundMotionConfig`.
-There is no per-building motion override, by design.
+Every building in the comparison — two, three or four of them — is solved in a
+single worker request from one `GroundMotionConfig`. There is no per-building
+motion override, by design.
 
 This is worth an adviser's confirmation because it is a claim the UI makes out
 loud: the results table prints the PGA and duration in a caption so a reader can
-see both sides were shaken identically. If the intended future behaviour is to
+see every building was shaken identically. If the intended future behaviour is to
 compare buildings under *different* site conditions, that is a change to this
 invariant, not a UI change — and it would make the caption misleading.
 
@@ -292,17 +293,37 @@ Two deliberate restraints:
   "0 % change" in material.
 - Differences under 0.5 % read `same` rather than a spurious `+0 %`.
 
-### The A/B colours are fixed across themes
+### The four building colours are fixed across themes
 
-Blue `#0072B2` for A and amber `#E69F00` for B in both light and dark. This
-follows the same reasoning as the drift scale: hue is carrying identity, so it
-must not shift with the theme. The contrast test covers both themes.
+| | Building | Colour | On the light surface | On the dark surface |
+|---|---|---|---|---|
+| A | blue | `#0072B2` (`#56B4E9` in dark) | 5.19:1 | 3.36:1 |
+| B | burnt orange | `#C46A00` | 3.88:1 | 4.48:1 |
+| C | green | `#3D8B00` | 4.29:1 | 4.05:1 |
+| D | purple | `#9B5DE5` | 4.13:1 | 4.22:1 |
 
-**Open question for the adviser:** are these two colours distinguishable enough
-for the most common form of colour vision deficiency, deuteranopia? They were
-taken from the client spec and chosen because they are the classic
-blue/orange pair precisely because it survives red-green deficiency. Worth a
-confirmation rather than an assumption.
+B, C and D are the same in both themes. A is the one exception and has a lighter
+variant for the dark surface, where that blue is not enough. This follows the
+same reasoning as the drift scale: hue is carrying identity, so it must not shift
+with the theme.
+
+Three checks in `tests/unit/contrast.test.ts` hold these in place — 3:1 on each
+surface, 45° of hue between every pair, and the drift and legend text unchanged.
+
+**Two of these are changes the client should know about.** The amber `#E69F00`
+was replaced because it scored **2.25:1** on the light surface: below the 3:1
+non-text minimum, which means building B's chart line was hard to see against a
+white background. That was true with two buildings and is not made better by
+three. The green was moved from teal `#009E73` to `#3D8B00` because teal sits
+only 38° of hue from the blue — close enough that a red-green deficiency merges
+A's and C's lines into one.
+
+**Open question for the adviser:** are four hues, at these contrast ratios,
+distinguishable enough under the colour vision deficiencies you expect your
+students to have? The hue-separation test is a floor, not a simulation — it
+catches two colours close enough to merge, and says nothing about how the set
+reads under any particular deficiency. Worth a confirmation rather than an
+assumption.
 
 ### A saved run stores the result, but loading re-runs the engine
 

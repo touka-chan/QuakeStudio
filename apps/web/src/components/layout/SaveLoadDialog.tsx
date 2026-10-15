@@ -17,7 +17,7 @@ import { formatMm } from '@/lib/utils';
 import { getRunStorage } from '@/storage';
 import { createRunRecord } from '@/storage/types';
 import { useConfigStore } from '@/store/configStore';
-import { useCompareStore } from '@/store/compareStore';
+import { sideAt, useCompareStore } from '@/store/compareStore';
 import { APP_VERSION, type RunRecord, type RunSummary } from '@/types';
 
 /* =========================================================================
@@ -107,7 +107,7 @@ export function SaveLoadDialog({
   }, [open, storage]);
 
   const saveCurrent = async () => {
-    const { building, compareBuilding, motion, result, resultB } = useConfigStore.getState();
+    const { building, compareBuildings, motion, result, results } = useConfigStore.getState();
     if (result.time.length === 0) {
       setStatus({ tone: 'error', message: 'Run the simulation before saving it.' });
       return;
@@ -115,19 +115,32 @@ export function SaveLoadDialog({
 
     setBusy(true);
     try {
-      await storage.saveRun(createRunRecord({ building, motion, result, appVersion: APP_VERSION }));
+      const base = await storage.saveRun(
+        createRunRecord({ building, motion, result, appVersion: APP_VERSION }),
+      );
 
-      // In comparison mode, save B alongside A so the pair reloads together.
-      if (useCompareStore.getState().enabled && resultB) {
-        await storage.saveRun(
-          createRunRecord({
-            building: compareBuilding,
-            motion,
-            result: resultB,
-            appVersion: APP_VERSION,
-            id: `${createRunRecord({ building: compareBuilding, motion, result: resultB, appVersion: APP_VERSION }).id}-b`,
-          }),
-        );
+      /*
+       * In comparison mode, save each other building alongside A so the set
+       * reloads together.
+       *
+       * One record per building, suffixed with its side letter, which is what
+       * the previous two-building version did for B. A single bundled record
+       * would load all four at once and lose the ability to open one on its
+       * own, which is the thing people actually do with a saved run.
+       */
+      const count = useCompareStore.getState().count;
+      const others = compareBuildings.slice(0, count - 1);
+      for (let i = 0; i < others.length; i += 1) {
+        const extra = results[i];
+        if (!extra) continue;
+        const record = createRunRecord({
+          building: others[i]!,
+          motion,
+          result: extra,
+          appVersion: APP_VERSION,
+          id: `${base.id}-${sideAt(i + 1).toLowerCase()}`,
+        });
+        await storage.saveRun(record);
       }
 
       setStatus({
@@ -342,7 +355,7 @@ function applyRun(record: RunRecord): void {
   config.setMotion({ ...record.motion });
   // The engine is re-run from the config, so the result in the record is used
   // only for reproducibility checking, not displayed directly.
-  useConfigStore.setState({ resultB: null, activeFloor: null });
+  useConfigStore.setState({ results: [], activeFloor: null });
   useCompareStore.getState().disable();
 }
 

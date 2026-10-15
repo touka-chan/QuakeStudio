@@ -59,9 +59,18 @@ function blocks(): { light: string; dark: string } {
   const rootEnd = tokens.indexOf('\n}', rootStart);
   const darkStart = tokens.indexOf('.dark {');
   const darkEnd = tokens.indexOf('\n}', darkStart);
+  const root = tokens.slice(rootStart, rootEnd);
   return {
-    light: tokens.slice(rootStart, rootEnd),
-    dark: tokens.slice(darkStart, darkEnd),
+    light: root,
+    /*
+     * The root block comes FIRST, then the dark overrides, because that is how
+     * custom properties actually cascade: `.dark` redeclares only the tokens
+     * it wants to change and the rest are inherited from `:root`. Slicing the
+     * dark block on its own reported `--series-b not found in block` for a
+     * token that is plainly there and plainly working in the browser — the mock
+     * was wrong about the language, not the stylesheet.
+     */
+    dark: `${root}\n${tokens.slice(darkStart, darkEnd)}`,
   };
 }
 
@@ -114,6 +123,72 @@ describe('WCAG AA contrast', () => {
     expect(contrastIn(light, '--border', '--surface')).toBeGreaterThanOrEqual(1.2);
     expect(contrastIn(dark, '--primary', '--surface')).toBeGreaterThanOrEqual(3);
     expect(contrastIn(light, '--primary', '--surface')).toBeGreaterThanOrEqual(3);
+  });
+
+  /*
+   * The four building colours are chart lines and table headings — non-text,
+   * so the 3:1 rule applies rather than the 4.5:1 one.
+   *
+   * `--series-b` was #e69f00 and scored 2.25:1 on the light surface, which this
+   * would have caught had it existed. Building B was simply hard to see against
+   * a white background, and nobody wrote that down because the charts carry
+   * labels too — the labels carried it, and the colour was decoration nobody
+   * checked.
+   *
+   * A fourth series does not fix that, it spreads it, so the four are checked
+   * together and the failure names which building lost.
+   */
+  const SERIES = ['--series-a', '--series-b', '--series-c', '--series-d'] as const;
+
+  for (const token of SERIES) {
+    it(`${token} clears 3:1 on the light surface`, () => {
+      expect(contrastIn(light, token, '--surface')).toBeGreaterThanOrEqual(3);
+    });
+
+    it(`${token} clears 3:1 on the dark surface`, () => {
+      expect(contrastIn(dark, token, '--surface')).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it('keeps the four building colours apart in hue', () => {
+    /*
+     * Not a colour-perception simulation, but the part that catches the obvious
+     * mistake: two series close enough in hue that a red-green colour
+     * deficiency merges them. Vermillion was the natural fourth and scores
+     * well, but against the amber in B it is two warm hues that collapse into
+     * one line for a deuteranope.
+     *
+     * 60 degrees of hue apart is the floor that makes that collapse unlikely.
+     * The colour alone is never the only cue either — every chart series and
+     * every comparison table column carries its building's letter — so this is
+     * the second line of defence rather than the only one.
+     */
+    const hues = SERIES.map((token) => {
+      const hex = resolveColor(light, token).replace('#', '');
+      const r = parseInt(hex.slice(0, 2), 16) / 255;
+      const g = parseInt(hex.slice(2, 4), 16) / 255;
+      const b = parseInt(hex.slice(4, 6), 16) / 255;
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      const d = max - min;
+      if (d === 0) return 0; // achromatic
+      let h: number;
+      if (max === r) h = ((g - b) / d) % 6;
+      else if (max === g) h = (b - r) / d + 2;
+      else h = (r - g) / d + 4;
+      return (h * 60 + 360) % 360;
+    });
+
+    for (let i = 0; i < hues.length; i += 1) {
+      for (let j = i + 1; j < hues.length; j += 1) {
+        const gap = Math.abs(hues[i]! - hues[j]!);
+        const apart = Math.min(gap, 360 - gap);
+        expect(
+          apart,
+          `${SERIES[i]} and ${SERIES[j]} are only ${apart.toFixed(0)} degrees apart in hue`,
+        ).toBeGreaterThanOrEqual(45);
+      }
+    }
   });
 
   it('documents why muted text differs from the spec on tinted surfaces', () => {

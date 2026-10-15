@@ -6,7 +6,12 @@ import { ComparisonTable } from '@/components/charts/ComparisonTable';
 import { LazyCharts } from '@/components/charts/LazyCharts';
 import { MetricCard } from '@/components/charts/MetricCard';
 import { formatMm, formatPct } from '@/lib/utils';
-import { useCompareStore, defaultCompareBuilding } from '@/store/compareStore';
+import {
+  defaultCompareBuilding,
+  seriesColor,
+  sideIndex,
+  useCompareStore,
+} from '@/store/compareStore';
 import { useConfigStore, resolveNow } from '@/store/configStore';
 
 /* =========================================================================
@@ -23,13 +28,32 @@ import { useConfigStore, resolveNow } from '@/store/configStore';
 const M2S_TO_MM = 1000;
 
 export function ResultsPanel() {
-  const result = useConfigStore((s) => s.result);
-  const building = useConfigStore((s) => s.building);
+  /*
+   * THE CARDS FOLLOW THE SELECTED BUILDING
+   *
+   * These used to read `s.result` and `s.building` — building A, always — so a
+   * user who switched the controls over to B, changed a slider, and came to
+   * read the outcome was shown A's numbers with no indication of whose they
+   * were. A metric panel that answers a question about something other than the
+   * thing being edited is worse than no panel, because it is confidently wrong.
+   *
+   * The building's own index is what indexes the store, so A through D are one
+   * code path rather than four.
+   */
+  const editing = useCompareStore((s) => s.editing);
+  const index = sideIndex(editing);
+  const result = useConfigStore((s) =>
+    index === 0 ? s.result : (s.results[index - 1] ?? s.result),
+  );
+  const building = useConfigStore((s) =>
+    index === 0 ? s.building : (s.compareBuildings[index - 1] ?? s.building),
+  );
   const status = useConfigStore((s) => s.status);
 
-  const compareEnabled = useCompareStore((s) => s.enabled);
+  const count = useCompareStore((s) => s.count);
   const enable = useCompareStore((s) => s.enable);
   const disable = useCompareStore((s) => s.disable);
+  const compareEnabled = count > 1;
 
   const toggleCompare = () => {
     if (compareEnabled) {
@@ -39,7 +63,7 @@ export function ResultsPanel() {
     }
     // Give B a genuinely different starting point, so the comparison shows
     // something rather than two identical buildings.
-    useConfigStore.getState().setCompareBuilding(defaultCompareBuilding());
+    useConfigStore.getState().setCompareBuildings([defaultCompareBuilding(0)]);
     enable();
     resolveNow();
   };
@@ -56,7 +80,7 @@ export function ResultsPanel() {
   const isLoading = status === 'computing' && result.time.length === 0;
 
   return (
-    <ScrollArea className="min-h-0 flex-1">
+    <ScrollArea className="qs-scroll-x min-h-0 flex-1">
       {/*
         The right gutter and the extra bottom padding are both for the floating
         "How to use" button.
@@ -74,12 +98,43 @@ export function ResultsPanel() {
       <div className="space-y-4 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
         <header className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase">Results</h2>
-          {status === 'computing' ? (
+          {/*
+            Whose numbers these are.
+
+            With one building this is noise worth suppressing. With four, the
+            cards follow the selection in the controls panel, and a number with
+            no owner is a number the reader has to guess about — and they will
+            guess A, because A is what was on screen when they last looked.
+
+            The letter is text, not just a coloured badge, so this survives a
+            colour deficiency, a greyscale print and a screen in sunlight.
+          */}
+          {compareEnabled ? (
+            <span
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+              data-testid="results-owner"
+            >
+              <span
+                className="grid size-4 place-items-center rounded text-[10px] font-semibold text-white"
+                style={{ backgroundColor: seriesColor(editing) }}
+                aria-hidden="true"
+              >
+                {editing}
+              </span>
+              Building {editing}
+            </span>
+          ) : status === 'computing' ? (
             <span className="text-xs text-muted-foreground" aria-live="polite">
               Updating…
             </span>
           ) : null}
         </header>
+
+        {compareEnabled && status === 'computing' ? (
+          <span className="sr-only" aria-live="polite">
+            Updating building {editing}
+          </span>
+        ) : null}
 
         {engineError ? (
           <p
@@ -146,8 +201,10 @@ export function ResultsPanel() {
           </Button>
           <p className="text-xs text-muted-foreground">
             {compareEnabled
-              ? 'Both buildings felt the same earthquake. Edit building B on the left.'
-              : 'Adds a second configuration and runs both under one earthquake.'}
+              ? // Generated from the count, because "Both buildings" under four
+                // columns is a caption that is quietly wrong.
+                `${count} buildings felt the same earthquake. Pick one on the left to edit it.`
+              : 'Adds a second, third or fourth configuration and runs them all under one earthquake.'}
           </p>
         </div>
       </div>

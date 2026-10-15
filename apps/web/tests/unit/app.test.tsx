@@ -7,7 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
-import { useCompareStore } from '@/store/compareStore';
+import { defaultCompareBuilding, useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
 import { __testing as tourTesting } from '@/store/tourStore';
@@ -56,13 +56,14 @@ beforeEach(() => {
   document.documentElement.classList.remove('dark');
   useConfigStore.setState({
     building: DEFAULT_BUILDING_CONFIG,
-    compareBuilding: DEFAULT_BUILDING_CONFIG,
+    compareBuildings: [],
+    results: [],
     templateId: DEFAULT_BUILDING_CONFIG.id,
     activeFloor: null,
     /*
      * The display copies too — and the originals they shadow.
      *
-     * They are the same object references as `building`, `compareBuilding` and
+     * They are the same object references as `building`, `compareBuildings` and
      * `motion` except while the tour is on screen, and the controls build every
      * edit on top of the display copy. Resetting one without the other leaves
      * the pair drifting apart, and the next thing to read them disagrees:
@@ -72,14 +73,14 @@ beforeEach(() => {
      */
     motion: DEFAULT_MOTION_CONFIG,
     displayBuilding: DEFAULT_BUILDING_CONFIG,
-    displayCompareBuilding: DEFAULT_BUILDING_CONFIG,
+    displayCompareBuildings: [],
     displayMotion: DEFAULT_MOTION_CONFIG,
   });
   // Zustand stores are module-level singletons, so a test that switches
   // comparison on leaks into the next one. Without this reset the comparison
-  // tests pass in isolation and fail in a file — which is the worst way for a
+  // tests pass in isolation and fail in a file - which is the worst way for a
   // test to be wrong.
-  useCompareStore.setState({ enabled: false, editing: 'B' });
+  useCompareStore.setState({ count: 1, editing: 'A' });
 });
 
 describe('theme selection', () => {
@@ -349,7 +350,7 @@ describe('results panel', () => {
     const panel = screen.getByRole('complementary', { name: /controls/i });
     const header = () => within(panel).getByRole('status');
 
-    // Comparison starts on side B, which `diversifyB` has made a different
+    // Comparison starts on side B, which has been given a genuinely different
     // building — so the header must name B and describe B, not A.
     expect(header()).toHaveTextContent(/Editing\s*B/);
     expect(header()).toHaveTextContent(/10-story steel/);
@@ -371,36 +372,103 @@ describe('results panel', () => {
     const before = useConfigStore.getState().building.floors;
     await user.click(toggle);
 
-    expect(useCompareStore.getState().enabled).toBe(true);
+    // Two to begin with, not four. The client asked for two first and for the
+    // rest to be a deliberate act.
+    expect(useCompareStore.getState().count).toBe(2);
     // A duplicate would make the comparison pointless.
-    expect(useConfigStore.getState().compareBuilding.floors).not.toBe(before);
-    expect(useConfigStore.getState().compareBuilding.name).toMatch(/variant/i);
+    const b = useConfigStore.getState().compareBuildings[0]!;
+    expect(b.floors).not.toBe(before);
+    // A different MATERIAL, which is the comparison worth making.
+    expect(b.material).not.toBe(useConfigStore.getState().building.material);
   });
 
-  it('uses ONE earthquake for both sides', () => {
+  it('adds a third and a fourth building, each in a different material', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+
+    await user.click(screen.getByRole('button', { name: /compare with another building/i }));
+    await user.click(screen.getByRole('button', { name: /add a building/i }));
+    expect(useCompareStore.getState().count).toBe(3);
+
+    await user.click(screen.getByRole('button', { name: /add a building/i }));
+    expect(useCompareStore.getState().count).toBe(4);
+
+    /*
+     * Four different materials.
+     *
+     * This is the default that makes the feature worth having: the same
+     * building in concrete, steel, composite and wood. If a future edit makes
+     * two of them share a material the comparison silently becomes "the same
+     * building twice", and nothing else would catch it.
+     */
+    const materials = [
+      useConfigStore.getState().building.material,
+      ...useConfigStore.getState().compareBuildings.map((b) => b.material),
+    ];
+    expect(materials).toHaveLength(4);
+    expect(new Set(materials).size).toBe(4);
+
+    // And a fifth is refused, out loud, rather than being a dead button.
+    expect(screen.queryByRole('button', { name: /add a building/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/four is the limit/i)).toBeInTheDocument();
+  });
+
+  it('removes a building above A and never removes A', () => {
+    render(<AppShell forceDesktopLayout />);
+
+    act(() => {
+      const { building } = useConfigStore.getState();
+      useConfigStore
+        .getState()
+        .setCompareBuildings([
+          defaultCompareBuilding(0, building),
+          defaultCompareBuilding(1, building),
+        ]);
+      useCompareStore.setState({ count: 3 });
+    });
+    expect(useCompareStore.getState().count).toBe(3);
+
+    useCompareStore.getState().removeSide('C');
+    expect(useCompareStore.getState().count).toBe(2);
+
+    // A is not removable — that is what "stop comparing" is for.
+    useCompareStore.getState().removeSide('A');
+    expect(useCompareStore.getState().count).toBe(2);
+  });
+
+  it('uses ONE earthquake for every building', () => {
     render(<AppShell forceDesktopLayout />);
     act(() => {
-      useCompareStore.getState().enable();
-      // `enable()` alone leaves B as a copy of A. `diversifyB()` is what the
-      // compare toggle calls in the app, and without it the "different id"
-      // assertion below only passed because an earlier test had leaked a
-      // modified B into the store.
-      useCompareStore.getState().diversifyB();
+      // Setting the buildings is what the compare toggle does. Without it the
+      // "different id" assertion below only passed because an earlier test had
+      // leaked a modified building into the store.
+      const { building } = useConfigStore.getState();
+      useConfigStore
+        .getState()
+        .setCompareBuildings([
+          defaultCompareBuilding(0, building),
+          defaultCompareBuilding(1, building),
+          defaultCompareBuilding(2, building),
+        ]);
+      useCompareStore.setState({ count: 4 });
     });
 
-    const { building, compareBuilding, motion } = useConfigStore.getState();
+    const { building, compareBuildings, motion } = useConfigStore.getState();
     // There is a single `motion` in the store, so the shaking cannot differ
-    // between A and B — that is the entire point of the comparison.
-    expect(compareBuilding).toBeDefined();
+    // between any of them — that is the entire point of the comparison.
+    expect(compareBuildings).toHaveLength(3);
     expect(motion.pgaG).toBeGreaterThan(0);
-    expect(building.id).not.toBe(compareBuilding.id);
+    const ids = [building.id, ...compareBuildings.map((b) => b.id)];
+    expect(new Set(ids).size).toBe(4);
 
     // And it STAYS shared. Editing one side's structure must not fork the
-    // motion object; if it ever did, the two buildings would be compared
-    // under different earthquakes and the whole comparison would be void.
-    act(() => useConfigStore.getState().setCompareBuilding({ floors: 12 }));
+    // motion object; if it ever did, the buildings would be compared under
+    // different earthquakes and the whole comparison would be void.
+    act(() => useConfigStore.getState().setCompareBuilding(1, { floors: 12 }));
     expect(useConfigStore.getState().motion).toBe(motion);
-    expect(useConfigStore.getState().compareBuilding.floors).toBe(12);
+    expect(useConfigStore.getState().compareBuildings[1]!.floors).toBe(12);
+    // Editing one must not disturb the others.
+    expect(useConfigStore.getState().compareBuildings[0]!.floors).not.toBe(12);
   });
 
   /**
@@ -423,10 +491,123 @@ describe('results panel', () => {
     });
 
     act(() => {
-      useCompareStore.getState().enable();
-      useConfigStore.setState({ result: make(1), resultB: make(bScale) });
+      // The building matters as much as the count: with a count of 2 and no
+      // extra building in the store, the table renders a single column and
+      // every change cell reads "not comparable" — which looks like a
+      // passing test and proves nothing.
+      const { building } = useConfigStore.getState();
+      useConfigStore.getState().setCompareBuildings([defaultCompareBuilding(0, building)]);
+      useCompareStore.setState({ count: 2 });
+      useConfigStore.setState({ result: make(1), results: [make(bScale)] });
     });
   }
+
+  /**
+   * Four buildings, with a known result each.
+   *
+   * The scales are 1, 1.5, 0.5 and 2, so the change column has to say +50 %,
+   * −50 % and +100 % all at once. That is the point: a four-column table where
+   * the columns happened to agree would pass a test that only ever checked one.
+   */
+  function enableFourWayComparison() {
+    /*
+     * A hand-built result with EVERY index filled in.
+     *
+     * The first version of this made a one-element `peakDisp`, which reads as
+     * "0.0 mm" on a five-storey building — the metric card indexes by floor, and
+     * `peakDisp[4]` on a one-element array is undefined. A test that asserted
+     * "50" then failed for a reason that had nothing to do with what it was
+     * checking, and the obvious response — loosen the assertion — would have
+     * left it proving nothing at all.
+     */
+    const make = (scale: number, floors = 20): SimulationResult => ({
+      time: [0, 0.1],
+      floorDisp: [Array.from({ length: floors }, () => 0.01 * scale)],
+      peakDisp: Array.from({ length: floors }, () => 0.05 * scale),
+      maxDisp: 0.05 * scale,
+      driftRatio: Array.from({ length: floors }, () => 0.004 * scale),
+      maxDriftRatio: 0.004 * scale,
+      periodsS: [0.5 * scale, 0.2 * scale],
+      groundAccel: [0, 1],
+    });
+
+    act(() => {
+      const { building } = useConfigStore.getState();
+      useConfigStore
+        .getState()
+        .setCompareBuildings([
+          defaultCompareBuilding(0, building),
+          defaultCompareBuilding(1, building),
+          defaultCompareBuilding(2, building),
+        ]);
+      useCompareStore.setState({ count: 4 });
+      useConfigStore.setState({ result: make(1), results: [make(1.5), make(0.5), make(2)] });
+    });
+  }
+
+  it('gives every building in a four-way comparison its own column', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableFourWayComparison();
+
+    const table = screen.getByRole('table');
+    const headers = within(table).getAllByRole('columnheader');
+    // Four building columns plus "Measure" and "vs A".
+    expect(headers).toHaveLength(6);
+    // Each names its building AND its letter — colour is not the only cue, and
+    // the letter is what makes four near-identical columns legible.
+    for (const side of ['A', 'B', 'C', 'D']) {
+      expect(
+        headers.some((th) => th.textContent?.includes(side)),
+        `no column header mentions building ${side}`,
+      ).toBe(true);
+    }
+
+    // Three distinct changes against A, all present at once. Several measures
+    // share a figure, so these are counted rather than found once.
+    expect(within(table).getAllByText('+50 %').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('−50 %').length).toBeGreaterThan(0);
+    expect(within(table).getAllByText('+100 %').length).toBeGreaterThan(0);
+  });
+
+  it('names the count honestly rather than saying "both" under four columns', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableFourWayComparison();
+    // A caption that says "both buildings" above four columns is quietly wrong,
+    // and a wrong caption costs the reader more than no caption at all. Two of
+    // them, in fact — the table's own footer and the hint under the button.
+    expect(screen.getByText(/All 4 buildings felt the identical earthquake/i)).toBeInTheDocument();
+    expect(screen.getByText(/4 buildings felt the same earthquake/i)).toBeInTheDocument();
+    expect(screen.queryByText(/both buildings felt/i)).not.toBeInTheDocument();
+  });
+
+  it('says which building the metric cards belong to, and follows the selection', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+    enableFourWayComparison();
+
+    const panel = screen.getByRole('complementary', { name: /results/i });
+    const owner = () => within(panel).getByTestId('results-owner');
+    const peak = () => within(panel).getByTestId('metric-peak-disp-value');
+
+    // Every building is scaled differently, so its peak is 50 / 75 / 25 / 100 mm
+    // and the card's NUMBER changes with the selection.
+    //
+    // Asserting the caption alone would not catch the bug this replaced: the
+    // caption is driven by `editing` while the numbers were hard-wired to A, so
+    // a caption that updates perfectly sits above a card showing the wrong
+    // building's answer. It looked right and was wrong, which is the worst
+    // combination available.
+    expect(owner()).toHaveTextContent('Building A');
+    expect(peak()).toHaveTextContent('50');
+
+    await user.click(screen.getByRole('radio', { name: /^Building D:/ }));
+    await waitFor(() => expect(owner()).toHaveTextContent('Building D'));
+    expect(peak()).toHaveTextContent('100');
+
+    await user.click(screen.getByRole('radio', { name: /^Building C:/ }));
+    await waitFor(() => expect(owner()).toHaveTextContent('Building C'));
+    expect(peak()).toHaveTextContent('25');
+  });
 
   it('shows the A/B table with a percentage change', () => {
     render(<AppShell forceDesktopLayout />);
@@ -441,6 +622,11 @@ describe('results panel', () => {
     // (1.5 - 1) / 1 = +50 %
     expect(within(table).getAllByText(/\+50\s*%/).length).toBeGreaterThan(0);
     expect(within(table).getAllByText('▲').length).toBeGreaterThan(0);
+    // And each change says whose it is, which is the cue that survives a
+    // colour deficiency and the only one that survives four buildings.
+    expect(
+      within(table).getAllByLabelText(/Building B: \+50 percent against A/).length,
+    ).toBeGreaterThan(0);
   });
 
   it('shows "same" rather than a spurious percentage when the sides match', () => {
@@ -448,7 +634,15 @@ describe('results panel', () => {
     enableComparison(1);
 
     const table = screen.getByRole('table');
-    expect(within(table).getAllByText('same').length).toBeGreaterThan(0);
+    /*
+     * Read through the accessible name, not the printed text.
+     *
+     * Each change cell now carries its building's letter ("B same"), because
+     * at four buildings an unlabelled "same" is a figure belonging to nobody.
+     * Asserting on the label checks what a screen reader actually announces,
+     * which is the thing that has to be right.
+     */
+    expect(within(table).getAllByLabelText(/the same as A/i).length).toBeGreaterThan(0);
   });
 
   it('marks a decrease with a down arrow, not just a minus sign', () => {

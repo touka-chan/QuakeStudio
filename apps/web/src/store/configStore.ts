@@ -54,11 +54,12 @@ const EMPTY_RESULT: SimulationResult = {
 
 const solver = new SolverClient(
   (results) => {
-    const compareEnabled = useCompareStore.getState().enabled;
-    const [a, b] = results;
+    const [a, ...rest] = results;
     useConfigStore.setState({
       result: a ?? EMPTY_RESULT,
-      resultB: compareEnabled ? (b ?? null) : null,
+      // One result per building in play, in the same order. The engine was
+      // always handed an array; it is only this store that was written for two.
+      results: rest,
       status: 'idle',
       error: null,
     });
@@ -71,12 +72,12 @@ const solver = new SolverClient(
 /** Kick off a solve for the current inputs. */
 function resolve(
   building: BuildingConfig,
-  compareBuilding: BuildingConfig | null,
+  compareBuildings: readonly BuildingConfig[],
   motion: GroundMotionConfig,
   immediate = false,
 ) {
   useConfigStore.setState({ status: 'computing' });
-  const batch = compareBuilding ? [building, compareBuilding] : [building];
+  const batch = [building, ...compareBuildings];
   if (immediate) solver.requestImmediate(batch, motion);
   else solver.request(batch, motion);
 }
@@ -84,12 +85,19 @@ function resolve(
 type ConfigState = {
   /** Building A — the primary configuration. */
   building: BuildingConfig;
-  /** Building B — only used when comparison is on. */
-  compareBuilding: BuildingConfig;
+  /**
+   * The buildings after A: B, C and D. Empty when not comparing.
+   *
+   * An array rather than three named fields, because the number of them is
+   * already `MAX_BUILDINGS` in `compareStore` and a fourth would mean a fifth
+   * there too.
+   */
+  compareBuildings: BuildingConfig[];
   motion: GroundMotionConfig;
   templateId: string;
   result: SimulationResult;
-  resultB: SimulationResult | null;
+  /** One result per entry in `compareBuildings`, in the same order. */
+  results: SimulationResult[];
   status: ComputeStatus;
   activeFloor: number | null;
   error: string | null;
@@ -113,7 +121,8 @@ type ConfigState = {
    * than not explaining anything.
    */
   displayBuilding: BuildingConfig;
-  displayCompareBuilding: BuildingConfig;
+  /** Mirrors `compareBuildings`, for the tour freeze. */
+  displayCompareBuildings: BuildingConfig[];
   displayMotion: GroundMotionConfig;
 
   /**
@@ -125,8 +134,20 @@ type ConfigState = {
    */
   commitTourEdits: () => void;
 
+  /**
+   * The extra buildings currently in play, as the controls would show them.
+   *
+   * Sliced to the compare count so a building left over from a longer
+   * comparison is never carried into the next one. Read through `get()` rather
+   * than closed over, so it always sees current state.
+   */
+  extras: () => BuildingConfig[];
+
   setBuilding: (patch: Partial<BuildingConfig>) => void;
-  setCompareBuilding: (patch: Partial<BuildingConfig>) => void;
+  /** Patch one of the extra buildings. `index` is 0 for B. */
+  setCompareBuilding: (index: number, patch: Partial<BuildingConfig>) => void;
+  /** Replace the whole cast of extra buildings, e.g. when one is added. */
+  setCompareBuildings: (buildings: BuildingConfig[]) => void;
   setMotion: (patch: Partial<GroundMotionConfig>) => void;
   applyTemplate: (templateId: string) => void;
   setActiveFloor: (floor: number | null) => void;
@@ -134,18 +155,24 @@ type ConfigState = {
 
 export const useConfigStore = create<ConfigState>((set, get) => ({
   building: DEFAULT_BUILDING_CONFIG,
-  compareBuilding: { ...DEFAULT_BUILDING_CONFIG },
+  compareBuildings: [],
   motion: DEFAULT_MOTION_CONFIG,
   // The same references, not copies. See the display-copy note above.
   displayBuilding: DEFAULT_BUILDING_CONFIG,
-  displayCompareBuilding: { ...DEFAULT_BUILDING_CONFIG },
+  displayCompareBuildings: [],
   displayMotion: DEFAULT_MOTION_CONFIG,
   templateId: DEFAULT_BUILDING_CONFIG.id,
   result: EMPTY_RESULT,
-  resultB: null,
+  results: [],
   status: 'computing',
   activeFloor: null,
   error: null,
+
+  /** The extra buildings currently in play, or empty when not comparing. */
+  extras: () => {
+    const { count } = useCompareStore.getState();
+    return count > 1 ? get().displayCompareBuildings.slice(0, count - 1) : [];
+  },
 
   setBuilding: (patch) => {
     // Patches stack on the display copy, so a tour that is reopened mid-edit
@@ -156,18 +183,29 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       return;
     }
     set({ building: next, displayBuilding: next, templateId: 'custom' });
-    resolve(next, useCompareStore.getState().enabled ? get().compareBuilding : null, get().motion);
+    resolve(next, get().extras(), get().motion);
   },
 
-  setCompareBuilding: (patch) => {
-    const next = { ...get().displayCompareBuilding, ...patch };
+  setCompareBuilding: (index, patch) => {
+    const current = get().displayCompareBuildings;
+    const base = current[index] ?? get().displayBuilding;
+    const next = current.map((b, i) => (i === index ? { ...base, ...patch } : b));
+    if (next.length === index) next.push({ ...base, ...patch });
     if (tourOpen()) {
-      set({ displayCompareBuilding: next });
+      set({ displayCompareBuildings: next });
       return;
     }
-    set({ compareBuilding: next, displayCompareBuilding: next });
-    const compareEnabled = useCompareStore.getState().enabled;
-    resolve(get().building, compareEnabled ? next : null, get().motion);
+    set({ compareBuildings: next, displayCompareBuildings: next });
+    resolve(get().building, get().extras(), get().motion);
+  },
+
+  setCompareBuildings: (buildings) => {
+    if (tourOpen()) {
+      set({ displayCompareBuildings: buildings });
+      return;
+    }
+    set({ compareBuildings: buildings, displayCompareBuildings: buildings });
+    resolve(get().building, get().extras(), get().motion);
   },
 
   setMotion: (patch) => {
@@ -177,9 +215,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       return;
     }
     set({ motion: next, displayMotion: next });
-    // The earthquake is shared by both sides, so both are re-solved together.
-    const compareEnabled = useCompareStore.getState().enabled;
-    resolve(get().building, compareEnabled ? get().compareBuilding : null, next);
+    // The earthquake is shared by every building, so they are all re-solved
+    // together.
+    resolve(get().building, get().extras(), next);
   },
 
   applyTemplate: (templateId) => {
@@ -201,35 +239,27 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     }
 
     set({ templateId, building, displayBuilding: building, activeFloor: null });
-    resolve(
-      building,
-      useCompareStore.getState().enabled ? get().compareBuilding : null,
-      get().motion,
-    );
+    resolve(building, get().extras(), get().motion);
   },
 
   commitTourEdits: () => {
-    const { displayBuilding, displayCompareBuilding, displayMotion } = get();
+    const { displayBuilding, displayCompareBuildings, displayMotion } = get();
     // Reference equality: the display copies are only re-created when a value
     // actually changed, so this is a sound "nothing was edited" test and skips
-    // a pointless solve on every tour close.
-    if (
+    // a pointless solve on every tour close. The array is compared by length
+    // and element identity for the same reason.
+    const unchanged =
       displayBuilding === get().building &&
-      displayCompareBuilding === get().compareBuilding &&
-      displayMotion === get().motion
-    ) {
-      return;
-    }
+      displayMotion === get().motion &&
+      displayCompareBuildings.length === get().compareBuildings.length &&
+      displayCompareBuildings.every((b, i) => b === get().compareBuildings[i]);
+    if (unchanged) return;
     set({
       building: displayBuilding,
-      compareBuilding: displayCompareBuilding,
+      compareBuildings: displayCompareBuildings,
       motion: displayMotion,
     });
-    resolve(
-      displayBuilding,
-      useCompareStore.getState().enabled ? displayCompareBuilding : null,
-      displayMotion,
-    );
+    resolve(displayBuilding, get().extras(), displayMotion);
   },
 
   setActiveFloor: (activeFloor) => set({ activeFloor }),
@@ -237,10 +267,9 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
 
 // Solve once as soon as the module loads, so the first paint already has real
 // numbers rather than an empty state.
-resolve(DEFAULT_BUILDING_CONFIG, null, DEFAULT_MOTION_CONFIG, true);
+resolve(DEFAULT_BUILDING_CONFIG, [], DEFAULT_MOTION_CONFIG, true);
 
-/** Convenience for callers that need to re-solve after a compare-mode change. */
 export function resolveNow(): void {
-  const { building, compareBuilding, motion } = useConfigStore.getState();
-  resolve(building, useCompareStore.getState().enabled ? compareBuilding : null, motion, true);
+  const { building, motion, extras } = useConfigStore.getState();
+  resolve(building, extras(), motion, true);
 }

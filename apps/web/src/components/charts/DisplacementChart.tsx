@@ -10,12 +10,13 @@ import {
 import { useEffect, useRef } from 'react';
 
 import { sampleDisplacement } from '@/lib/time';
+import { describeBuilding } from '@/lib/describeBuilding';
 import { formatMm } from '@/lib/utils';
 import { useCssVar } from '@/lib/useCssVar';
 import { useConfigStore } from '@/store/configStore';
-import { useCompareStore } from '@/store/compareStore';
+import { seriesColor, sideAt, sideIndex, useCompareStore } from '@/store/compareStore';
 import { usePlaybackStore } from '@/store/playbackStore';
-import type { SimulationResult } from '@/types';
+import type { BuildingConfig, SimulationResult } from '@/types';
 
 /* =========================================================================
    Displacement over time
@@ -23,6 +24,26 @@ import type { SimulationResult } from '@/types';
    Plots the selected floor's displacement from `result.floorDisp` — the same
    array the 3D view samples. There is deliberately no second copy: if the
    animation and the chart could disagree, they eventually will.
+
+   ONE LINE PER BUILDING IN PLAY
+   It used to plot building A only, with a second card below it doing the
+   A-against-B overlay. Two charts for one question meant scrolling to
+   compare, and the overlay card could not show a selected floor at all.
+   Plotting them all here means the comparison sits next to the 3D view it
+   explains, and follows whatever floor is highlighted.
+
+   FOUR LINES ON A PHONE IS BUSY, AND THAT IS FINE
+   This chart is for the SHAPE of the response — which building sways more,
+   and when. The numbers are in the table below, at full precision, with a
+   scroll rather than a squeeze. Thinning this to fit would remove the only
+   place the phase difference between four buildings is visible, so the lines
+   stay and the legend carries the names.
+
+   COLOUR IS NEVER THE ONLY CUE
+   Every legend entry names its building and prints its letter, so the four
+   lines are readable in greyscale, under a colour deficiency, and on a
+   screen in sunlight. The dash patterns differ for the same reason: two solid
+   lines in colours a reader cannot tell apart are one line.
 
    CURSOR PERFORMANCE: the playback cursor is an absolutely-positioned div
    moved with `transform`, driven from a requestAnimationFrame loop reading the
@@ -37,45 +58,66 @@ import type { SimulationResult } from '@/types';
 const M2S_TO_MM = 1000;
 const MAX_POINTS = 400;
 
+/**
+ * Dash patterns, so the lines are separable without colour.
+ *
+ * Index 0 (building A) is solid because it is the one shown when nothing is
+ * being compared, and changing its look would change the single-building
+ * reading for no reason.
+ */
+const DASHES = [undefined, '6 3', '2 3', '8 3 2 3'] as const;
+
+/** One building, and where its line comes from. */
+type Series = {
+  side: string;
+  key: string;
+  color: string;
+  name: string;
+  result: SimulationResult;
+  floorIndex: number;
+  /** False when this building is shorter than the floor on show. */
+  hasFloor: boolean;
+  floors: number;
+};
+
 export function DisplacementChart() {
-  const result = useConfigStore((s) => s.result);
-  const building = useConfigStore((s) => s.building);
-  const resultB = useConfigStore((s) => s.resultB);
-  const buildingB = useConfigStore((s) => s.compareBuilding);
+  const resultA = useConfigStore((s) => s.result);
+  const buildingA = useConfigStore((s) => s.building);
+  const results = useConfigStore((s) => s.results);
+  const compareBuildings = useConfigStore((s) => s.compareBuildings);
+  const count = useCompareStore((s) => s.count);
   const activeFloor = useConfigStore((s) => s.activeFloor);
   const showGround = activeFloor === null;
 
-  /*
-   * In comparison this chart carries BOTH buildings.
-   *
-   * It used to plot building A only, with a second card below it doing the
-   * A-against-B overlay. Two charts for one question meant scrolling to
-   * compare, and the overlay card could not show a selected floor at all.
-   * Plotting both here means the comparison sits next to the 3D view it
-   * explains, and follows whatever floor is highlighted.
-   */
-  const comparing = useCompareStore((s) => s.enabled) && Boolean(resultB);
-
-  const seriesColor = useCssVar('--series-a');
-  const seriesColorB = useCssVar('--series-b');
   const groundColor = useCssVar('--series-ground');
   const gridColor = useCssVar('--border');
   const textMuted = useCssVar('--text-muted');
   const cursorColor = useCssVar('--series-cursor');
 
-  const floorIndex = (activeFloor ?? building.floors) - 1;
-  const floorLabel = activeFloor ?? building.floors;
-
-  // A floor above B's roof has no B value to plot; the gap shows as a break.
-  const bFloorIndex = (activeFloor ?? buildingB.floors) - 1;
-  const bHasFloor = bFloorIndex < buildingB.floors;
-
-  const data = buildChartData(
-    result,
-    floorIndex,
-    showGround,
-    comparing && bHasFloor ? { result: resultB!, floorIndex: bFloorIndex } : null,
+  /*
+   * A floor above a building's roof has no value to plot; that series' gap
+   * shows as a break rather than as a flat line along the axis.
+   */
+  const series: Series[] = [buildingA, ...compareBuildings.slice(0, count - 1)].map(
+    (building, i) => {
+      const result = i === 0 ? resultA : (results[i - 1] ?? resultA);
+      const floorIndex = (activeFloor ?? building.floors) - 1;
+      return {
+        side: sideAt(i),
+        key: `s${i}`,
+        color: seriesColor(sideAt(i)),
+        name: describeBuilding(building),
+        result,
+        floorIndex,
+        hasFloor: floorIndex < building.floors,
+        floors: building.floors,
+      };
+    },
   );
+
+  const comparing = count > 1;
+  const floorLabel = activeFloor ?? buildingA.floors;
+  const data = buildChartData(series, showGround);
 
   // ---- Imperative playback cursor ----
   const plotAreaRef = useRef<HTMLDivElement>(null);
@@ -177,27 +219,21 @@ export function DisplacementChart() {
               />
             ) : null}
 
-            <Line
-              type="monotone"
-              dataKey="floor"
-              stroke={seriesColor}
-              strokeWidth={2}
-              dot={false}
-              name={`Floor ${floorLabel}`}
-              isAnimationActive={false}
-            />
-
-            {comparing && bHasFloor ? (
-              <Line
-                type="monotone"
-                dataKey="floorB"
-                stroke={seriesColorB}
-                strokeWidth={2}
-                dot={false}
-                name={`B · Floor ${activeFloor ?? buildingB.floors}`}
-                isAnimationActive={false}
-              />
-            ) : null}
+            {series.map((s, i) =>
+              s.hasFloor ? (
+                <Line
+                  key={s.key}
+                  type="monotone"
+                  dataKey={s.key}
+                  stroke={s.color}
+                  strokeDasharray={DASHES[i]}
+                  strokeWidth={2}
+                  dot={false}
+                  name={`${s.side} · ${s.name} · Floor ${floorLabel}`}
+                  isAnimationActive={false}
+                />
+              ) : null,
+            )}
           </LineChart>
         </ResponsiveContainer>
 
@@ -212,31 +248,39 @@ export function DisplacementChart() {
 
       <TimeReadout />
 
+      {/*
+        The legend is the only thing separating four lines, so it names each
+        one. A swatch alone would leave a reader guessing which of four
+        similar curves belongs to the building they just edited.
+      */}
       <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {/*
-          The A series keeps its plain name when nothing is being compared, so
-          the single-building reading is unchanged.
-        */}
-        <li className="flex items-center gap-1.5">
-          <span className="h-0.5 w-4 rounded" style={{ backgroundColor: seriesColor }} />
-          {comparing ? 'A · Floor ' : 'Floor '}
-          {floorLabel} displacement
-        </li>
-        {comparing && bHasFloor ? (
-          <li className="flex items-center gap-1.5">
-            <span className="h-0.5 w-4 rounded" style={{ backgroundColor: seriesColorB }} />B ·
-            Floor {activeFloor ?? buildingB.floors} displacement
-          </li>
-        ) : null}
-        {comparing && !bHasFloor ? (
-          <li className="flex items-center gap-1.5">
+        {series.map((s, i) => (
+          <li key={s.key} className="flex items-center gap-1.5">
             <span
-              className="h-0.5 w-4 rounded opacity-40"
-              style={{ backgroundColor: seriesColorB }}
+              className={`h-0.5 w-4 rounded ${s.hasFloor ? '' : 'opacity-40'}`}
+              style={{
+                backgroundColor: s.color,
+                ...(DASHES[i]
+                  ? {
+                      backgroundImage: `repeating-linear-gradient(90deg, ${s.color} 0 4px, transparent 4px 7px)`,
+                      backgroundColor: 'transparent',
+                    }
+                  : {}),
+              }}
             />
-            B has no floor {floorLabel} — it is {buildingB.floors} storeys
+            {comparing ? `${s.side} · ` : ''}
+            Floor {floorLabel} displacement
+            {s.hasFloor ? null : (
+              // True, not a silent gap: a reader must know the line is missing
+              // because the building has no floor there, not because it stood
+              // perfectly still.
+              <span>
+                {' '}
+                — {s.side} is only {s.floors} storeys
+              </span>
+            )}
           </li>
-        ) : null}
+        ))}
         {showGround ? (
           <li className="flex items-center gap-1.5">
             <span
@@ -258,17 +302,41 @@ export function DisplacementChart() {
 /** The "now" readout. One of the few places that re-renders on the clock. */
 function TimeReadout() {
   const time = usePlaybackStore((s) => s.time);
-  const result = useConfigStore((s) => s.result);
-  const building = useConfigStore((s) => s.building);
+  const resultA = useConfigStore((s) => s.result);
+  const results = useConfigStore((s) => s.results);
+  const buildingA = useConfigStore((s) => s.building);
+  const compareBuildings = useConfigStore((s) => s.compareBuildings);
   const activeFloor = useConfigStore((s) => s.activeFloor);
+  const editing = useCompareStore((s) => s.editing);
+  const count = useCompareStore((s) => s.count);
 
+  /*
+   * Follows the selected building, like the metric cards above it.
+   *
+   * A "Now: 42 mm" readout sitting under a chart about four buildings, while the
+   * cards show a different one, is the sort of quiet inconsistency that makes
+   * a tool feel broken in a way nobody can point at.
+   */
+  const i = count > 1 ? sideIndex(editing) : 0;
+  const result = i === 0 ? resultA : (results[i - 1] ?? resultA);
+  const building: BuildingConfig = i === 0 ? buildingA : (compareBuildings[i - 1] ?? buildingA);
   const floorIndex = (activeFloor ?? building.floors) - 1;
   // Same interpolating sampler the 3D view uses, so the two readouts agree.
   const value = sampleDisplacement(result.floorDisp, result.time, floorIndex, time);
+  const side = sideAt(i);
 
   return (
     <p className="mt-2 font-mono-nums text-xs text-muted-foreground">
       Now: <span className="text-foreground">{time.toFixed(1)} s</span> ·{' '}
+      {/*
+        Building A reads "Now: 1.2 s · 42 mm" with nothing added. With several
+        in play the owner has to be named, or the number belongs to nobody.
+      */}
+      {count > 1 ? (
+        <>
+          <span className="text-foreground">{side}</span> at{' '}
+        </>
+      ) : null}
       <span className="text-foreground">{formatMm(value * M2S_TO_MM)} mm</span>
     </p>
   );
@@ -281,33 +349,34 @@ function TimeReadout() {
  * that has to react to a slider must not render all of them per frame.
  */
 function buildChartData(
-  result: SimulationResult,
-  floorIndex: number,
+  series: Series[],
   includeGround: boolean,
-  compare?: { result: SimulationResult; floorIndex: number } | null,
-) {
-  const total = result.time.length;
+): Array<Record<string, number | null>> {
+  const first = series[0];
+  if (!first) return [];
+  const total = first.result.time.length;
   if (total === 0) return [];
   const stride = Math.max(1, Math.ceil(total / MAX_POINTS));
-  const series = result.floorDisp[floorIndex] ?? [];
-  const compareSeries = compare ? (compare.result.floorDisp[compare.floorIndex] ?? []) : null;
 
-  const rows: Array<{ t: number; floor: number; floorB: number | null; ground: number }> = [];
+  const rows: Array<Record<string, number | null>> = [];
   for (let i = 0; i < total; i += stride) {
-    rows.push({
-      t: result.time[i]!,
-      floor: (series[i] ?? 0) * M2S_TO_MM,
+    const row: Record<string, number | null> = {
+      t: first.result.time[i]!,
+      ground: includeGround ? first.result.groundAccel[i]! * 40 : 0,
+    };
+    for (const s of series) {
       /*
-       * `null` rather than 0 for a missing B point.
+       * `null` rather than 0 for a missing point.
        *
-       * A building B shorter than the selected floor has no value there, and
-       * plotting 0 would draw a flat line along the axis reading "B did not
-       * move" — which is a measurement claim about a building that has no
-       * floor there at all. Recharts leaves a gap for null.
+       * A building shorter than the selected floor has no value there, and
+       * plotting 0 would draw a flat line along the axis reading "it did not
+       * move" — which is a measurement claim about a building that has no floor
+       * there at all. Recharts leaves a gap for null.
        */
-      floorB: compareSeries ? (compareSeries[i] ?? null) * M2S_TO_MM : null,
-      ground: includeGround ? result.groundAccel[i]! * 40 : 0,
-    });
+      const values = s.hasFloor ? (s.result.floorDisp[s.floorIndex] ?? []) : [];
+      row[s.key] = values.length === 0 ? null : (values[i] ?? null) * M2S_TO_MM;
+    }
+    rows.push(row);
   }
   return rows;
 }

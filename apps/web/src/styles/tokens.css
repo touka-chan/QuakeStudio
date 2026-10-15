@@ -65,10 +65,27 @@
   --drift-4-side: #c97430;
   --drift-5-side: #c2490a;
 
-  /* ---- Data-viz series (identical in both themes) ---- */
-  --series-a: #0072b2; /* Config A / blue        */
-  --series-b: #e69f00; /* Config B / amber       */
-  --series-c: #009e73; /* optional third series  */
+  /* ---- Data-viz series, one per building ---- */
+  /* One colour per building, A through D. B, C and D are the same in both
+     themes on purpose: a series that changed shade with the theme would make
+     two charts taken in different lighting look like they were about
+     different things. A is the exception and has a lighter variant for the
+     dark surface, where the blue this dark is not enough.
+
+     Every one of these clears 3:1 against BOTH surfaces, which is the
+     non-text minimum in WCAG 1.4.11 - these are chart lines and table
+     headings, not text. `--series-b` was #e69f00, which scored 2.25:1 on the
+     light surface: building B's line was hard to see on a white background,
+     and adding a fourth series does not fix that, it just spreads the problem.
+
+     Blue, orange, green and purple, rather than four of the Okabe-Ito set.
+     Vermillion was the obvious fourth and it scores well, but against the
+     amber already in B it is two warm hues that a red-green colour deficiency
+     collapses into the same line. These four stay apart. */
+  --series-a: #0072b2; /* Building A / blue          */
+  --series-b: #c46a00; /* Building B / burnt orange   */
+  --series-c: #3d8b00; /* Building C / green          */
+  --series-d: #9b5de5; /* Building D / purple         */
   --series-ground: #94a3b8; /* ground motion, dashed */
   --series-cursor: var(--primary); /* playback cursor */
 

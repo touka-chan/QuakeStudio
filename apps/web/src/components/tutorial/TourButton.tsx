@@ -105,9 +105,15 @@ export function TourButton() {
   const [settling, setSettling] = useState(false);
 
   const boxRef = useRef<HTMLButtonElement>(null);
-  // Mirrors `spot`, for the pointerup handler, which must not read a value the
-  // last pointermove has set but React has not re-rendered yet.
-  const spotRef = useRef<Spot | null>(null);
+  /*
+   * The live position, and the only one a resize may read.
+   *
+   * Seeded from `spot` rather than null so the mount-time clamp has something
+   * to work on, and written by every pointer handler, by the clamp and by the
+   * settle alike — the four places that move the button all update it, which is
+   * what makes it the most current answer to "where is the button now".
+   */
+  const spotRef = useRef<Spot | null>(spot);
   // Where the current drag started from. The live transform is measured against
   // this, which is what lets `left`/`top` stay put during the drag.
   const originRef = useRef<Spot | null>(null);
@@ -121,18 +127,34 @@ export function TourButton() {
   const swallowClick = useRef(false);
 
   /*
-   * Keep a stored spot inside the current window.
+   * Keep the button inside the current window.
    *
    * A spot chosen on a desktop is off the edge of a phone, and one chosen on a
    * phone is in the middle of nowhere on a desktop. This runs on mount and on
    * every resize, so rotating a device or resizing a window cannot leave the
    * button somewhere the user cannot see it or reach it.
+   *
+   * IT CLAMPS THE LIVE POSITION, NOT THE COMMITTED ONE.
+   *
+   * Between pointerup and the settle there are two frames in which the
+   * transform holds where the button was dropped and the state still holds
+   * where the drag started. A resize landing in that window clamped the OLD
+   * position, and the settle then committed the pre-resize position — leaving
+   * the button off the edge of the new, smaller window with no further resize
+   * event coming to put it back.
+   *
+   * `spotRef` is always the most current position there is, so clamping it and
+   * writing the result to both places closes the window.
    */
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
     function reclamp() {
-      setSpot((prev) => (prev ? clampToWindow(prev, el!.offsetWidth, el!.offsetHeight) : prev));
+      const live = spotRef.current;
+      if (!live) return;
+      const next = clampToWindow(live, el!.offsetWidth, el!.offsetHeight);
+      spotRef.current = next;
+      setSpot(next);
     }
     reclamp();
     window.addEventListener('resize', reclamp);
@@ -224,11 +246,17 @@ export function TourButton() {
      * Two frames: one for React to write the new `left`/`top`, and one for the
      * class to come off. If it came off in the same frame there would be
      * nothing to animate and the button would stop dead.
+     *
+     * The commit reads `spotRef` again rather than reusing the value captured
+     * above, because a resize landing in this window has already clamped the
+     * live position. Committing the captured value would put the button back
+     * off the edge of a window that had just shrunk, which is the same bug one
+     * step later.
      */
     setSettling(true);
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        setSpot(final);
+        setSpot(spotRef.current ?? final);
         setSettling(false);
       });
     });

@@ -10,9 +10,10 @@ import {
 } from 'recharts';
 
 import { formatMm } from '@/lib/utils';
+import { describeBuilding } from '@/lib/describeBuilding';
 import { DRIFT_BANDS, driftBand } from '@/lib/driftScale';
 import { useCssVars } from '@/lib/useCssVar';
-import { useCompareStore } from '@/store/compareStore';
+import { seriesColor, sideAt, useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 
 /* =========================================================================
@@ -23,6 +24,19 @@ import { useConfigStore } from '@/store/configStore';
    colour alone — which also means it still works for a colourblind reader and
    in greyscale print.
 
+   ONE BAR PER BUILDING PER FLOOR
+   Two buildings were two named columns. Four are four generated ones, keyed by
+   index, so a building is identified by the slot it occupies rather than by a
+   hard-wired letter.
+
+   WHICH BAR IS WHICH BUILDING IS NOT CARRIED BY COLOUR HERE, AND CANNOT BE
+   Every building's bars are coloured by DRIFT, on purpose, so that a floor
+   sharing a colour in the 3D view shares it here too. The series colour is
+   therefore not on the bar at all — it is in the key underneath, which names
+   each building and says whether it is the 1st, 2nd, 3rd or 4th bar in the
+   row. An earlier version used the series colour in that key next to bars
+   that were not that colour, which taught a reader a false association.
+
    The band thresholds live in lib/driftScale.ts, shared with the 3D view, so
    the legend can never disagree with the bars.
    ========================================================================= */
@@ -30,12 +44,13 @@ import { useConfigStore } from '@/store/configStore';
 const M2S_TO_MM = 1000;
 
 export function PeakByFloorChart() {
-  const result = useConfigStore((s) => s.result);
+  const resultA = useConfigStore((s) => s.result);
+  const buildingA = useConfigStore((s) => s.building);
+  const results = useConfigStore((s) => s.results);
+  const compareBuildings = useConfigStore((s) => s.compareBuildings);
+  const count = useCompareStore((s) => s.count);
   const activeFloor = useConfigStore((s) => s.activeFloor);
   const setActiveFloor = useConfigStore((s) => s.setActiveFloor);
-  const resultB = useConfigStore((s) => s.resultB);
-  const buildingB = useConfigStore((s) => s.compareBuilding);
-  const comparing = useCompareStore((s) => s.enabled) && Boolean(resultB);
 
   const colors = useCssVars([
     '--drift-1',
@@ -43,44 +58,63 @@ export function PeakByFloorChart() {
     '--drift-3',
     '--drift-4',
     '--drift-5',
-    '--series-a',
-    '--series-b',
     '--surface-2',
     '--border',
     '--text-muted',
     '--text',
   ]);
 
+  const series = [buildingA, ...compareBuildings.slice(0, count - 1)].map((building, i) => ({
+    side: sideAt(i),
+    /** Bar value for this building on each floor row. */
+    mmKey: `mm${i}`,
+    /** Story drift for this building on each floor row, for the bar colour. */
+    driftKey: `drift${i}`,
+    building,
+    result: i === 0 ? resultA : (results[i - 1] ?? resultA),
+  }));
+
+  const comparing = count > 1;
+
   /*
    * One row per floor, carrying a column for each building.
    *
-   * The two buildings rarely have the same height, so the axis runs to the
-   * taller of the two and the shorter one simply has no bar on its upper
-   * floors. `null` rather than 0 there — a 0-length bar would claim "no
-   * displacement" about a floor that does not exist.
+   * The buildings rarely have the same height, so the axis runs to the tallest
+   * and a shorter one simply has no bar on its upper floors. `null` rather than
+   * 0 there — a 0-length bar would claim "no displacement" about a floor that
+   * does not exist.
    */
-  const floorCount = comparing
-    ? Math.max(result.peakDisp.length, buildingB.floors)
-    : result.peakDisp.length;
+  const floorCount = series.reduce(
+    (max, s) => Math.max(max, s.result.peakDisp.length, s.building.floors),
+    0,
+  );
 
   const data = Array.from({ length: floorCount }, (_, index) => {
-    const floor = index + 1;
-    const driftA = result.driftRatio[index] ?? 0;
-    const driftB = resultB?.driftRatio[index] ?? 0;
-    return {
-      floor,
-      mm: result.peakDisp[index] === undefined ? null : result.peakDisp[index] * M2S_TO_MM,
-      mmB:
-        comparing && resultB?.peakDisp[index] !== undefined
-          ? resultB.peakDisp[index]! * M2S_TO_MM
-          : null,
-      drift: driftA,
-      driftB,
-    };
+    const row: Record<string, number | null> & { floor: number } = { floor: index + 1 };
+    for (const s of series) {
+      row[s.driftKey] = s.result.driftRatio[index] ?? 0;
+      row[s.mmKey] =
+        s.result.peakDisp[index] === undefined ? null : s.result.peakDisp[index] * M2S_TO_MM;
+    }
+    return row;
   });
 
-  // A floor row needs ~14px for its label; two bars in a row need more.
-  const chartHeight = Math.max(256, data.length * (comparing ? 30 : 20));
+  /*
+   * Height follows the floor count AND the number of bars in each row.
+   *
+   * It was a fixed `h-64`, which was fine for five floors and wrong for
+   * twenty: 20 floors in 256px is under 13px a row, so the "Floor N" labels
+   * printed on top of each other and the chart became unreadable exactly when
+   * it had the most to say. Comparing made it worse, because buildings can be
+   * twenty storeys apart from one another.
+   *
+   * Capped rather than left to run away: four buildings over twenty storeys is
+   * eighty bars, and a chart taller than the window cannot be read either. Past
+   * the cap the bars thin out and the numbers stay printed, which is the cue
+   * that saves it.
+   */
+  const rowHeight = series.length * 12 + 12;
+  const chartHeight = Math.min(640, Math.max(256, data.length * rowHeight));
 
   return (
     <section
@@ -94,18 +128,6 @@ export function PeakByFloorChart() {
         <span className="font-mono-nums text-xs text-muted-foreground">mm</span>
       </div>
 
-      {/*
-        Height follows the floor count.
-
-        It was a fixed `h-64`, which was fine for five floors and wrong for
-        twenty: 20 floors in 256px is under 13px a row, so the "Floor N" labels
-        printed on top of each other and the chart became unreadable exactly
-        when it had the most to say. Comparing two buildings made it worse,
-        because two buildings can be twenty storeys between them.
-
-        Each row needs about 14px for its label, and a good deal more when a
-        row carries two bars rather than one.
-      */}
       <div className="w-full" style={{ height: chartHeight }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart
@@ -133,8 +155,17 @@ export function PeakByFloorChart() {
                 fontSize: 12,
                 color: 'var(--text)',
               }}
-              formatter={(value, _name, item) => {
-                const drift = (item?.payload as { drift?: number } | undefined)?.drift ?? 0;
+              formatter={(value, name, item) => {
+                const payload = item?.payload as Record<string, number | null> | undefined;
+                /*
+                 * Read the drift for the SAME building the value came from.
+                 * Reading `drift` — building A's — would attach A's drift to B's
+                 * millimetres, which is the kind of pairing that is only wrong
+                 * on the second building and so survives casual testing.
+                 */
+                const side = String(name).slice(0, 1);
+                const index = series.findIndex((s) => s.side === side);
+                const drift = payload?.[series[index]?.driftKey ?? 'drift0'] ?? 0;
                 return [
                   `${formatMm(Number(value))} mm peak · ${(drift * 100).toFixed(2)} % drift`,
                   '',
@@ -143,47 +174,18 @@ export function PeakByFloorChart() {
               labelFormatter={(floor) => `Floor ${floor}`}
             />
 
-            <Bar
-              dataKey="mm"
-              radius={[0, 4, 4, 0]}
-              isAnimationActive={false}
-              onClick={(entry: unknown) => {
-                const payload = entry as { payload?: { floor?: number } };
-                const floor = payload.payload?.floor;
-                if (floor) setActiveFloor(floor === activeFloor ? null : floor);
-              }}
-            >
-              {data.map((row) => (
-                <Cell
-                  key={row.floor}
-                  fill={colors[driftBand(row.drift).token]}
-                  stroke={activeFloor === row.floor ? colors['--text'] : 'transparent'}
-                  strokeWidth={2}
-                  cursor="pointer"
-                />
-              ))}
-              <LabelList
-                dataKey="mm"
-                position="right"
-                offset={6}
-                fontSize={10}
-                formatter={(v) => (v === null || v === undefined ? '' : formatMm(Number(v)))}
-                fill={colors['--text-muted']}
-              />
-            </Bar>
-
-            {/*
-              Building B, only while comparing.
-
-              Same click handler and same highlight as A, because "click a bar
-              to highlight that floor" is one behaviour and it should not depend
-              on which building the bar belongs to.
-            */}
-            {comparing ? (
+            {series.map((s) => (
+              /*
+                One behaviour for every bar. "Click a bar to highlight that
+                floor" is a single rule and should not depend on which building
+                the bar belongs to.
+              */
               <Bar
-                dataKey="mmB"
+                key={s.mmKey}
+                dataKey={s.mmKey}
                 radius={[0, 4, 4, 0]}
                 isAnimationActive={false}
+                stackId={undefined}
                 onClick={(entry: unknown) => {
                   const payload = entry as { payload?: { floor?: number } };
                   const floor = payload.payload?.floor;
@@ -192,15 +194,15 @@ export function PeakByFloorChart() {
               >
                 {data.map((row) => (
                   <Cell
-                    key={row.floor}
-                    fill={colors[driftBand(row.driftB).token]}
+                    key={`${s.side}-${row.floor}`}
+                    fill={colors[driftBand(row[s.driftKey] ?? 0).token]}
                     stroke={activeFloor === row.floor ? colors['--text'] : 'transparent'}
                     strokeWidth={2}
                     cursor="pointer"
                   />
                 ))}
                 <LabelList
-                  dataKey="mmB"
+                  dataKey={s.mmKey}
                   position="right"
                   offset={6}
                   fontSize={10}
@@ -208,7 +210,7 @@ export function PeakByFloorChart() {
                   fill={colors['--text-muted']}
                 />
               </Bar>
-            ) : null}
+            ))}
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -216,34 +218,26 @@ export function PeakByFloorChart() {
       <DriftLegend colors={colors} />
 
       {/*
-        The key says which bar of each pair is which building. Colour alone
-        cannot do this job here — both buildings' bars are coloured by drift,
-        on purpose, so that same-coloured floors have the same drift across
-        the 3D view and this chart.
-
-        "Top" and "bottom", not "left" and "right": the bars run horizontally
-        but they are stacked WITHIN each floor row, because the axis is
-        vertical. An earlier version of this key said left/right, which is
-        simply false of this chart.
+        The key says which bar of each group is which building. Ordinals, not a
+        colour swatch: the bars are coloured by drift, not by building, and a
+        swatch in the series colour sitting next to them would be a claim about
+        the bars that is not true.
       */}
       {comparing ? (
         <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-          <li className="flex items-center gap-1.5">
-            <span
-              className="size-2.5 rounded-sm"
-              style={{ backgroundColor: colors['--series-a'] }}
-              aria-hidden="true"
-            />
-            Building A (top bar)
-          </li>
-          <li className="flex items-center gap-1.5">
-            <span
-              className="size-2.5 rounded-sm"
-              style={{ backgroundColor: colors['--series-b'] }}
-              aria-hidden="true"
-            />
-            Building B (bottom bar)
-          </li>
+          {series.map((s, i) => (
+            <li key={s.side} className="flex items-center gap-1.5">
+              <span
+                className="grid size-4 place-items-center rounded text-[10px] font-semibold text-white"
+                style={{ backgroundColor: seriesColor(s.side) }}
+                aria-hidden="true"
+              >
+                {s.side}
+              </span>
+              {s.side} · {describeBuilding(s.building)} ({ordinal(i)} bar
+              {series.length > 1 ? '' : ''})
+            </li>
+          ))}
         </ul>
       ) : null}
 
@@ -251,7 +245,7 @@ export function PeakByFloorChart() {
         Bar colour shows story drift. The peak in millimetres is printed beside every bar, so colour
         is never the only cue. Click a bar, or a floor in 3D, to highlight it.
         {comparing
-          ? ' Both buildings are coloured on the same drift scale, so floors sharing a colour have the same drift.'
+          ? ` All ${series.length} buildings are coloured on the same drift scale, so floors sharing a colour have the same drift.`
           : ''}
       </p>
     </section>
@@ -259,6 +253,12 @@ export function PeakByFloorChart() {
 }
 
 /* ------------------------------------------------------------------------- */
+
+/** "1st", "2nd", "3rd", "4th". Small list; a lookup beats a grammar library. */
+const ORDINALS = ['1st', '2nd', '3rd', '4th'];
+function ordinal(index: number): string {
+  return ORDINALS[index] ?? `${index + 1}th`;
+}
 
 function DriftLegend({ colors }: { colors: Record<string, string> }) {
   return (

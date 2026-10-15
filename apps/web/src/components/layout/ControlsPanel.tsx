@@ -1,10 +1,22 @@
+import { Plus, X } from 'lucide-react';
+
 import { BuildingControls } from '@/components/controls/BuildingControls';
 import { EarthquakeControls } from '@/components/controls/EarthquakeControls';
 import { TemplatePicker } from '@/components/controls/TemplatePicker';
+import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { useCompareStore } from '@/store/compareStore';
-import { useConfigStore } from '@/store/configStore';
+import {
+  defaultCompareBuilding,
+  MAX_BUILDINGS,
+  seriesColor,
+  sideAt,
+  sideIndex,
+  useCompareStore,
+  type CompareSide,
+} from '@/store/compareStore';
+import { resolveNow, useConfigStore } from '@/store/configStore';
+import type { BuildingConfig } from '@/types';
 import { describeBuilding } from '@/lib/describeBuilding';
 
 /* =========================================================================
@@ -19,11 +31,53 @@ import { describeBuilding } from '@/lib/describeBuilding';
    ========================================================================= */
 
 export function ControlsPanel() {
-  const compareEnabled = useCompareStore((s) => s.enabled);
+  const count = useCompareStore((s) => s.count);
   const editing = useCompareStore((s) => s.editing);
   const setEditing = useCompareStore((s) => s.setEditing);
+  const addSide = useCompareStore((s) => s.addSide);
   const building = useConfigStore((s) => s.building);
-  const compareBuilding = useConfigStore((s) => s.compareBuilding);
+  const compareBuildings = useConfigStore((s) => s.compareBuildings);
+  const compareEnabled = count > 1;
+
+  const editingIndex = sideIndex(editing);
+  const editingName = describeBuilding(
+    editingIndex === 0 ? building : (compareBuildings[editingIndex - 1] ?? building),
+  );
+
+  /**
+   * Add one more building to the comparison.
+   *
+   * The building is added before the count goes up. `extras()` in the config
+   * store slices the list to the compare count, so a building added after the
+   * count rose would be there — but a count raised before the building landed
+   * would solve one fewer than it is showing.
+   */
+  function addAnother() {
+    const extras = useConfigStore.getState().displayCompareBuildings;
+    const a = useConfigStore.getState().displayBuilding;
+    useConfigStore
+      .getState()
+      .setCompareBuildings([...extras, defaultCompareBuilding(extras.length, a)]);
+    addSide();
+    resolveNow();
+  }
+
+  /**
+   * Drop one building from the comparison.
+   *
+   * The buildings after it go too, because the slots are positional: dropping C
+   * out of [B, C, D] leaves D in third place, and "Building C" on screen
+   * showing D's measurements is precisely the kind of quiet mismatch this app
+   * is supposed to be free of.
+   */
+  function removeAnother(side: CompareSide) {
+    const index = sideIndex(side);
+    if (index < 1) return;
+    const { compareBuildings: extras } = useConfigStore.getState();
+    useConfigStore.getState().setCompareBuildings(extras.slice(0, index - 1));
+    useCompareStore.getState().removeSide(side);
+    resolveNow();
+  }
 
   return (
     <>
@@ -49,13 +103,11 @@ export function ControlsPanel() {
           <span className="text-xs tracking-wide text-muted-foreground uppercase">Editing</span>
           <span
             className="grid size-5 place-items-center rounded text-xs font-semibold text-white"
-            style={{ backgroundColor: editing === 'A' ? 'var(--series-a)' : 'var(--series-b)' }}
+            style={{ backgroundColor: seriesColor(editing) }}
           >
             {editing}
           </span>
-          <span className="min-w-0 truncate text-sm">
-            {editing === 'A' ? describeBuilding(building) : describeBuilding(compareBuilding)}
-          </span>
+          <span className="min-w-0 truncate text-sm">{editingName}</span>
         </div>
       ) : null}
 
@@ -91,10 +143,13 @@ export function ControlsPanel() {
         <div className="space-y-6 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
           {compareEnabled ? (
             <CompareSwitcher
+              count={count}
               editing={editing}
               onChange={setEditing}
-              nameA={describeBuilding(building)}
-              nameB={describeBuilding(compareBuilding)}
+              onAdd={addAnother}
+              onRemove={removeAnother}
+              canAdd={count < MAX_BUILDINGS}
+              buildings={[building, ...compareBuildings]}
             />
           ) : (
             <TemplatePicker />
@@ -142,26 +197,42 @@ export function ControlsPanel() {
 /* ------------------------------------------------------------------------- */
 
 /**
- * A / B switch, shown instead of the template picker while comparing.
+ * The A / B / C / D switch, shown instead of the template picker while
+ * comparing.
  *
- * Deliberately plain: two labelled buttons in the series colours that the
- * chart and table also use, so "A" always looks the same everywhere.
+ * Deliberately plain: one labelled button per building, in the series colour
+ * that the chart and the table also use, so a building looks the same
+ * everywhere. The letter is on the button as well as in the colour, which is
+ * what makes it readable for a colour deficiency and on a bad screen.
+ *
+ * Adding is a second click, not a dropdown. The client asked for two buildings
+ * to appear first and for the rest to be a deliberate act — and with four
+ * materials, the default four are the same building in concrete, steel,
+ * composite and wood, which is the comparison worth making before anyone has
+ * touched anything.
  */
 function CompareSwitcher({
+  count,
   editing,
   onChange,
-  nameA,
-  nameB,
+  onAdd,
+  onRemove,
+  canAdd,
+  buildings,
 }: {
-  editing: 'A' | 'B';
-  onChange: (side: 'A' | 'B') => void;
-  nameA: string;
-  nameB: string;
+  count: number;
+  editing: CompareSide;
+  onChange: (side: CompareSide) => void;
+  onAdd: () => void;
+  onRemove: (side: CompareSide) => void;
+  canAdd: boolean;
+  buildings: BuildingConfig[];
 }) {
-  const sides = [
-    { id: 'A' as const, name: nameA, color: 'var(--series-a)' },
-    { id: 'B' as const, name: nameB, color: 'var(--series-b)' },
-  ];
+  const sides = buildings.slice(0, count).map((b, i) => ({
+    id: sideAt(i),
+    name: describeBuilding(b),
+    color: seriesColor(sideAt(i)),
+  }));
 
   return (
     <div>
@@ -174,38 +245,80 @@ function CompareSwitcher({
       <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
         Switch
       </p>
-      <div role="radiogroup" aria-label="Which building to edit" className="flex gap-1">
-        {sides.map((side) => {
+      <div role="radiogroup" aria-label="Which building to edit" className="flex flex-col gap-1">
+        {sides.map((side, i) => {
           const selected = side.id === editing;
+          // A is not removable. Going back to a single building is "stop
+          // comparing", and that button lives once, in the results panel — two
+          // controls with the same label in two panels is not a shortcut, it is
+          // a question the user has to answer before they can carry on.
+          const removable = i > 0;
           return (
-            <button
-              key={side.id}
-              type="button"
-              role="radio"
-              aria-checked={selected}
-              // The coloured A/B badge is decorative, so without this a screen
-              // reader would announce only the building name and give no clue
-              // which side of the comparison is being edited.
-              aria-label={`Building ${side.id}: ${side.name}`}
-              onClick={() => onChange(side.id)}
-              className={`flex flex-1 items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
-                selected ? 'border-line bg-surface-2' : 'border-transparent'
-              }`}
-            >
-              <span
-                className="grid size-5 shrink-0 place-items-center rounded text-xs font-semibold text-white"
-                style={{ backgroundColor: side.color }}
-                aria-hidden="true"
+            <div key={side.id} className="flex items-center gap-1">
+              <button
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                // The coloured badge is decorative, so without this a screen
+                // reader would announce only the building name and give no clue
+                // which building of the comparison is being edited.
+                aria-label={`Building ${side.id}: ${side.name}`}
+                onClick={() => onChange(side.id)}
+                className={`flex flex-1 items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
+                  selected ? 'border-line bg-surface-2' : 'border-transparent'
+                }`}
               >
-                {side.id}
-              </span>
-              <span className="min-w-0">
-                <span className="block text-xs font-medium">{side.name}</span>
-              </span>
-            </button>
+                <span
+                  className="grid size-5 shrink-0 place-items-center rounded text-xs font-semibold text-white"
+                  style={{ backgroundColor: side.color }}
+                  aria-hidden="true"
+                >
+                  {side.id}
+                </span>
+                <span className="min-w-0">
+                  <span className="block text-xs font-medium">{side.name}</span>
+                </span>
+              </button>
+              {/*
+                A per-building remove, not a second "stop comparing".
+
+                At four buildings the useful move is dropping one of them, and a
+                single stop button can only collapse the whole thing back to
+                one — losing three buildings' worth of work to remove the one
+                you are done with.
+              */}
+              {removable ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onRemove(side.id)}
+                  aria-label={`Remove building ${side.id}`}
+                  className="size-8 shrink-0 p-0 text-muted-foreground"
+                >
+                  <X aria-hidden="true" />
+                </Button>
+              ) : null}
+            </div>
           );
         })}
       </div>
+
+      {canAdd ? (
+        <Button variant="outline" size="sm" onClick={onAdd} className="mt-2 w-full">
+          <Plus aria-hidden="true" />
+          Add a building
+        </Button>
+      ) : null}
+      {/*
+        A sentence rather than a tooltip, because the limit is the sort of thing
+        a user finds out by pressing a button that does nothing. Four buildings
+        is the number of materials, so it is a real ceiling and worth saying so.
+      */}
+      {!canAdd ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          Four is the limit: there are four materials to compare.
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { AppShell } from '@/components/layout/AppShell';
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
-import { useCompareStore } from '@/store/compareStore';
+import { defaultCompareBuilding, useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { __testing as tourTesting } from '@/store/tourStore';
 import type { SimulationResult } from '@/types';
@@ -194,8 +194,41 @@ describe('accessibility', () => {
   it('comparison mode has no violations', async () => {
     // Seeded BEFORE rendering. Rendering twice leaves two shells in the
     // document, which axe correctly reports as duplicate landmarks.
-    useCompareStore.setState({ enabled: true });
-    useConfigStore.setState({ result: seedResult(1), resultB: seedResult(1.4) });
+    const { building } = useConfigStore.getState();
+    useConfigStore.getState().setCompareBuildings([defaultCompareBuilding(0, building)]);
+    useCompareStore.setState({ count: 2 });
+    useConfigStore.setState({ result: seedResult(1), results: [seedResult(1.4)] });
+
+    const { container } = render(<AppShell forceDesktopLayout />);
+
+    const results = await audit(container);
+    expect(describeViolations(results)).toBe('');
+    expect(results.violations).toHaveLength(0);
+  });
+
+  it('a FOUR-building comparison has no violations either', async () => {
+    /*
+     * Audited at four, not two.
+     *
+     * Four columns of the same shape are where accessibility actually breaks:
+     * the extra tab stops, the extra radio buttons, and the badge-and-name
+     * pairs in every column header. Auditing only the two-building case would
+     * have passed this file and shipped a broken screen at the size the client
+     * actually asked for.
+     */
+    const { building } = useConfigStore.getState();
+    useConfigStore
+      .getState()
+      .setCompareBuildings([
+        defaultCompareBuilding(0, building),
+        defaultCompareBuilding(1, building),
+        defaultCompareBuilding(2, building),
+      ]);
+    useCompareStore.setState({ count: 4 });
+    useConfigStore.setState({
+      result: seedResult(1),
+      results: [seedResult(1.4), seedResult(0.6), seedResult(2)],
+    });
 
     const { container } = render(<AppShell forceDesktopLayout />);
 

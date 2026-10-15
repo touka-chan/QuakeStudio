@@ -8,7 +8,7 @@ import { describeBuilding } from '@/lib/describeBuilding';
 import { driftBand } from '@/lib/driftScale';
 import { useCssVar, useCssVars } from '@/lib/useCssVar';
 import { sampleDisplacement } from '@/lib/time';
-import { useCompareStore } from '@/store/compareStore';
+import { seriesColor, sideAt, useCompareStore, type CompareSide } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
 import type { BuildingConfig } from '@/types';
@@ -19,40 +19,76 @@ import { ShakeArrow } from './ShakeArrow';
 /* =========================================================================
    Comparison viewport
    -------------------------------------------------------------------------
-   Two presentations of the same pair of buildings:
+   Two presentations of the same set of buildings:
 
-     • SIDE BY SIDE — A and B on one ground slab, separated along X. Easiest to
+     • SIDE BY SIDE — each on one ground slab, separated along X. Easiest to
        read when the buildings are very different.
-     • GHOST OVERLAY — both drawn in the same place, B translucent over A. Best
-       for spotting that two differently-shaped buildings happen to sway almost
-       the same amount, which side-by-side makes hard to see.
+     • GHOST OVERLAY — all drawn in the same place, each translucent over A.
+       Best for spotting that differently-shaped buildings happen to sway
+       almost the same amount, which side-by-side makes hard to see.
+
+   THREE OR FOUR BUILDINGS ARE ALWAYS GHOSTED, AND THE TOGGLE SAYS SO
+   Four buildings side by side need four footprints and three gaps, so at any
+   camera distance that keeps a building legible the frame is several screens
+   wide and each building is a few pixels across. The comparison stops being a
+   comparison and becomes a plan of a street. Rather than ship a view that
+   cannot work at 3 or 4, the view is chosen for the user and the reason is
+   printed on screen.
 
    Both sample displacement from the same playback clock as the single-building
    view, and from each building's own `floorDisp`. There is no second clock.
    ========================================================================= */
 
+/** Above this many buildings, side by side cannot be made to work. */
+const MAX_SIDE_BY_SIDE = 2;
+
+/** One building in the comparison, with everything the scene needs. */
+type Subject = {
+  side: CompareSide;
+  building: BuildingConfig;
+  /** Result for this building, or null while the first solve is in flight. */
+  result: ReturnType<typeof useConfigStore.getState>['result'] | null;
+  resultIndex: number;
+};
+
 export function CompareViewport() {
   const view = useCompareStore((s) => s.view);
   const setView = useCompareStore((s) => s.setView);
+  const count = useCompareStore((s) => s.count);
+
   const buildingA = useConfigStore((s) => s.building);
-  const buildingB = useConfigStore((s) => s.compareBuilding);
+  const compareBuildings = useConfigStore((s) => s.compareBuildings);
+  const results = useConfigStore((s) => s.results);
+  const resultA = useConfigStore((s) => s.result);
 
   const viewportBg = useCssVar('--viewport-bg');
 
+  const subjects: Subject[] = [buildingA, ...compareBuildings.slice(0, count - 1)].map(
+    (building, i) => ({
+      side: sideAt(i),
+      building,
+      result: i === 0 ? resultA : (results[i - 1] ?? null),
+      resultIndex: i,
+    }),
+  );
+
+  const ghostForced = subjects.length > MAX_SIDE_BY_SIDE;
+  const ghost = ghostForced || view === 'ghost';
+
   /* What has to fit in the frame, and from where.
 
-   * Side by side, the camera has to hold both buildings AND the gap between
+   * Side by side, the camera has to hold every building AND the gap between
    * them — keying the fit on A alone cropped the taller building off the top.
-   * In ghost overlay the two occupy the same space, so only one footprint
-   * needs fitting, and the wider of the two counts for both.
+   * In ghost overlay they all occupy the same space, so only one footprint
+   * needs fitting, and the widest of them counts for all.
    */
-  const clearance = Math.max(buildingA.widthM, buildingB.widthM) * 0.35;
-  const ghost = view === 'ghost';
+  const clearance = Math.max(...subjects.map((s) => s.building.widthM)) * 0.35;
+  const widths = subjects.map((s) => s.building.widthM);
   const frameWidth = ghost
-    ? Math.max(buildingA.widthM, buildingB.widthM)
-    : buildingA.widthM + clearance + buildingB.widthM;
-  const frameDepth = Math.max(buildingA.depthM, buildingB.depthM);
-  const frameHeight = Math.max(buildingHeight(buildingA), buildingHeight(buildingB));
+    ? Math.max(...widths)
+    : widths.reduce((sum, w) => sum + w, 0) + clearance * (subjects.length - 1);
+  const frameDepth = Math.max(...subjects.map((s) => s.building.depthM));
+  const frameHeight = Math.max(...subjects.map((s) => buildingHeight(s.building)));
 
   return (
     /*
@@ -84,9 +120,9 @@ export function CompareViewport() {
         // See Viewport.tsx: an aria-label on a roleless element is
         // prohibited, and assistive technology silently drops it.
         role="img"
-        aria-label={`3D comparison of two buildings under the same earthquake.
-          A: ${describeBuilding(buildingA)}. B: ${describeBuilding(buildingB)}.
-          The measured numbers are in the comparison table.`}
+        aria-label={`3D comparison of ${subjects.length} buildings under the same earthquake. ${subjects
+          .map((s) => `${s.side}: ${describeBuilding(s.building)}.`)
+          .join(' ')} The measured numbers are in the comparison table.`}
       >
         <hemisphereLight args={['#ffffff', '#94a3b8', 1.15]} />
         <directionalLight position={[24, 34, 18]} intensity={1.4} />
@@ -118,7 +154,11 @@ export function CompareViewport() {
           margin={1.25}
         />
 
-        {ghost ? <GhostOverlay /> : <SideBySide clearance={clearance} />}
+        {ghost ? (
+          <GhostOverlay subjects={subjects} />
+        ) : (
+          <SideBySide subjects={subjects} clearance={clearance} />
+        )}
 
         <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
 
@@ -128,68 +168,91 @@ export function CompareViewport() {
         <GroundSlab />
       </Canvas>
 
-      <ViewToggle view={view} onChange={setView} />
-      <CompareTags
-        nameA={describeBuilding(buildingA)}
-        nameB={describeBuilding(buildingB)}
-        ghost={ghost}
-      />
+      {ghostForced ? null : <ViewToggle view={view} onChange={setView} />}
+      <CompareTags subjects={subjects} ghost={ghost} />
     </div>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
-function SideBySide({ clearance }: { clearance: number }) {
-  const buildingA = useConfigStore((s) => s.building);
-  const buildingB = useConfigStore((s) => s.compareBuilding);
+function SideBySide({ subjects, clearance }: { subjects: Subject[]; clearance: number }) {
+  /* Place the buildings side by side, adjacent, with the GROUP centred.
 
-  /* Place the two side by side, adjacent, with the PAIR centred.
-   *
-   * Placing them symmetrically about the origin instead — A at −gap/2, B at
-   * +gap/2 — leaves a large empty stretch whenever the two widths differ
-   * much: a 14 m building next to a 40 m one ends up 25 m from anything.
-   * Measuring the actual widths and packing them edge to edge keeps the
-   * framing stable no matter how different the two are.
+   * Placing them symmetrically about the origin instead — first at −gap/2, last
+   * at +gap/2 — leaves a large empty stretch whenever the widths differ much: a
+   * 14 m building next to a 40 m one ends up 25 m from anything. Measuring the
+   * actual widths and packing them edge to edge keeps the framing stable no
+   * matter how different they are.
    */
-  const totalWidth = buildingA.widthM + clearance + buildingB.widthM;
-  const leftEdge = -totalWidth / 2;
+  const totalWidth =
+    subjects.reduce((sum, s) => sum + s.building.widthM, 0) + clearance * (subjects.length - 1);
+
+  // Each building's centre: the leftmost edge of the packed row, plus whatever
+  // has already been laid down, plus half of this building's own width.
+  //
+  // Written as a sum over the ones before it rather than a running cursor,
+  // because a running total is a variable reassigned during render — something
+  // React does not promise to keep stable, and the linter rightly objects to.
+  // With at most four buildings the repeated sum costs nothing, and it says
+  // what it means.
+  const positions = subjects.map((_, i) => {
+    const laidBefore = subjects
+      .slice(0, i)
+      .reduce((sum, s) => sum + s.building.widthM + clearance, 0);
+    return -totalWidth / 2 + laidBefore + subjects[i]!.building.widthM / 2;
+  });
 
   return (
     <group>
-      <SwayingBuilding
-        building={buildingA}
-        resultKey="a"
-        x={leftEdge + buildingA.widthM / 2}
-        tint="a"
-      />
-      <SwayingBuilding
-        building={buildingB}
-        resultKey="b"
-        x={leftEdge + buildingA.widthM + clearance + buildingB.widthM / 2}
-        tint="b"
-      />
+      {subjects.map((s, i) => (
+        <SwayingBuilding key={s.side} subject={s} x={positions[i]!} ghost={false} />
+      ))}
     </group>
   );
 }
 
-function GhostOverlay() {
-  const buildingA = useConfigStore((s) => s.building);
-  const buildingB = useConfigStore((s) => s.compareBuilding);
+/**
+ * Every building in the same place.
+ *
+ * THE SELECTED BUILDING IS THE SOLID ONE.
+ *
+ * It was A that stayed solid and everything else went translucent, which is
+ * fine for one ghost and useless for three: three sheets of 32%-opacity colour
+ * stacked on each other average out to a single mass, and the picture stops
+ * being a comparison of four buildings and becomes one building that is
+ * vaguely red.
+ *
+ * Making the one being edited solid solves both problems at once. There is
+ * always exactly one readable building, the one the user is working on, and the
+ * other three recede into context behind it — which is what "overlay" is for.
+ * Changing the selection changes what is in focus, so the view answers the
+ * question the user is actually asking.
+ */
+function GhostOverlay({ subjects }: { subjects: Subject[] }) {
+  // Subscribed through a hook rather than `getState()`: reading the store
+  // imperatively would render once and never again, so switching buildings
+  // would leave the focus stuck on whichever was selected first.
+  const editing = useCompareStore((s) => s.editing);
+  const focus = subjects.some((s) => s.side === editing) ? editing : subjects[0]!.side;
 
-  // Subscribed, not `getState()`: reading the store imperatively would render
-  // once and never again, so editing a floor would leave the mesh stale.
   return (
     <group>
-      <SwayingBuilding building={buildingA} resultKey="a" x={0} tint="a" />
-      <SwayingBuilding building={buildingB} resultKey="b" x={0} tint="b" ghost />
+      {subjects.map((s, i) => (
+        <SwayingBuilding
+          key={s.side}
+          subject={s}
+          x={0}
+          ghost={s.side !== focus}
+          // Layer order, so a later building is never hidden by an earlier one.
+          order={i}
+        />
+      ))}
     </group>
   );
 }
 
 /* ------------------------------------------------------------------------- */
-
-type ResultKey = 'a' | 'b';
 
 /**
  * One building, swaying.
@@ -198,19 +261,17 @@ type ResultKey = 'a' | 'b';
  * building behind stays readable through it.
  */
 function SwayingBuilding({
-  building,
-  resultKey,
+  subject,
   x,
-  tint,
   ghost = false,
+  order = 0,
 }: {
-  building: BuildingConfig;
-  resultKey: ResultKey;
+  subject: Subject;
   x: number;
-  tint: ResultKey;
   ghost?: boolean;
+  order?: number;
 }) {
-  const result = useConfigStore((s) => (resultKey === 'a' ? s.result : s.resultB));
+  const { building, result, side } = subject;
 
   /*
    * Floors are coloured by story drift, on the SAME scale the bar chart uses.
@@ -219,13 +280,13 @@ function SwayingBuilding({
    * identity outranks the drift scale in a comparison. That was the wrong
    * trade: it left the 3D view speaking a different visual language from the
    * chart beside it, and it made colour useless for the one job comparison
-   * exists for. With both buildings on one shared scale, colour IS the
+   * exists for. With every building on one shared scale, colour IS the
    * comparison — two floors the same colour have the same drift, and you can
    * see which building is worse without reading a single number.
    *
-   * A/B identity moves to a label above each building instead of its hue,
-   * because position already distinguishes them in Side by side and
-   * translucency does it in Ghost overlay.
+   * Identity moves to a label above each building instead of its hue, because
+   * position already distinguishes them in Side by side and translucency does
+   * it in Ghost overlay.
    */
   const palette = useCssVars(['--drift-1', '--drift-2', '--drift-3', '--drift-4', '--drift-5']);
 
@@ -242,12 +303,16 @@ function SwayingBuilding({
     [floors, result, palette],
   );
 
-  // Identity colour, used for the A/B tag above the building rather than for
-  // the floors themselves. Both hooks are called unconditionally — selecting
-  // one with a ternary would call a hook conditionally.
-  const colorA = useCssVar('--series-a');
-  const colorB = useCssVar('--series-b');
-  const identityColor = tint === 'a' ? colorA : colorB;
+  // Identity colour, for the outline and the tag rather than the floor faces.
+  const identityColor = useCssVar(
+    side === 'A'
+      ? '--series-a'
+      : side === 'B'
+        ? '--series-b'
+        : side === 'C'
+          ? '--series-c'
+          : '--series-d',
+  );
   const slabHeight = floorHeightM * 0.86;
 
   const geometry = useMemo(() => {
@@ -282,7 +347,7 @@ function SwayingBuilding({
               floorRefs.current[index] = node;
             }}
           >
-            <mesh geometry={geometry.box} renderOrder={ghost ? 2 : 0}>
+            <mesh geometry={geometry.box} renderOrder={ghost ? 2 + order : 0}>
               <meshLambertMaterial
                 color={floorColors[index]}
                 transparent={ghost}
@@ -294,24 +359,22 @@ function SwayingBuilding({
               <lineBasicMaterial
                 color={identityColor}
                 transparent
-                opacity={ghost ? 0.9 : 0.55}
+                opacity={ghost ? 0.95 : 0.55}
                 depthTest={!ghost}
               />
             </lineSegments>
           </group>
         );
       })}
-      {/* The A/B tags are a DOM overlay instead of drei <Html> - see CompareTags. */}
+      {/* The identity tags are a DOM overlay instead of drei <Html> - see CompareTags. */}
     </group>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
-/* ------------------------------------------------------------------------- */
-
 /**
- * The A/B tags, which is where identity lives now that both buildings are
+ * The identity tags, which is where identity lives now that every building is
  * coloured by drift.
  *
  * These were first drawn inside the 3D scene with drei's `<Html>`, anchored
@@ -325,21 +388,27 @@ function SwayingBuilding({
  * camera. In exchange they are always on screen, always legible, and readable
  * by a screen reader — which an in-scene HTML label is not.
  *
- * Side by side puts A left and B right, matching where the buildings stand.
- * Ghost overlay puts them together, because there the two occupy the same
- * space and claiming otherwise would be a lie.
+ * Side by side puts them left to right, matching where the buildings stand.
+ * Ghost overlay stacks them down the left, because there they all occupy the
+ * same space and claiming otherwise would be a lie.
  */
-function CompareTags({ nameA, nameB, ghost }: { nameA: string; nameB: string; ghost: boolean }) {
-  const colorA = useCssVar('--series-a');
-  const colorB = useCssVar('--series-b');
-
+function CompareTags({ subjects, ghost }: { subjects: Subject[]; ghost: boolean }) {
   return (
     <div
-      className="pointer-events-none absolute inset-x-3 top-12 flex items-start justify-between gap-2"
+      className={`pointer-events-none absolute inset-x-3 top-12 flex gap-2 ${
+        ghost ? 'flex-col items-start' : 'items-start justify-between'
+      }`}
       aria-hidden="true"
     >
-      <IdentityTag letter="A" name={nameA} color={colorA} />
-      <IdentityTag letter="B" name={nameB} color={colorB} align={ghost ? 'left' : 'right'} />
+      {subjects.map((s, i) => (
+        <IdentityTag
+          key={s.side}
+          letter={s.side}
+          name={describeBuilding(s.building)}
+          color={seriesColor(s.side)}
+          align={ghost ? 'left' : i === 0 ? 'left' : 'right'}
+        />
+      ))}
     </div>
   );
 }
@@ -369,7 +438,7 @@ function IdentityTag({
       </span>
       {/*
         The name appears only when the viewport column is wide enough for it.
-        The letter is the part that is load-bearing - it is what tells the two
+        The letter is the part that is load-bearing - it is what tells the
         buildings apart - so it is never the thing that gets dropped.
       */}
       <span className="hidden truncate text-[11px] text-muted-foreground @xl:inline">{name}</span>

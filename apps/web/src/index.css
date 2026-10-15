@@ -1,3 +1,43 @@
+/* =========================================================================
+   Horizontal scrolling, where it is a real feature rather than a symptom.
+   -------------------------------------------------------------------------
+   The results panel holds the comparison table: one column per building, plus
+   a measure column and a change column. Six columns of figures do not fit a
+   320px column at a size anyone can read, and shrinking the type until they
+   do is how a table stops being a table.
+
+   `!important` is not laziness here. Radix sets the viewport's overflow
+   INLINE, which outranks every class rule — an `overflow-x-auto` utility on
+   the viewport is silently ignored and the content is clipped instead of
+   scrollable. To make this work the inline style has to be beaten outright.
+
+   Opt-in per ScrollArea, not global: a panel that scrolls sideways is a panel
+   where something overflowed, and for every other panel that is a bug worth
+   seeing rather than a feature worth enabling.
+   ========================================================================= */
+.qs-scroll-x [data-slot='scroll-area-viewport'] {
+  overflow-x: auto !important;
+}
+
+/*
+ * The wrapper Radix puts inside the viewport is `display: table`, which
+ * shrink-to-fits to its widest content.
+ *
+ * That is a trick for keeping a vertical scrollbar from clipping the last
+ * line, and it is actively harmful here: a `display: table` box sizes to
+ * MAX-CONTENT, so the comparison table inside it pushed the whole panel 10px
+ * wider than the viewport no matter how much `overflow-x: auto` the
+ * scroll wrapper had. The wrapper was the scroll container on paper and the
+ * thing defeating it in practice.
+ *
+ * `display: block` with an explicit width fills the viewport instead, and the
+ * inner `overflow-x-auto` then does what it says: scrolls.
+ */
+.qs-scroll-x [data-slot='scroll-area-viewport'] > div {
+  display: block !important;
+  min-width: 0 !important;
+  width: 100% !important;
+}
 @import 'tailwindcss';
 @import './styles/tokens.css';
 

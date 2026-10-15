@@ -5,8 +5,23 @@ import { ScrollArea as ScrollAreaPrimitive } from 'radix-ui';
 function ScrollArea({
   className,
   children,
+  allowHorizontalScroll = false,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  /**
+   * Let the contents scroll sideways as well as down.
+   *
+   * Off by default, because the viewport clips by default and a panel that
+   * scrolls sideways is a panel where something has overflowed — usually a
+   * layout mistake nobody can see, because the content is simply gone.
+   *
+   * Opted into for one place: the results panel, whose comparison table is a
+   * genuine horizontal scroll rather than an accident. Six columns of figures
+   * will not fit a 320px column at a readable size, and shrinking the type to
+   * force them in is the version where the numbers stop being legible.
+   */
+  allowHorizontalScroll?: boolean;
+}) {
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
@@ -15,7 +30,10 @@ function ScrollArea({
     >
       <ScrollAreaPrimitive.Viewport
         data-slot="scroll-area-viewport"
-        className="size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1"
+        className={cn(
+          'size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-1',
+          allowHorizontalScroll && 'overflow-x-auto',
+        )}
       >
         {children}
       </ScrollAreaPrimitive.Viewport>

@@ -188,26 +188,44 @@ labelled as such rather than hidden, so the boundary of the model is explicit.
 `Compare with another building` adds a second configuration and runs **both**
 under the identical earthquake. That last part is the whole point of the
 feature, so the results table states the shared PGA and duration in a caption
-and the 3D view colours each side in a fixed hue — blue for A, amber for B, in
-both light and dark themes, because in a comparison the colour *is* the identity
-of a series.
+and the 3D view colours each side in a fixed hue - blue for A, burnt orange for
+B, green for C, purple for D, in both light and dark themes, because in a
+comparison the colour *is* the identity of a series. Every chart series and
+every table column also carries the building's **letter**, so the colour is never
+the only thing telling them apart.
+
+**Two, three or four buildings.** `Compare with another building` gives you B;
+`Add a building` takes that to C and then D. The four default to four different
+materials - concrete, steel, composite, wood - so the default four-way
+comparison is the same building built four ways, which is the exercise worth
+doing before anyone touches a slider. Each one after A can be removed on its own;
+going all the way back to one is `Stop comparing`.
 
 Two presentations, switched at the top of the viewport:
 
-- **Side by side** — easiest to read when the buildings are very different.
-- **Ghost overlay** — B translucent over A; best for spotting that two
-  differently-shaped buildings happen to sway almost the same amount.
+- **Side by side** - easiest to read when the buildings are very different.
+- **Ghost overlay** - all in the same place, the one being edited solid and the
+  rest translucent over it; best for spotting that differently-shaped buildings
+  happen to sway almost the same amount.
 
-The change column gives the difference as a percentage of A, with an arrow as
-well as a sign so the direction does not depend on colour. **Nothing in the
-comparison says which building is better** — that is a verdict this tool is not
-entitled to.
+With **three or four** buildings the view is always Ghost overlay and the switch
+is hidden. Four footprints side by side need several screens of width before
+each building is more than a few pixels across, and a plan of a street is not a
+comparison.
 
-Both sides are solved in a **single** worker request. Two separate requests
+The change column gives each building's difference from A as a percentage, with
+an arrow as well as a sign so the direction does not depend on colour. **Nothing
+in the comparison says which building is better** - that is a verdict this tool
+is not entitled to. The baseline is always A and never moves: a change that
+depended on what else happened to be selected would be a different statement
+about the same number every time you looked at it.
+
+All of them are solved in a **single** worker request. Two separate requests
 would race and leave one side showing numbers from different inputs.
 
-A persistent **"Editing A / Editing B"** indicator sits outside the scrolling
-controls panel, so it stays visible however far you scroll down.
+A persistent **"Editing A / B / C / D"** indicator sits outside the scrolling
+controls panel, so it stays visible however far you scroll down. The metric cards
+follow it, and say which building they belong to.
 
 ### Saving and sharing runs
 

@@ -6,6 +6,7 @@ import {
   type MaterialId,
 } from '@/config/engineeringAssumptions';
 import { useConfigStore } from '@/store/configStore';
+import { sideIndex, type CompareSide } from '@/store/compareStore';
 
 /* =========================================================================
    Building controls — Step 1
@@ -30,17 +31,21 @@ const FRAME_HELP: Record<FrameTypeId, string> = {
  *
  * In single mode `side` is always 'A' and the controls write to building A.
  * In comparison mode the controls write to whichever side the user is editing,
- * so the same sliders drive both buildings without duplicating the UI.
+ * so the same sliders drive every building without duplicating the UI.
+ *
+ * The side's own index is what indexes the store, so B, C and D are the same
+ * code path rather than three near-copies of it.
  */
-export function BuildingControls({ side = 'A' }: { side?: 'A' | 'B' }) {
+export function BuildingControls({ side = 'A' }: { side?: CompareSide }) {
+  const index = sideIndex(side);
   const building = useConfigStore((s) =>
-    side === 'B' ? s.displayCompareBuilding : s.displayBuilding,
+    index === 0 ? s.displayBuilding : (s.displayCompareBuildings[index - 1] ?? s.displayBuilding),
   );
   const setBuilding = useConfigStore((s) => s.setBuilding);
   const setCompareBuilding = useConfigStore((s) => s.setCompareBuilding);
 
   const apply = (patch: Partial<typeof building>) =>
-    side === 'B' ? setCompareBuilding(patch) : setBuilding(patch);
+    index === 0 ? setBuilding(patch) : setCompareBuilding(index - 1, patch);
 
   const heightM = building.floors * building.floorHeightM;
 
