@@ -204,19 +204,27 @@ going all the way back to one is `Stop comparing`.
 Two presentations, switched at the bottom of the viewport, and **both are
 available at every count**:
 
-- **Side by side** - packed edge to edge, two per row once there are more than
-  two. Easiest to read when the buildings are very different. Rows are set
-  further apart than columns are, because from any camera looking down at an
-  angle the front row hides the bottom of the row behind it.
+- **Side by side** - one horizontal line, packed edge to edge, at every count.
+  Easiest to read when the buildings are very different. The cost is real and
+  measured: four buildings in a line means each one gets less of the frame, so
+  at 1024px each is around 60px wide. What carries the reading at that size is
+  the roof badge, the hover callout and the exact figures in the table.
 - **Ghost overlay** - all in the same place, the one being edited solid and the
   rest translucent over it; best for spotting that differently-shaped buildings
   happen to sway almost the same amount.
 
 **Every building wears a badge over its roof** saying which of A, B, C or D it
 is. The badge is positioned by projecting the roof through the camera on every
-frame, so it sits on the building and follows when you orbit - which is also
-what keeps each building tellable apart when one stands in front of another. In
-Ghost overlay the roofs coincide, so the badges stack instead.
+frame, and the anchor carries that floor's own displacement - so the badge
+rides the roof as the building sways instead of standing where it used to be.
+It follows an orbit too, and in Ghost overlay, where the roofs coincide, the
+badges stack instead.
+
+**Hover any floor for the numbers**, exactly as the single-building view has
+always done: which building, which floor, its peak displacement and its story
+drift. The building's letter is in the readout, because with four in a line
+"Floor 5" on its own belongs to nobody. Clicking a slab pins that floor, and
+the pin is shared with the charts.
 
 The change column gives each building's difference from A as a percentage, with
 an arrow as well as a sign so the direction does not depend on colour. **Nothing

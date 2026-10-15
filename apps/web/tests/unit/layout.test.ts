@@ -9,6 +9,13 @@ import { layoutSideBySide } from '@/lib/layout';
    does not put a building in the wrong place — it crops it, or puts the
    camera so far out that the buildings are specks. Neither shows up in a
    screenshot of one floor count.
+
+   One horizontal line at every count, which is what the client asked for. The
+   two-row version that came before is gone, and the tests for it with it:
+   "wraps to two per row", "centres a short final row" and "gives each column
+   the widest building that shares it" described behaviour that no longer
+   exists, and a test for behaviour that does not exist is a test that cannot
+   fail.
    ========================================================================= */
 
 const sq = (size: number) => ({ width: size, depth: size });
@@ -19,81 +26,64 @@ describe('layoutSideBySide', () => {
     expect(layout.spots).toEqual([]);
     expect(layout.width).toBe(0);
     expect(layout.depth).toBe(0);
-    // Division by `perRow` would be the first thing to blow up on an empty set.
-    expect(layout.perRow).toBe(0);
   });
 
   it('puts a single building on the origin', () => {
     const layout = layoutSideBySide([sq(10)], 5);
-    expect(layout.perRow).toBe(1);
     expect(layout.width).toBe(10);
-    // Depth of a single row is just its own depth — no gap is added for a row
-    // that does not exist, which would frame the scene loosely for no reason.
+    // The depth of one building is its own depth — no gap is added for a row
+    // that does not exist, which framed the scene loosely for no reason.
     expect(layout.depth).toBe(10);
     expect(layout.spots).toEqual([[0, 0]]);
   });
 
-  it('lays two buildings out in one row, left to right', () => {
-    const layout = layoutSideBySide([sq(10), sq(10)], 4);
-
-    expect(layout.perRow).toBe(2);
-    expect(layout.width).toBe(24); // 10 + 4 + 10
-    expect(layout.depth).toBe(10);
-
-    const [a, b] = layout.spots as Array<[number, number]>;
-    // Centred as a pair, and in the order they were given.
-    expect(a[0]).toBeCloseTo(-7);
-    expect(b[0]).toBeCloseTo(7);
-    // Same row, so same depth.
-    expect(a[1]).toBeCloseTo(b[1]);
+  it('lays every count out in ONE line, never wrapping', () => {
+    for (const n of [1, 2, 3, 4]) {
+      const layout = layoutSideBySide(
+        Array.from({ length: n }, () => sq(10)),
+        4,
+      );
+      // The whole point of the change. Every building at z = 0, so they are
+      // side by side rather than in rows.
+      expect(
+        layout.spots.map(([, z]) => z),
+        `${n} buildings wrapped onto a second row`,
+      ).toEqual(Array(n).fill(0));
+      expect(layout.width, `${n} buildings did not fit in one line`).toBe(n * 10 + (n - 1) * 4);
+      expect(layout.depth, `${n} buildings made the frame deeper than one building`).toBe(10);
+    }
   });
 
-  it('wraps to two per row above two buildings', () => {
-    expect(layoutSideBySide([sq(10), sq(10), sq(10)], 4).perRow).toBe(2);
-    expect(layoutSideBySide([sq(10), sq(10), sq(10), sq(10)], 4).perRow).toBe(2);
-  });
-
-  it('puts four buildings in two rows of two, front row nearest the camera', () => {
+  it('keeps them left to right, in the order given', () => {
     const layout = layoutSideBySide([sq(10), sq(10), sq(10), sq(10)], 4);
-
-    // Two columns wide, two rows deep: 24 across, 24 front to back.
-    expect(layout.width).toBe(24);
-    expect(layout.depth).toBe(24);
-
-    const spots = layout.spots as Array<[number, number]>;
-    // Front row is the first two, and nearer the camera means a LARGER z,
-    // because the camera sits at +Z.
-    expect(spots[0]![1]).toBeGreaterThan(spots[2]![1]);
-    expect(spots[1]![1]).toBeCloseTo(spots[0]![1]);
-    expect(spots[2]![1]).toBeCloseTo(spots[3]![1]);
-
-    // Left column is left of the right column, in both rows.
-    expect(spots[0]![0]).toBeLessThan(spots[1]![0]);
-    expect(spots[2]![0]).toBeLessThan(spots[3]![0]);
-    // And the second row lines up with the first.
-    expect(spots[2]![0]).toBeCloseTo(spots[0]![0]);
-    expect(spots[3]![0]).toBeCloseTo(spots[1]![0]);
+    const xs = layout.spots.map(([x]) => x);
+    for (let i = 1; i < xs.length; i += 1) {
+      expect(xs[i]!, `building ${i} is not right of building ${i - 1}`).toBeGreaterThan(xs[i - 1]!);
+    }
   });
 
-  it('centres a short final row rather than leaving it hanging', () => {
-    const layout = layoutSideBySide([sq(10), sq(10), sq(10)], 4);
-    const spots = layout.spots as Array<[number, number]>;
-
-    // Three buildings: a pair on the front row, one alone behind. That one has
-    // to sit under the middle of the pair, not off to one side, or the scene
-    // looks lopsided and the camera frames empty ground to make room for it.
-    expect(spots[2]![0]).toBeCloseTo(0);
-    expect(spots[0]![0]).toBeLessThan(0);
-    expect(spots[1]![0]).toBeGreaterThan(0);
-    // The bounding box is still as wide as two columns — the last row is
-    // centred inside it, not measured by it.
-    expect(layout.width).toBe(24);
+  it('centres the whole line on the origin', () => {
+    const layout = layoutSideBySide([sq(10), sq(10)], 4);
+    // A, B, A. Keying the frame on the first building instead pushes the last
+    // one off the right edge, which is the bug the shared function exists to
+    // make impossible.
+    expect(layout.spots[0]![0]).toBeCloseTo(-7);
+    expect(layout.spots[1]![0]).toBeCloseTo(7);
   });
 
-  it('packs columns to their own widest building, not to the widest anywhere', () => {
-    // A 14 m building next to a 40 m one. Sizing both columns by the 40 m
-    // leaves the 14 m one floating 13 m from anything, which is the empty
-    // stretch this was written to avoid.
+  it('leaves exactly `clearance` between neighbouring buildings', () => {
+    for (const gap of [1, 4, 12.5]) {
+      const layout = layoutSideBySide([sq(10), sq(10), sq(10)], gap);
+      const xs = layout.spots.map(([x]) => x);
+      const gapSeen = xs[1]! - xs[0]! - 10;
+      expect(gapSeen, `gap wrong with clearance ${gap}`).toBeCloseTo(gap);
+    }
+  });
+
+  it('packs each building by its OWN width, not by the widest anywhere', () => {
+    // A 14 m building next to a 40 m one. Sizing both slots by the 40 m one
+    // leaves the 14 m floating 13 m from anything, which is the empty stretch
+    // this was written to avoid.
     const layout = layoutSideBySide(
       [
         { width: 14, depth: 10 },
@@ -103,26 +93,15 @@ describe('layoutSideBySide', () => {
     );
 
     expect(layout.width).toBe(14 + 4 + 40);
-    const [small, large] = layout.spots as Array<[number, number]>;
+    const [small, large] = layout.spots;
     // The small one's right edge meets the gap, and the large one's left edge
     // is exactly `clearance` away.
-    expect(small[0] + 7).toBeCloseTo(large[0] - 20 - 4);
+    expect(small![0] + 7).toBeCloseTo(large![0] - 20 - 4);
   });
 
-  it('gives each column the widest building that shares it', () => {
-    // Column 0 holds buildings A and C; C is the wider of the two, so column 0
-    // has to be wide enough for C.
-    const layout = layoutSideBySide(
-      [
-        { width: 10, depth: 10 },
-        { width: 12, depth: 10 },
-        { width: 30, depth: 10 },
-        { width: 12, depth: 10 },
-      ],
-      4,
-    );
-    // Column 0 = 30 (from C), column 1 = 12.
-    expect(layout.width).toBe(30 + 4 + 12);
+  it('takes the depth from the deepest building', () => {
+    const layout = layoutSideBySide([sq(10), { width: 10, depth: 22 }, sq(10)], 4);
+    expect(layout.depth).toBe(22);
   });
 
   it('keeps every building inside the box it reports', () => {
@@ -177,11 +156,6 @@ describe('layoutSideBySide', () => {
      * positive clearance means the packing arithmetic is wrong, and two
      * buildings drawn through each other is the single most obvious possible
      * symptom of a side-by-side view.
-     *
-     * The first version of this got the gap wrong by one side: it compared
-     * centre-to-centre against the SUM of the half-widths instead of the sum
-     * of the full widths, which passes for equal-sized buildings and fails the
-     * moment one of them is wider than the other.
      */
     const sizes = [
       { width: 10, depth: 10 },
@@ -190,12 +164,11 @@ describe('layoutSideBySide', () => {
       { width: 22, depth: 12 },
     ];
     const layout = layoutSideBySide(sizes, 5);
-    const spots = layout.spots as Array<[number, number]>;
 
-    for (let i = 0; i < spots.length; i += 1) {
-      for (let j = i + 1; j < spots.length; j += 1) {
-        const [xi, zi] = spots[i]!;
-        const [xj, zj] = spots[j]!;
+    for (let i = 0; i < layout.spots.length; i += 1) {
+      for (let j = i + 1; j < layout.spots.length; j += 1) {
+        const [xi, zi] = layout.spots[i]!;
+        const [xj, zj] = layout.spots[j]!;
         // Two boxes are apart on an axis when their centres are at least half
         // of each one's extent on that axis.
         const apart =

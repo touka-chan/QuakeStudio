@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 import { buildingHeight } from '@/lib/camera';
@@ -40,23 +40,18 @@ import { ShakeArrow } from './ShakeArrow';
    ========================================================================= */
 
 /**
- * Near head-on, for buildings in a single row.
+ * The camera sits nearly head-on.
  *
- * The X separation then reads as left/right, and both buildings sit at the same
+ * The X separation then reads as left/right, and every building sits at the same
  * distance from the lens, so the shorter one is not made to look shorter than it
  * is. A three-quarter camera did both of those things badly.
- */
-const ROW_DIRECTION: [number, number, number] = [0.2, 0.38, 0.9];
-
-/**
- * Lifted, for a second row.
  *
- * Head-on, the front row hides the back row — at four buildings that is half
- * the comparison gone. About 42 degrees of pitch looks down the rows enough to
- * see both, at the cost of the back row being further from the lens and so
- * looking smaller. Perspective does that; the table carries the exact figures.
+ * There was a second, lifted angle for when the buildings wrapped onto a second
+ * row. They do not any more — the client asked for one horizontal line — and a
+ * lifted camera would put the buildings at different distances from the lens,
+ * reintroducing exactly the size difference the head-on angle exists to avoid.
  */
-const GRID_DIRECTION: [number, number, number] = [0.18, 0.95, 1.05];
+const CAMERA_DIRECTION: [number, number, number] = [0.2, 0.38, 0.9];
 
 /** How far above a roof its badge floats, in metres. */
 const BADGE_LIFT_M = 3.5;
@@ -90,6 +85,16 @@ export function CompareViewport() {
 
   const viewportBg = useCssVar('--viewport-bg');
 
+  /** Same colour the single-building callout uses, so the two look identical. */
+  const hoverLabel = useCssVar('--text');
+
+  /*
+   * The floor the user has pinned by clicking a slab or a bar, shared with the
+   * chart so a pinned floor is pinned everywhere at once.
+   */
+  const activeFloor = useConfigStore((s) => s.activeFloor);
+  const setActiveFloor = useConfigStore((s) => s.setActiveFloor);
+
   const subjects: Subject[] = [buildingA, ...compareBuildings.slice(0, count - 1)].map(
     (building, i) => ({
       side: sideAt(i),
@@ -109,17 +114,6 @@ export function CompareViewport() {
   const clearance = Math.max(0, ...widths) * 0.35;
 
   /*
-   * Rows are further apart than columns are, because of the camera rather than
-   * the buildings. Side by side reads as side by side even when one is partly
-   * in front of the other; one-behind-another only reads if the back building's
-   * roof is clear of the front one's, and at the same gap it was not — about a
-   * third of the back row disappeared behind the front row.
-   *
-   * Screenshot at 1440 and 1024, both four buildings. See lib/layout.ts.
-   */
-  const rowClearance = clearance * 1.8;
-
-  /*
    * WHAT HAS TO FIT IN THE FRAME, AND FROM WHERE.
    *
    * Side by side, the camera has to hold every building AND the gaps between
@@ -135,67 +129,70 @@ export function CompareViewport() {
   const layout = layoutSideBySide(
     subjects.map((s) => ({ width: s.building.widthM, depth: s.building.depthM })),
     clearance,
-    rowClearance,
   );
 
   const frameWidth = ghost ? Math.max(...widths) : layout.width;
   const frameDepth = ghost ? Math.max(...depths) : layout.depth;
   const frameHeight = Math.max(...heights);
 
-  /*
-   * TWO CAMERA ANGLES, AND THE REASON IS NOT AESTHETIC.
-   *
-   * With two buildings in one row the camera sits nearly head-on, so the
-   * horizontal separation reads as left/right and both buildings are the same
-   * distance from the lens. That was a deliberate choice: a three-quarter
-   * camera put the far building in front of the near one — exactly the
-   * comparison this view exists to make easy — and made the shorter building
-   * look smaller than it was.
-   *
-   * That reasoning does not survive a second row. Head-on, the front row
-   * simply hides the back row, which for four buildings is half of them gone.
-   * So above two the camera lifts to about 42 degrees, which looks down the
-   * rows enough to see both.
-   *
-   * The cost is real and worth naming: buildings in the back row are further
-   * from the lens and so appear smaller. Perspective does that. The table and
-   * the charts carry the exact figures, and the 3D is for shape and sway.
-   */
-  const direction = ghost || layout.perRow < 2 ? ROW_DIRECTION : GRID_DIRECTION;
-
-  /*
-   * WHERE EACH BADGE SITS.
-   *
-   * Side by side, a badge floats over its own building's roof — which is the
-   * most visible part of it even when a nearer building is in the way.
-   *
-   * In ghost overlay every building occupies the same spot, so four badges would
-   * land on one pixel. They are stacked, in side order, so all four are readable
-   * and the reading order matches the switcher.
-   *
-   * THE STACK IS IN SCREEN SPACE, NOT WORLD SPACE.
-   *
-   * The first version raised each one by three metres, which is the obvious
-   * way and is wrong: the camera frames the tallest roof and nothing above it,
-   * so the stack climbed straight out of the top of the viewport and only the
-   * bottom sliver of one badge was left. A world-space offset cannot know where
-   * the edge of the frame is. A pixel offset is measured from an anchor that is
-   * already known to be on screen, so the stack always grows into the picture.
-   */
-  const badgePoints = subjects.map((s, i) => {
-    const spot = ghost ? [0, 0] : (layout.spots[i] ?? [0, 0]);
-    return {
-      x: spot[0],
-      y: buildingHeight(s.building) + BADGE_LIFT_M,
-      z: spot[1],
-      /** Pixels to push the badge down the screen, for the ghost stack. */
-      offsetPx: ghost ? i * BADGE_STACK_PX : 0,
-    };
-  });
+  const direction = CAMERA_DIRECTION;
 
   // The badge nodes live OUTSIDE the canvas but are positioned from INSIDE it,
   // where the camera is. They meet through this ref.
   const badgeNodes = useRef<(HTMLSpanElement | null)[]>([]);
+
+  /*
+   * THE HOVER CALLOUT, AND WHY IT IS NOT drei's <Html>
+   *
+   * The single-building view has always had one: hover a floor and it reads
+   * back the peak and the story drift for that floor. The comparison view had
+   * none, which is a strange gap once there are four buildings and the numbers
+   * on the chart belong to whichever floor was last clicked.
+   *
+   * Deliberately NOT <Html>, which is what the single-building callout uses and
+   * which works there. Two reasons:
+   *
+   *   - One callout, not four. <Html> mounts inside the mesh it belongs to, so
+   *     four buildings would each carry their own and hovering two at once would
+   *     put two overlapping readouts on screen. Hover state lives here, above
+   *     all of them, so there is only ever one.
+   *   - One mechanism on the screen. The badges already project from the camera
+   *     every frame; a second, different way of placing a label in the same
+   *     viewport is a second thing to understand and a second thing to break.
+   */
+  const [hovered, setHovered] = useState<Hovered>(null);
+  const calloutNode = useRef<HTMLDivElement>(null);
+
+  // Clearing on leave is not enough — orbiting the camera moves the floors out
+  // from under a stationary pointer, so the floor under it is no longer the one
+  // that was hovered.
+  useEffect(() => () => setHovered(null), [view]);
+
+  const hoveredSubject = hovered ? subjects.find((s) => s.side === hovered.side) : undefined;
+
+  /*
+   * The numbers in the callout, pulled from the hovered building's OWN result.
+   *
+   * The building's letter is in the heading, and it has to be: with four
+   * buildings in one line, "Floor 6" on its own is a number attached to nothing.
+   * The same rule as everywhere else in the comparison — the colour is never the
+   * only thing telling two of them apart.
+   */
+  const hoveredData =
+    hovered && hoveredSubject?.result
+      ? {
+          peakMm: (hoveredSubject.result.peakDisp[hovered.floor - 1] ?? 0) * 1000,
+          driftPct: (hoveredSubject.result.driftRatio[hovered.floor - 1] ?? 0) * 100,
+        }
+      : null;
+
+  /** Widen the cursor over a floor, the way the single view does. */
+  const hoverHandlers = (side: CompareSide, floor: number) => ({
+    onPointerOver: () => {
+      setHovered({ side, floor });
+    },
+    onPointerOut: () => setHovered(null),
+  });
 
   return (
     /*
@@ -259,14 +256,32 @@ export function CompareViewport() {
         />
 
         {ghost ? (
-          <GhostOverlay subjects={subjects} />
+          <GhostOverlay
+            subjects={subjects}
+            hoverHandlers={hoverHandlers}
+            setActiveFloor={setActiveFloor}
+            activeFloor={activeFloor}
+          />
         ) : (
-          <SideBySide subjects={subjects} layout={layout} />
+          <SideBySide
+            subjects={subjects}
+            layout={layout}
+            hoverHandlers={hoverHandlers}
+            setActiveFloor={setActiveFloor}
+            activeFloor={activeFloor}
+          />
         )}
 
         {/* Projects the badge anchors onto the screen every frame. Renders
               nothing itself; it writes to the DOM nodes held by `badgeNodes`. */}
-        <RoofBadges points={badgePoints} nodes={badgeNodes} />
+        <RoofBadges
+          subjects={subjects}
+          layout={layout}
+          ghost={ghost}
+          hovered={hovered}
+          nodes={badgeNodes}
+          callout={calloutNode}
+        />
 
         <ShakeArrow widthM={frameWidth} depthM={frameDepth} />
 
@@ -278,6 +293,12 @@ export function CompareViewport() {
 
       <ViewToggle view={view} onChange={setView} />
       <RoofBadgeLayer subjects={subjects} nodes={badgeNodes} />
+      <FloorCalloutLayer
+        node={calloutNode}
+        hovered={hovered}
+        data={hoveredData}
+        color={hoverLabel}
+      />
     </div>
   );
 }
@@ -286,6 +307,25 @@ export function CompareViewport() {
 
 /** Reused between frames so the projector allocates nothing per frame. */
 const projected = new THREE.Vector3();
+
+/** Where the hovered floor's callout is anchored, in metres. Reused per frame. */
+const calloutAnchor = new THREE.Vector3();
+
+/** A floor the pointer is over. `null` when nothing is hovered. */
+type Hovered = { side: CompareSide; floor: number } | null;
+
+/**
+ * Per-floor pointer handlers, built once per floor and shared by every
+ * building — so hovering any floor anywhere in the scene updates the single
+ * callout rather than mounting one per mesh.
+ */
+type HoverHandlers = (
+  side: CompareSide,
+  floor: number,
+) => {
+  onPointerOver: () => void;
+  onPointerOut: () => void;
+};
 
 /**
  * Moves one badge to a screen position.
@@ -304,11 +344,35 @@ function placeBadge(
   behind: boolean,
 ): void {
   if (!node) return;
-  // `translate(-50%, -100%)` sits the badge just above the anchor rather than
-  // centred on it, so the roof it belongs to stays visible underneath instead
-  // of being covered by the thing naming it.
-  node.style.transform = `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0) translate(-50%, -100%)`;
-  node.style.visibility = behind ? 'hidden' : 'visible';
+  // Behind the camera, the projection inverts and the number means nothing, so
+  // the badge is moved out of sight rather than placed somewhere absurd.
+  if (behind) {
+    hideOverlay(node);
+    return;
+  }
+  placeOverlay(
+    node,
+    `translate3d(${Math.round(x)}px, ${Math.round(y)}px, 0) translate(-50%, -100%)`,
+  );
+}
+
+/**
+ * Writes a position and a visibility onto a projected overlay.
+ *
+ * Same function boundary as `placeBadge`, and for the same reason: a DOM node's
+ * inline style is not component state, and saying so in one place is better than
+ * saying it twice.
+ */
+function placeOverlay(node: HTMLElement | null | undefined, transform: string): void {
+  if (!node) return;
+  node.style.transform = transform;
+  node.style.opacity = '1';
+}
+
+/** Moves an overlay out of the way rather than deleting it. */
+function hideOverlay(node: HTMLElement | null | undefined): void {
+  if (!node) return;
+  node.style.opacity = '0';
 }
 
 /**
@@ -329,11 +393,19 @@ function placeBadge(
  * The screen position changes; React does not need to know that.
  */
 function RoofBadges({
-  points,
+  subjects,
+  layout,
+  ghost,
+  hovered,
   nodes,
+  callout,
 }: {
-  points: Array<{ x: number; y: number; z: number; offsetPx: number }>;
+  subjects: Subject[];
+  layout: Layout;
+  ghost: boolean;
+  hovered: Hovered;
   nodes: React.RefObject<(HTMLSpanElement | null)[]>;
+  callout: React.RefObject<HTMLDivElement | null>;
 }) {
   const camera = useThree((s) => s.camera);
   const size = useThree((s) => s.size);
@@ -341,23 +413,103 @@ function RoofBadges({
   useFrame(() => {
     const list = nodes.current;
     if (!list) return;
-    for (let i = 0; i < points.length; i += 1) {
-      const point = points[i]!;
-      projected.set(point.x, point.y, point.z).project(camera);
+    const time = usePlaybackStore.getState().time;
+    const exaggeration = usePlaybackStore.getState().exaggeration;
+
+    for (let i = 0; i < subjects.length; i += 1) {
+      const node = list[i];
+      if (!node) continue;
+      const subject = subjects[i]!;
+      const spot = ghost ? ([0, 0] as [number, number]) : layout.spots[i];
+
+      /*
+       * THE BADGE RIDES THE TOP FLOOR, NOT A FIXED POINT IN SPACE.
+       *
+       * The anchor used to be the building's static x. The building, though,
+       * sways: every floor group is moved by its own sampled displacement, so
+       * during playback the whole thing leans sideways and the badge stood still
+       * where the roof used to be. Found by the client, and it is the kind of
+       * thing that looks like it is working right up until the shake starts.
+       *
+       * Sampled with the same call the floor groups use, at the same instant, so
+       * the badge cannot drift away from the thing it is labelling.
+       */
+      const top = Math.max(0, subject.building.floors - 1);
+      const sway = subject.result
+        ? sampleDisplacement(subject.result.floorDisp, subject.result.time, top, time) *
+          exaggeration
+        : 0;
+
+      projected
+        .set(
+          (spot ? spot[0] : 0) + sway,
+          buildingHeight(subject.building) + BADGE_LIFT_M,
+          spot ? spot[1] : 0,
+        )
+        .project(camera);
 
       // Normalised device coordinates run -1..1 across the frustum. Anything
       // past 1 in z is behind the camera or beyond the far plane, where the
       // projection inverts and the number means nothing.
       const behind = projected.z > 1;
       placeBadge(
-        list[i],
+        node,
         (projected.x * 0.5 + 0.5) * size.width,
         // The ghost stack is a pixel offset from an anchor already on screen,
         // so it can never climb out of the frame the way a world-space one did.
-        (-projected.y * 0.5 + 0.5) * size.height + point.offsetPx,
+        (-projected.y * 0.5 + 0.5) * size.height + (ghost ? i * BADGE_STACK_PX : 0),
         behind,
       );
     }
+
+    /*
+     * The callout, anchored to the hovered floor rather than to a building.
+     *
+     * It rides that floor's own displacement for the same reason the badge
+     * rides its roof's: an anchor that does not move with the floor it belongs
+     * to slides off the thing it is labelling the moment the shake starts.
+     */
+    const box = callout.current;
+    // Not mounted until the first React commit has run; nothing to move yet.
+    if (!box) return;
+    if (!hovered) {
+      hideOverlay(box);
+      return;
+    }
+    const subject = subjects.find((s) => s.side === hovered.side);
+    const spot = ghost
+      ? ([0, 0] as [number, number])
+      : layout.spots.find((_, i) => sideAt(i) === hovered.side);
+    if (!subject || !subject.result || !spot) {
+      hideOverlay(box);
+      return;
+    }
+    const index = hovered.floor - 1;
+    const sway =
+      sampleDisplacement(subject.result.floorDisp, subject.result.time, index, time) * exaggeration;
+    calloutAnchor
+      .set(
+        spot[0] + sway,
+        (subject.building.floors - 1 - index) * subject.building.floorHeightM,
+        spot[1],
+      )
+      .project(camera);
+    if (calloutAnchor.z > 1) {
+      hideOverlay(box);
+      return;
+    }
+    // Off to the right of the floor, as the single-building callout is — unless
+    // that would run it into the next building. With four in a line the right
+    // half of the frame is where the callout has no room, and it landed on the
+    // badge of the building beside it. Flipping to the left past the midpoint
+    // puts it over empty space instead, and over the floor the pointer is
+    // already on.
+    const sx = (calloutAnchor.x * 0.5 + 0.5) * size.width;
+    const flip = sx > size.width / 2;
+    placeOverlay(
+      box,
+      `translate3d(${Math.round(sx + (flip ? -12 : 12))}px, ${(-calloutAnchor.y * 0.5 + 0.5) * size.height}px, 0) translate(${flip ? '-100%' : '0'}, -50%)`,
+    );
   });
 
   return null;
@@ -405,6 +557,62 @@ function RoofBadgeLayer({
   );
 }
 
+/**
+ * The hover callout — the readout the single-building view has always had.
+ *
+ * Positioned from the camera by `RoofBadges`, anchored to the hovered floor, so
+ * it follows the floor as the building sways rather than sliding off it.
+ *
+ * NO `visibility` IN THE STYLE PROP, AND THAT IS THE WHOLE LESSON
+ *
+ * The first version had `visibility: 'hidden'` here as the initial state, and
+ * the callout never appeared — not once, at any position, on any width.
+ *
+ * React owns the style prop: setting `hovered` re-renders this element, React
+ * re-applies the prop it was given, and `visibility` snaps back to hidden. The
+ * frame loop showed it, and the render that came a millisecond later hid it
+ * again — every time. The imperative write and the declarative write were
+ * fighting over one property, and React won because it is React.
+ *
+ * So the frame loop owns `visibility` outright, and the style prop here carries
+ * `color` and nothing else. Anything the loop writes must not also appear in
+ * this object.
+ */
+function FloorCalloutLayer({
+  node,
+  hovered,
+  data,
+  color,
+}: {
+  node: React.RefObject<HTMLDivElement | null>;
+  hovered: Hovered;
+  data: { peakMm: number; driftPct: number } | null;
+  color: string;
+}) {
+  return (
+    <div
+      ref={node}
+      data-floor-callout=""
+      className="pointer-events-none absolute top-0 left-0 min-w-44 rounded-app border border-line bg-surface px-3 py-2 text-xs opacity-0 shadow-lg transition-opacity"
+      style={{ color }}
+    >
+      {hovered && data ? (
+        <>
+          <p className="font-semibold">
+            <span className="font-mono-nums">{hovered.side}</span> · Floor {hovered.floor}
+            {hovered.floor === 1 ? ' (ground floor)' : ''}
+          </p>
+          <p className="font-mono-nums mt-1">
+            Peak {data.peakMm.toFixed(1)} mm
+            <br />
+            Story drift {data.driftPct.toFixed(2)} %
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------------- */
 
 /**
@@ -414,12 +622,35 @@ function RoofBadgeLayer({
  * the same numbers the camera was framed from. See lib/layout.ts for why those
  * two must not be separate calculations.
  */
-function SideBySide({ subjects, layout }: { subjects: Subject[]; layout: Layout }) {
+function SideBySide({
+  subjects,
+  layout,
+  hoverHandlers,
+  setActiveFloor,
+  activeFloor,
+}: {
+  subjects: Subject[];
+  layout: Layout;
+  hoverHandlers: HoverHandlers;
+  setActiveFloor: (floor: number | null) => void;
+  activeFloor: number | null;
+}) {
   return (
     <group>
       {subjects.map((s, i) => {
         const spot = layout.spots[i] ?? [0, 0];
-        return <SwayingBuilding key={s.side} subject={s} x={spot[0]} z={spot[1]} ghost={false} />;
+        return (
+          <SwayingBuilding
+            key={s.side}
+            subject={s}
+            x={spot[0]}
+            z={spot[1]}
+            ghost={false}
+            hoverHandlers={hoverHandlers}
+            setActiveFloor={setActiveFloor}
+            activeFloor={activeFloor}
+          />
+        );
       })}
     </group>
   );
@@ -442,7 +673,17 @@ function SideBySide({ subjects, layout }: { subjects: Subject[]; layout: Layout 
  * Changing the selection changes what is in focus, so the view answers the
  * question the user is actually asking.
  */
-function GhostOverlay({ subjects }: { subjects: Subject[] }) {
+function GhostOverlay({
+  subjects,
+  hoverHandlers,
+  setActiveFloor,
+  activeFloor,
+}: {
+  subjects: Subject[];
+  hoverHandlers: HoverHandlers;
+  setActiveFloor: (floor: number | null) => void;
+  activeFloor: number | null;
+}) {
   // Subscribed through a hook rather than `getState()`: reading the store
   // imperatively would render once and never again, so switching buildings
   // would leave the focus stuck on whichever was selected first.
@@ -457,6 +698,9 @@ function GhostOverlay({ subjects }: { subjects: Subject[] }) {
           subject={s}
           x={0}
           ghost={s.side !== focus}
+          hoverHandlers={hoverHandlers}
+          setActiveFloor={setActiveFloor}
+          activeFloor={activeFloor}
           // Layer order, so a later building is never hidden by an earlier one.
           order={i}
         />
@@ -479,13 +723,19 @@ function SwayingBuilding({
   z = 0,
   ghost = false,
   order = 0,
+  hoverHandlers,
+  setActiveFloor,
+  activeFloor,
 }: {
   subject: Subject;
   x: number;
-  /** Row position. Ghost overlay puts everything at 0; the grid does not. */
+  /** Depth. Ghost overlay puts everything at 0; side by side does too. */
   z?: number;
   ghost?: boolean;
   order?: number;
+  hoverHandlers: HoverHandlers;
+  setActiveFloor: (floor: number | null) => void;
+  activeFloor: number | null;
 }) {
   const { building, result, side } = subject;
 
@@ -504,7 +754,14 @@ function SwayingBuilding({
    * position already distinguishes them in Side by side and translucency does
    * it in Ghost overlay.
    */
-  const palette = useCssVars(['--drift-1', '--drift-2', '--drift-3', '--drift-4', '--drift-5']);
+  const palette = useCssVars([
+    '--drift-1',
+    '--drift-2',
+    '--drift-3',
+    '--drift-4',
+    '--drift-5',
+    '--selection',
+  ]);
 
   const floorRefs = useRef<(THREE.Group | null)[]>([]);
   const floors = building.floors;
@@ -555,6 +812,27 @@ function SwayingBuilding({
     <group position={[x, 0, z]}>
       {Array.from({ length: floors }, (_, index) => {
         const y = index * floorHeightM + slabHeight / 2;
+        const floor = index + 1;
+        // Same selection state the single-building view highlights, so a floor
+        // pinned in the chart is also visibly pinned here.
+        const isActive = activeFloor === floor;
+
+        /*
+         * Built here rather than inline in the JSX.
+         *
+         * The first version wrote `onPointerOver={hoverHandlers(side, floor)}` —
+         * handing R3F the whole `{ onPointerOver, onPointerOut }` object as if
+         * it were the handler. React and R3F accept it without complaint and the
+         * hover simply never fires. `onPointerOut` worked, because that one was
+         * written as a closure calling the method, so the only symptom was a
+         * callout that would not appear and an exit event that would. Which is
+         * what it looked like: a feature that did nothing, with no error.
+         *
+         * A ghost gets no handlers at all. It is a translucent overlay, and
+         * swallowing pointer events on the building you are trying to compare
+         * against would be actively unhelpful.
+         */
+        const hover = ghost ? null : hoverHandlers(side, floor);
         return (
           <group
             key={index}
@@ -563,9 +841,24 @@ function SwayingBuilding({
               floorRefs.current[index] = node;
             }}
           >
-            <mesh geometry={geometry.box} renderOrder={ghost ? 2 + order : 0}>
+            <mesh
+              geometry={geometry.box}
+              renderOrder={ghost ? 2 + order : 0}
+              onPointerOver={hover?.onPointerOver}
+              onPointerOut={hover?.onPointerOut}
+              onClick={
+                ghost
+                  ? undefined
+                  : (event: { stopPropagation: () => void }) => {
+                      event.stopPropagation();
+                      setActiveFloor(isActive ? null : floor);
+                    }
+              }
+            >
               <meshLambertMaterial
                 color={floorColors[index]}
+                emissive={isActive ? (palette['--selection'] ?? '#000000') : '#000000'}
+                emissiveIntensity={isActive ? 0.35 : 0}
                 transparent={ghost}
                 opacity={ghost ? 0.32 : 0.85}
                 depthWrite={!ghost}

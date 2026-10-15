@@ -192,6 +192,86 @@ for (const size of WIDTHS) {
       await expectBadgesAreReadable(page, 'ghost overlay');
     });
 
+    test('hovering a floor reads back that floor of that building', async ({ page }) => {
+      await fourBuildings(page);
+
+      const callout = page.locator('[data-floor-callout]');
+
+      /*
+       * Sweep for a point that is actually over a floor. Hard-coding a
+       * coordinate is a test that passes at one width and misses the building
+       * at every other, and "no callout" then looks identical to "the hover is
+       * broken" — which is exactly how a real bug in here nearly went unnoticed.
+       */
+      const canvas = (await page.locator('canvas').boundingBox())!;
+      let hovered = false;
+      for (const fy of [0.5, 0.45, 0.55, 0.4, 0.6]) {
+        for (const fx of [0.55, 0.6, 0.5, 0.45, 0.65]) {
+          const y = canvas.y + canvas.height * fy;
+          await page.mouse.move(canvas.x + 4, y);
+          await page.mouse.move(canvas.x + canvas.width * fx, y, { steps: 8 });
+          await page.waitForTimeout(250);
+          if (await callout.evaluate((el) => getComputedStyle(el).opacity === '1')) {
+            hovered = true;
+            break;
+          }
+        }
+        if (hovered) break;
+      }
+
+      expect(hovered, `no point over the canvas produced a callout at ${size.width}px`).toBe(true);
+
+      /*
+       * The callout must NAME the building. Four buildings in one line, and
+       * "Floor 5" on its own is a number attached to nothing.
+       */
+      const text = (await callout.textContent())!.replace(/\s+/g, ' ').trim();
+      expect(text).toMatch(/^[ABCD] · Floor \d+/);
+      expect(text).toMatch(/Peak [\d.]+ mm/);
+      expect(text).toMatch(/Story drift [\d.]+ %/);
+
+      // And it goes away again on leaving, which the frame loop does without
+      // waiting for a render.
+      await page.mouse.move(canvas.x + 4, canvas.y + canvas.height * 0.95);
+      await page.waitForTimeout(400);
+      expect(await callout.evaluate((el) => getComputedStyle(el).opacity)).toBe('0');
+    });
+
+    test('a badge rides the building while it shakes', async ({ page }) => {
+      await fourBuildings(page);
+
+      const before = await badgeBoxes(page);
+
+      /*
+       * The anchor used to be the building's STATIC x. The building sways — every
+       * floor is moved by its own sampled displacement — so during playback the
+       * whole thing leaned over and the badge stood where the roof used to be.
+       * Found by the client, and invisible until the shake starts.
+       *
+       * Press play and watch. With the camera still, a static anchor cannot move
+       * at all, so this is a direct check rather than an inference.
+       */
+      const play = page.getByRole('button', { name: /^play$/i });
+      if ((await play.count()) > 0) await play.first().click();
+
+      let movedMost = 0;
+      for (let i = 0; i < 8; i += 1) {
+        await page.waitForTimeout(350);
+        const now = await badgeBoxes(page);
+        for (const side of ['A', 'B', 'C', 'D']) {
+          movedMost = Math.max(
+            movedMost,
+            Math.abs(now[side]!.x - before[side]!.x) + Math.abs(now[side]!.y - before[side]!.y),
+          );
+        }
+      }
+
+      expect(
+        movedMost,
+        `no badge moved while the buildings shook (max ${movedMost}px)`,
+      ).toBeGreaterThan(4);
+    });
+
     test('a badge follows the building when the camera is orbited', async ({ page }) => {
       await fourBuildings(page);
 
