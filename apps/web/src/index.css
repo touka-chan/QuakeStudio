@@ -67,6 +67,46 @@
   --radius-card: var(--radius-card);
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  /*
+     The floating "How to use" button.
+
+     A ring that expands and fades, repeating every 2.8s. The button itself does
+     not animate: it carries a drop shadow, and animating `box-shadow` would
+     have to re-state that shadow in every keyframe or the button would visibly
+     lose it on the first frame. A pseudo-element keeps the two apart.
+
+     The ring is `pointer-events: none`, so it cannot get between a click and
+     the button. Not cosmetic — a decorative overlay that swallowed clicks on a
+     floating control is invisible until someone taps it and nothing happens.
+
+     The whole block sits inside `no-preference`, so this needs no second
+     reduced-motion rule of its own and cannot be left running by a future
+     change to the global one in `@layer base` below.
+  */
+  @keyframes qs-attention-ring {
+    0% {
+      transform: scale(1);
+      opacity: 0.65;
+    }
+    70%,
+    100% {
+      transform: scale(1.55);
+      opacity: 0;
+    }
+  }
+
+  .qs-attention::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 9999px;
+    border: 2px solid var(--primary);
+    pointer-events: none;
+    animation: qs-attention-ring 2.8s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  }
+}
+
 @layer base {
   * {
     border-color: var(--border);
@@ -97,8 +137,6 @@
     outline-offset: 2px;
   }
 
-  /* Respect the OS "reduce motion" setting. Phase 1 uses this to start the
-     playback paused and lower the default speed. */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,

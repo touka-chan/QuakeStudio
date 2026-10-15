@@ -480,6 +480,127 @@ test.describe('the floating How to use button', () => {
 });
 
 /*
+ * The floating button: green, pulsing, and draggable.
+ *
+ * None of this can be checked in jsdom. Dragging needs a real pointer with
+ * capture and a real layout to clamp against, and the colour is a computed
+ * style that only exists once CSS has resolved the tokens for a theme.
+ */
+test.describe('the floating button is draggable and green', () => {
+  async function open(page: Page) {
+    await asPlainUser(page);
+    await page.goto('/');
+    await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
+    await page.waitForTimeout(800);
+  }
+
+  const fab = (page: Page) => page.getByRole('button', { name: /how to use/i });
+
+  /**
+   * Drag, in steps, then let it settle.
+   *
+   * A single `mouse.move(..., { steps: 12 })` interpolates the whole path so
+   * fast that the reading taken straight after lands on an intermediate render:
+   * the first version of this test saw the button travel 174px of the 300px
+   * asked for, and reported it as not working. It works. Reading the box
+   * between the steps — as this does — is what makes the measurement mean
+   * something.
+   */
+  async function dragTo(page: Page, from: { x: number; y: number }, to: { x: number; y: number }) {
+    await page.mouse.move(from.x, from.y);
+    await page.mouse.down();
+    for (let i = 1; i <= 10; i += 1) {
+      await page.mouse.move(
+        from.x + ((to.x - from.x) * i) / 10,
+        from.y + ((to.y - from.y) * i) / 10,
+      );
+    }
+    await page.mouse.up();
+    await page.waitForTimeout(150);
+  }
+
+  test('is the app green, in both themes', async ({ page }) => {
+    await open(page);
+    await expect(fab(page)).toHaveCSS('background-color', 'rgb(21, 128, 61)');
+
+    await page.evaluate(() => document.documentElement.classList.add('dark'));
+    // toHaveCSS rather than a single read: the button cross-fades, and a read
+    // taken immediately catches it mid-transition at a colour that is in
+    // neither theme.
+    await expect(fab(page)).toHaveCSS('background-color', 'rgb(74, 222, 128)');
+  });
+
+  test('carries the attention ring', async ({ page }) => {
+    await open(page);
+    await expect(fab(page)).toHaveClass(/qs-attention/);
+  });
+
+  test('can be dragged, and lands exactly where it was let go', async ({ page }) => {
+    await open(page);
+    const before = (await fab(page).boundingBox())!;
+    const from = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
+    const to = { x: from.x - 300, y: from.y - 220 };
+
+    await dragTo(page, from, to);
+    const after = (await fab(page).boundingBox())!;
+
+    // The grab point stays under the pointer, so the button's top-left lands
+    // half a button up and to the left of where the mouse was released.
+    // Parenthesised on purpose: `after.y - to.y - h / 2` subtracts the half
+    // height a second time and comes out a whole button out, which is exactly
+    // what the first version of this assertion did.
+    const expectedX = to.x - before.width / 2;
+    const expectedY = to.y - before.height / 2;
+    expect(Math.abs(after.x - expectedX), 'it landed somewhere else').toBeLessThan(3);
+    expect(Math.abs(after.y - expectedY), 'it landed somewhere else').toBeLessThan(3);
+
+    // The click that ends a drag is swallowed. Without this, every attempt to
+    // reposition the button would also start the tutorial.
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+  });
+
+  test('stays where it was put, on the next visit', async ({ page }) => {
+    await open(page);
+    const before = (await fab(page).boundingBox())!;
+    const from = { x: before.x + before.width / 2, y: before.y + before.height / 2 };
+    await dragTo(page, from, { x: from.x - 280, y: from.y - 200 });
+    const moved = (await fab(page).boundingBox())!;
+
+    await page.reload();
+    await expect(fab(page)).toBeVisible();
+    await page.waitForTimeout(500);
+    const after = (await fab(page).boundingBox())!;
+
+    expect(Math.abs(after.x - moved.x), 'it forgot where it was put').toBeLessThan(3);
+    expect(Math.abs(after.y - moved.y), 'it forgot where it was put').toBeLessThan(3);
+  });
+
+  /*
+   * A spot chosen on a wide screen is off the edge of a phone. Resizing has to
+   * pull it back rather than leave it somewhere the user cannot reach it.
+   */
+  test('is pulled back on screen when the window shrinks a lot', async ({ page }) => {
+    await page.setViewportSize({ width: 1600, height: 900 });
+    await open(page);
+    await dragTo(page, { x: 1560, y: 860 }, { x: 1592, y: 892 });
+
+    await page.setViewportSize({ width: 360, height: 720 });
+    await page.waitForTimeout(500);
+    const box = (await fab(page).boundingBox())!;
+    expect(box.x, 'it is off the left').toBeGreaterThanOrEqual(0);
+    expect(box.x + box.width, 'it is off the right').toBeLessThanOrEqual(361);
+    expect(box.y + box.height, 'it is off the bottom').toBeLessThanOrEqual(721);
+  });
+
+  test('still opens the tour on a plain click', async ({ page }) => {
+    await open(page);
+    await fab(page).click();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByRole('dialog').getByText(/step 1 of 4/i)).toBeVisible();
+  });
+});
+
+/*
  * The narrow-screen presentation, which is a real dialog and therefore the one
  * case where the two overlays genuinely could have been stacked.
  */

@@ -237,6 +237,18 @@ export const STORAGE_KEYS = {
    * they say "no tour, just the app".
    */
   tourSuppressed: 'quakestudio.tourSuppressed',
+
+  /*
+   * Where the user dragged the floating "How to use" button, as JSON.
+   *
+   * Written by the app - unlike `tourSuppressed`. A button a user has
+   * deliberately put somewhere should still be there on the next visit, or
+   * moving it is a chore that repeats itself every time the page loads.
+   *
+   * Always clamped to the current window on the way back in, because a spot
+   * chosen on a desktop is off the edge of a phone.
+   */
+  tourButtonPos: 'quakestudio.tourButtonPos',
   appVersion: 'quakestudio.appVersion',
 } as const;
 
