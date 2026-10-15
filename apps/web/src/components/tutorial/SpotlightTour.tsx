@@ -233,6 +233,20 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
   return (
     <>
       {/* ---- The blur, with the target cut out of it ----
+
+          The hole is the point of the whole effect, and it stays: the client
+          wants the control being talked about sharp, and everything around it
+          softened. Confirmed twice — "the thing being pointed at should NOT be
+          blurred" — after a first reading that took the opposite meaning and
+          was wrong.
+
+          What is not covered by this layer, and used to be, is the 3D canvas.
+          The canvas is blurred separately, by a rule on `html[data-tour-open]`
+          in index.css, because `backdrop-filter` was skipping it entirely and
+          a compositing decision cannot be argued with from here. See there for
+          why, and for why no tour step points at the canvas — the invariant a
+          test holds.
+
           `pointer-events-none` so this layer is purely visual; the blocker
           further down is the one that stops clicks. */}
       <div
@@ -255,6 +269,10 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
       />
 
       {/* ---- The dim, with the target cut out of it ----
+          Cut in step with the blur, so the target is neither softened nor
+          darkened. Dimming it but not the blur would leave a bright patch
+          sitting in a soft page, which reads as a rendering fault.
+
           Also pointer-events-none. An SVG mask affects what is painted, and
           what is painted is not a reliable answer to what receives a click
           across engines, so this layer is told outright not to take any. */}
@@ -311,10 +329,20 @@ export function SpotlightTour({ step, index, total, isLast, onNext, onBack, onSk
 
       {/* ---- The blocker.
 
+          Carries the same clip as the blur and the dim, and for the same reason:
+          the hole is where the user is meant to be able to act. Inside it this
+          layer is not painted and so not hit; outside it swallows the click
+          without doing anything with it. Without it a user told to "set the
+          floors" could not drag the slider or scroll the panel they were being
+          shown, which is the worst version of a tutorial.
+
+          Three layers cut with the same shape — the blur, the dim, and this —
+          and the reason they are three rather than one is that what each does
+          is different: blur and dim paint, this stops clicks. Folding them
+          together would quietly make the highlighted control unclickable.
+
           Sits last among the z-50 layers so it is the topmost thing at any
-          point inside the hole's surroundings, and carries the same clip as
-          the blur. Inside the hole it is not painted and so not hit; outside
-          it swallows the click without doing anything with it.
+          point inside the hole's surroundings.
 
           No background on purpose — this is an area that should feel dead, not
           one that should look different from the dim already behind it. */}

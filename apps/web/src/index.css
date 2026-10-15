@@ -196,4 +196,39 @@
     font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
   }
+
+  /*
+     THE 3D CANVAS, BLURRED WHILE THE TOUR IS SHOWING
+
+     A second mechanism on purpose, next to the tour's own `backdrop-filter`
+     layer over the whole window.
+
+     That layer works on the DOM — the client saw the panels go soft — and did
+     nothing at all for the 3D view, which stayed sharp on their machine while
+     everything around it blurred. That is the signature of a WebGL canvas being
+     skipped by the backdrop: `backdrop-filter` samples what has already been
+     composited BEHIND the element, and a canvas promoted to its own
+     compositing layer can come through unfiltered depending on the GPU path.
+
+     Nothing here creates that on purpose. There is no `will-change`, no
+     `contain`, no `filter` and no `transform` on any ancestor of the canvas,
+     which is precisely why it was so hard to find: it was the browser's
+     decision, not ours, and it did not reproduce on the machine it was
+     diagnosed from. A `filter` on the canvas itself samples nothing — it is
+     applied to the element — so no compositing arrangement can skip it.
+
+     THE HOLE DOES NOT APPLY HERE, and that is a promise rather than an
+     oversight. The spotlight's other three layers cut a hole so the control
+     being described stays sharp, and this one cannot: a `filter` is the whole
+     element or nothing.
+
+     So the guarantee is that no tour step points at the canvas. Today none of
+     the four does — they point at the controls panel, the play button, the
+     results panel and the compare button, all ordinary DOM outside the 3D — and
+     `tour.spec.ts` asserts that for every step, so a step that broke the promise
+     would fail the build rather than ship a blurred thing to look at.
+  */
+  html[data-tour-open] canvas {
+    filter: blur(3px) saturate(0.55);
+  }
 }

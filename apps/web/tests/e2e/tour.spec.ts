@@ -499,6 +499,126 @@ test.describe('the background behind the tour', () => {
     ).toBeLessThan(before.chromaPerLuma * 0.8);
   });
   /*
+   * THE 3D CANVAS IS BLURRED BY ITS OWN RULE, NOT BY THE BACKDROP LAYER.
+   *
+   * This is the structural check for the thing that was reported and could not
+   * be reproduced from here: the panels went soft while the 3D view stayed
+   * sharp. `backdrop-filter` samples what has already been composited behind an
+   * element, and a WebGL canvas promoted to its own layer can come through
+   * unfiltered — the browser's decision, not ours, and nothing in this
+   * stylesheet asks for it.
+   *
+   * So the canvas is blurred by a `filter` on the element itself, keyed on
+   * `html[data-tour-open]`. Asking the question this way needs no pixel of it to
+   * be measured correctly: it cannot be fooled by a threshold, a theme, or a
+   * region that happens to be flat.
+   */
+  for (const size of PRESENTATIONS) {
+    test(`flags itself for the stylesheet on ${size.name}`, async ({ page }) => {
+      await page.setViewportSize({ width: size.w, height: size.h });
+      await asPlainUser(page);
+      await page.goto('/');
+      await page.waitForTimeout(600);
+
+      const flagged = () =>
+        page.evaluate(() => document.documentElement.hasAttribute('data-tour-open'));
+      expect(await flagged(), 'the tour announced itself while it was shut').toBe(false);
+
+      await page.getByRole('button', { name: /how to use/i }).click();
+      await expect(card(page)).toBeVisible();
+      expect(await flagged(), 'the tour did not flag itself for the stylesheet').toBe(true);
+
+      // And taken away again, or the app is left soft after the tour ends.
+      await card(page).press('Escape');
+      await expect(card(page)).toHaveCount(0);
+      expect(await flagged(), 'the tour left itself flagged after it closed').toBe(false);
+    });
+  }
+
+  /*
+   * The canvas itself, and only where there IS a 3D view.
+   *
+   * Below the breakpoint the layout is tab-based and the tab open on arrival is
+   * Build, so no canvas is mounted at all. Asserting a filter on an element that
+   * is not there is a check that passes on nothing — and it did: the first
+   * version of this ran at both widths and failed on `no canvas` being compared
+   * against `none`, which is what sent it looking for a bug that was not there.
+   */
+  test('blurs the 3D canvas itself, and takes it off again', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await asPlainUser(page);
+    await page.goto('/');
+
+    /*
+     * Waited for, not slept on.
+     *
+     * The 3D view is lazily mounted and the suite runs against the dev server,
+     * so it is not there the instant the page loads — a fixed wait long enough
+     * for a production preview was long enough to be wrong against a first
+     * dev-server compile, and the failure that produced was "no canvas at
+     * 1280px", which reads like a layout bug and is really a race.
+     */
+    await page.waitForSelector('canvas', { timeout: 20_000 });
+
+    const read = () =>
+      page.evaluate(() => {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) throw new Error('the 3D view was mounted a moment ago and is not now');
+        return getComputedStyle(canvas).filter;
+      });
+
+    expect(await read(), 'the 3D view is blurred with the tour closed').toBe('none');
+
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(400);
+
+    const during = await read();
+    expect(during, `the 3D view is not blurred: "${during}"`).toContain('blur');
+
+    await card(page).press('Escape');
+    await expect(card(page)).toHaveCount(0);
+    expect(await read(), 'the 3D view stayed blurred after the tour').toBe('none');
+  });
+
+  /*
+   * THE INVARIANT THAT MAKES THE ABOVE LEGAL.
+   *
+   * The spotlight cuts a hole in three layers so the control it is describing
+   * stays sharp. It cannot cut a hole in a `filter` on the canvas — that is the
+   * whole element or nothing — so blurring the canvas whole is only correct
+   * while no step points at the canvas.
+   *
+   * That is a promise about the future, and a promise in a comment is not a
+   * check. A step that pointed at the 3D would ship a blurred thing to look at
+   * and this would fail the build on the day it happened, naming the step.
+   */
+  test('no step points at the 3D canvas, which is blurred whole', async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await asFirstTimer(page);
+    await page.goto('/');
+    await expect(card(page)).toBeVisible();
+
+    for (let step = 1; step <= 4; step += 1) {
+      const inside = await page.evaluate(() => {
+        const target = document.querySelector<HTMLElement>('[data-tour-active]');
+        if (!target) return 'no target on this step';
+        const canvas = document.querySelector('canvas');
+        if (!canvas) return false;
+        return canvas.contains(target) || target.contains(canvas);
+      });
+
+      expect(
+        inside,
+        `step ${step} points at the 3D canvas, which the tour blurs whole — it would be blurred too, so this step needs the blur to be cut out of it instead`,
+      ).toBe(false);
+
+      const next = card(page).getByRole('button', { name: /^next$/i });
+      if (await next.count()) await next.click();
+    }
+  });
+
+  /*
    * The other half of the claim: the thing the tour is pointing at is NOT
    * blurred. A background that has gone soft while the target has not is what
    * the whole effect is for, and it is possible to get the first without the

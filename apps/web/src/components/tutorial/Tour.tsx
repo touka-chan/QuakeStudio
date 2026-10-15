@@ -42,6 +42,23 @@ export function Tour({ forceDesktopLayout }: Props = {}) {
   const skip = useTourStore((s) => s.skip);
 
   /*
+   * Tell the stylesheet the tour is up, so the 3D canvas can be blurred by a
+   * rule rather than by a style write.
+   *
+   * An attribute on <html> rather than a class on a wrapper: the canvas is many
+   * levels down inside a lazily mounted subtree, and a rule keyed on document
+   * state cannot be out of step with React re-rendering the thing it applies to.
+   * A per-frame style write to the canvas can be.
+   *
+   * Set on the root rather than on each presentation, so the spotlight and the
+   * narrow-screen modal put the 3D in the same state and one check covers both.
+   */
+  useEffect(() => {
+    document.documentElement.toggleAttribute('data-tour-open', open);
+    return () => document.documentElement.removeAttribute('data-tour-open');
+  }, [open]);
+
+  /*
    * No effect decides whether to open the tour. The store's initial state
    * already knows, derived from the same storage read that decides `settled`
    * — see tourStore.ts. Deciding it here instead would mean two independent
