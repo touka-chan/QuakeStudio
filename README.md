@@ -262,9 +262,22 @@ different shape to the one on screen.
 
 ### The guided tour
 
-Four steps, shown once, and reachable again from the green **How to use** button.
-It points at the controls panel, the play button, the results panel and the
-compare button, in that order.
+Four steps, shown on **every visit** rather than once, and reachable again from
+the green **How to use** button. It points at the controls panel, the play
+button, the results panel and the compare button, in that order.
+
+**The welcome gate comes after it, on every visit too.** Neither overlay
+remembers anything: acknowledging the disclaimer used to write a flag, and that
+flag is what is gone. Dismissing either one closes it for the rest of the
+session and for nothing else, so a refresh brings the whole ceremony back.
+`STORAGE_KEYS.disclaimerSuppressed` still exists and is still honoured, but the
+app never writes it — same deal as `tourSuppressed`. It is there for the
+end-to-end suite, which would otherwise tick a checkbox before every test, and
+for anyone embedding the tool where the disclaimer has already been given.
+
+That is a lot of ceremony on every page load, and it was asked for: a student
+opening the tool for the first time should meet the disclaimer, and someone
+coming back should meet it again rather than trust that they once did.
 
 **Two presentations, because one of them cannot work on a narrow screen.** Above
 the desktop breakpoint it is a spotlight: the page behind goes soft, whatever
@@ -290,8 +303,13 @@ about it are worth knowing before you touch it:
   hole did not make the control sharp, it removed the blur from the entire page
   while the untouched page showing through the hole *looked* like it working. An
   SVG `mask` behaves the same way, and so does a clip on a parent wrapper.
-  Measured on a panel at step 3: 7.2% of edges left with the clip, 2.7% without
-  it, 7.1% with the tour closed.
+  That the clip was to blame was established by putting the clip back and
+  seeing the layer stop blurring altogether, which is the only way to tell:
+  the first attempt measured edge counts with the tour open against the tour
+  closed and quoted numbers from it, but a dim is a black multiply and it
+  collapses that measurement on its own. The blur check now switches the blur
+  off with everything else held still, which is the only comparison that can
+  tell a blur from a dim.
 - **So the hole moved.** The highlighted control is painted *above* the blur
   (`html[data-tour-open] [data-tour-active]` in `index.css`), not cut out of it.
   `position: relative` is there so `z-index` applies at all; it has no offsets

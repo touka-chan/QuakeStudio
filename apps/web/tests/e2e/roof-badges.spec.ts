@@ -39,7 +39,7 @@ const WIDTHS = [
 async function skipFirstRun(page: Page) {
   await page.addInitScript(() => {
     try {
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
       localStorage.setItem('quakestudio.tourSuppressed', 'true');
     } catch {
       /* storage unavailable — the dialog will show and block these tests */

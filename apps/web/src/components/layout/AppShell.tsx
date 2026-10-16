@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { useIsDesktop } from '@/lib/useMediaQuery';
 import { BACK_REQUESTED } from '@/pwa/backButton';
 import { ControlsPanel } from './ControlsPanel';
-import { FirstRunDialog } from './FirstRunDialog';
+import { WelcomeGate } from './WelcomeGate';
 import { MobileTabBar, type MobileTab } from './MobileTabBar';
 import { PlaybackBar } from './PlaybackBar';
 import { PlaybackClock } from './PlaybackClock';
@@ -128,7 +128,7 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
           already seen the tour gets the gate immediately, and a new user sees
           one overlay at a time rather than two fighting over focus.
         */}
-        <FirstRunDialog onOpenAssumptions={() => setAssumptionsOpen(true)} blocked={!tourSettled} />
+        <WelcomeGate onOpenAssumptions={() => setAssumptionsOpen(true)} blocked={!tourSettled} />
       </div>
     </TooltipProvider>
   );

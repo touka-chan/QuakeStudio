@@ -83,7 +83,7 @@ function seedResult(scale = 1): SimulationResult {
 }
 
 beforeEach(() => {
-  localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+  localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
   /*
    * The guided tour also runs before the workspace is usable, and it holds the
    * disclaimer gate closed while it is on screen. axe rules run against

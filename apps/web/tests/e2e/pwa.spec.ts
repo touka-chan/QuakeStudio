@@ -22,7 +22,7 @@ const DESKTOP = { width: 1440, height: 900 };
 async function skipFirstRun(page: Page) {
   await page.addInitScript(() => {
     try {
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
       // The guided tour also runs before the workspace is reachable, and it holds
       // the disclaimer gate closed while it is on screen. This is the storage a user
       // who has already seen the tour has.

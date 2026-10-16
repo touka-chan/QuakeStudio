@@ -81,7 +81,7 @@ describe('guided tour — first run', () => {
   });
 
   it('still appears to a user who already acknowledged the disclaimer', async () => {
-    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     asFirstTimer();
     render(<App />);
     expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
@@ -135,7 +135,7 @@ describe('guided tour — and the disclaimer gate', () => {
 
     const start = await screen.findByRole('button', { name: /start exploring/i });
     expect(start).toBeDisabled();
-    expect(localStorage.getItem(STORAGE_KEYS.firstRunAcknowledged)).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.disclaimerSuppressed)).toBeNull();
   });
 
   it('does NOT record the disclaimer when the tour is skipped', async () => {
@@ -145,7 +145,7 @@ describe('guided tour — and the disclaimer gate', () => {
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
     expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
-    expect(localStorage.getItem(STORAGE_KEYS.firstRunAcknowledged)).toBeNull();
+    expect(localStorage.getItem(STORAGE_KEYS.disclaimerSuppressed)).toBeNull();
   });
 
   it('releases the gate after the tour is completed, not just skipped', async () => {
@@ -166,7 +166,7 @@ describe('guided tour — and the disclaimer gate', () => {
 
 describe('guided tour — re-entry', () => {
   it('can be reopened from the top bar after it has been seen', async () => {
-    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     tourTesting.reset();
     render(<App />);
@@ -188,7 +188,7 @@ describe('guided tour — re-entry', () => {
    * not responding — while the card already offers "Skip tour".
    */
   it('takes its own button out of reach while the tour is showing', async () => {
-    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     asFirstTimer();
     render(<App />);
 
@@ -287,7 +287,7 @@ describe('guided tour — the spotlight', () => {
 
   it('keeps focus inside the card and gives it back on close', async () => {
     localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
-    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     tourTesting.reset();
     render(<AppShell forceDesktopLayout />);
 
@@ -389,7 +389,7 @@ describe('guided tour — the model behind stays put', () => {
      * the test fails for a reason that has nothing to do with freezing.
      */
     localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
-    localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+    localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     tourTesting.reset();
     render(<AppShell forceDesktopLayout />);
 

@@ -32,7 +32,7 @@ type Box = Exclude<Awaited<ReturnType<Locator['boundingBox']>>, null>;
 async function asFirstTimer(page: Page) {
   await page.addInitScript(() => {
     try {
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
       if (!localStorage.getItem('__tourSeeded')) {
         localStorage.removeItem('quakestudio.tourSuppressed');
         localStorage.setItem('__tourSeeded', 'true');
@@ -53,7 +53,7 @@ async function asCompleteFirstTimer(page: Page) {
     try {
       if (!localStorage.getItem('__tourSeeded')) {
         localStorage.removeItem('quakestudio.tourSuppressed');
-        localStorage.removeItem('quakestudio.firstRunAcknowledged');
+        localStorage.removeItem('quakestudio.disclaimerSuppressed');
         localStorage.setItem('__tourSeeded', 'true');
       }
     } catch {
@@ -67,7 +67,7 @@ async function asPlainUser(page: Page) {
   await page.addInitScript(() => {
     try {
       localStorage.setItem('quakestudio.tourSuppressed', 'true');
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
     } catch {
       /* noop */
     }
@@ -275,6 +275,31 @@ async function measureLook(page: Page, region: Box): Promise<Look> {
   return (await measureLooks(page, [region]))[0]!;
 }
 
+/**
+ * The 3D canvas box, waited for until it is a real size.
+ *
+ * A <canvas> element exists from the first render and is 300x150 until the
+ * viewport mounts and sizes it. Reading `boundingBox()` before that gives a
+ * perfectly valid box over empty background, and every measurement taken from it
+ * is a measurement of nothing — which then reads as "there is no detail here"
+ * rather than "you looked in the wrong place".
+ *
+ * Polled rather than slept on, because how long the 3D takes to mount is a
+ * property of the machine, and this suite is loaded when it runs.
+ */
+async function sizedCanvasBox(page: Page): Promise<Box> {
+  await expect
+    .poll(
+      async () => {
+        const box = await page.locator('canvas').first().boundingBox();
+        return box ? Math.round(box.width * box.height) : 0;
+      },
+      { timeout: 20_000 },
+    )
+    .toBeGreaterThan(300 * 150);
+  return (await page.locator('canvas').first().boundingBox())!;
+}
+
 function overlaps(a: Box, b: Box): boolean {
   return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 }
@@ -297,11 +322,89 @@ test.describe('the background behind the tour', () => {
    * Reopening the tour restarts it at step 1, which is where the card was
    * measured, so the two readings are of the same state.
    */
+  /*
+   * Hide or restore everything that blurs what is behind the tour.
+   *
+   * TWO THINGS BLUR IT, AND THAT IS WHY THE FIRST VERSION OF THE MEASUREMENT
+   * BELOW COULD NOT FAIL.
+   *
+   * The backdrop layer carries `backdrop-filter: blur() saturate()`, and the
+   * canvas has its own `filter: blur() saturate()` because backdrop-filter could
+   * not be trusted over a WebGL canvas. Either one alone is enough, so a
+   * measurement that switched off only the canvas still had a blur applied from
+   * the layer above it, and the two readings agreed to one decimal place.
+   * `blur(0px)`, `filter: none` and `saturate()` on its own all passed the check
+   * they were supposed to be proving.
+   *
+   * So both go off together, and both go on together.
+   */
+  async function setBlur(page: Page, on: boolean, alsoCanvas: boolean) {
+    await page.evaluate(
+      ({ enabled, canvas }) => {
+        const backdrop = document.querySelector<HTMLElement>('[data-tour-backdrop]');
+        if (backdrop) backdrop.style.display = enabled ? '' : 'none';
+        if (canvas) {
+          for (const c of document.querySelectorAll<HTMLElement>('canvas')) {
+            // Clearing the inline style hands the rule back to the stylesheet.
+            c.style.filter = enabled ? '' : 'none';
+          }
+        }
+      },
+      { enabled: on, canvas: alsoCanvas },
+    );
+  }
+
+  /*
+   * One rectangle, read twice, differing only in whether anything blurs it.
+   *
+   * Both readings are taken with the tour open, so the dim, the card, the paused
+   * clock and the layout are identical between them and the only thing that
+   * changed is the blur. The first version compared a tour-closed reading
+   * against a tour-open one, which cannot work: the dim alone collapses this
+   * measurement, so the check passed whatever the blur was set to.
+   *
+   * `sharpAgain` is the third reading that makes the pair worth anything. If the
+   * scene is still between readings then the first two differ because of the
+   * blur; if it is not, that is reported rather than quietly passing.
+   */
+  async function readWithAndWithoutBlur(page: Page, region: Box, alsoCanvas: boolean) {
+    const read = async () => (await measureLooks(page, [region]))[0]!;
+
+    await setBlur(page, false, alsoCanvas);
+    await page.waitForTimeout(250);
+    const sharp = await read();
+
+    await setBlur(page, true, alsoCanvas);
+    await page.waitForTimeout(250);
+    const blurred = await read();
+
+    await setBlur(page, false, alsoCanvas);
+    await page.waitForTimeout(250);
+    const sharpAgain = await read();
+
+    await setBlur(page, true, alsoCanvas);
+    return { sharp, blurred, sharpAgain };
+  }
+
+  /*
+   * The busiest patch of the search area that the tour card is not sitting on.
+   *
+   * Picked with the tour OPEN and nothing blurring, because that is the view the
+   * blur is applied to. The first version picked it with the tour closed, and
+   * that region was a wall of orange: high contrast against empty background,
+   * and the least interesting thing to measure a blur on.
+   *
+   * The card is measured once at the start and any candidate it covers is thrown
+   * away. The card sits over the middle of the screen and is deliberately NOT
+   * blurred, so a candidate under it reads as detail that never goes away.
+   *
+   * It leaves the tour OPEN, which is the only state the blur exists in.
+   */
   async function pickBackgroundRegion(
     page: Page,
     /** Resolved inside, after the tour has been opened and closed: a canvas read too early is still 300x150. */
     area: Box | (() => Promise<Box | null>),
-  ): Promise<{ region: Box; before: Look }> {
+  ): Promise<Box> {
     // Where the card will be. Measured with the tour open, then dismissed.
     await page.getByRole('button', { name: /how to use/i }).click();
     await expect(card(page)).toBeVisible();
@@ -341,13 +444,23 @@ test.describe('the background behind the tour', () => {
         `the tour card (${JSON.stringify(cardBox)}) covers all of ${JSON.stringify(box)} — nothing left to measure`,
       );
 
+    await page.getByRole('button', { name: /how to use/i }).click();
+    await expect(card(page)).toBeVisible();
+    await page.waitForTimeout(700);
+
+    // Below the breakpoint there is no canvas, and the backdrop layer is the
+    // only thing that blurs.
+    const alsoCanvas = (await page.locator('canvas').count()) > 0;
+    await setBlur(page, false, alsoCanvas);
     const looks = await measureLooks(page, candidates);
+    await setBlur(page, true, alsoCanvas);
+
     let bestAt = 0;
     candidates.forEach((_, i) => {
       if (looks[i]!.edges > looks[bestAt]!.edges) bestAt = i;
     });
 
-    return { region: candidates[bestAt]!, before: looks[bestAt]! };
+    return candidates[bestAt]!;
   }
 
   /*
@@ -418,41 +531,31 @@ test.describe('the background behind the tour', () => {
       }
       await page.waitForTimeout(900);
 
-      const { region, before } = await pickBackgroundRegion(page, () =>
-        page.locator('canvas').boundingBox(),
-      );
+      const region = await pickBackgroundRegion(page, () => sizedCanvasBox(page));
+
+      // The picker leaves the tour open, because that is the only state the
+      // comparison below means anything in. Asserted rather than clicked: the
+      // floating button is behind the tour's own blocker while it is up.
+      await expect(card(page)).toBeVisible();
+
+      const { sharp, blurred, sharpAgain } = await readWithAndWithoutBlur(page, region, true);
+
       expect(
-        before.edges,
+        sharp.edges,
         `nothing in the 3D viewport had any detail to blur (picked ${JSON.stringify(region)})`,
       ).toBeGreaterThan(2);
-
-      await page.getByRole('button', { name: /how to use/i }).click();
-      await expect(card(page)).toBeVisible();
-      // Past the layer's own transition, so this measures the settled state.
-      await page.waitForTimeout(700);
-
-      const during = (await measureLooks(page, [region]))[0]!;
-
-      // 1. The detail is gone. A missing blur cannot fake this.
-      //
-      //    The threshold is a quarter, and where it sits is deliberate. Measured
-      //    on the busiest patch of the 3D view: no blur at all removes 0% of the
-      //    edges, the shipped 3px removes 50%. A "less than half" rule put the bar
-      //    exactly on the number the shipped value happens to produce on this
-      //    machine — which is not a check, it is a tripwire that fires whenever a
-      //    renderer differs by a little. A quarter separates the two real cases
-      //    with margin on both sides, which is what a threshold is for.
       expect(
-        during.edges,
-        `the 3D view still has ${during.edges}% of its edges (was ${before.edges}%) — it is not blurred`,
-      ).toBeLessThan(before.edges * 0.75);
-
-      // 2. And so is the colour. This is the one the client reported: a blur
-      //    strong enough to measure but weak enough to look like nothing.
+        Math.abs(sharpAgain.edges - sharp.edges),
+        `the scene moved between readings — ${sharp.edges}% then ${sharpAgain.edges}% with the blur off both times — so the two readings are not of the same thing`,
+      ).toBeLessThanOrEqual(1);
       expect(
-        during.chromaPerLuma,
-        `colour barely changed (${before.chromaPerLuma} -> ${during.chromaPerLuma}), so the background does not read as blurred`,
-      ).toBeLessThan(before.chromaPerLuma * 0.8);
+        blurred.edges,
+        `the 3D view keeps ${blurred.edges}% of its edges with the blur on and ${sharp.edges}% with it off — it is not blurred`,
+      ).toBeLessThan(sharp.edges * 0.75);
+      expect(
+        blurred.chromaPerLuma,
+        `colour barely changed (${sharp.chromaPerLuma} → ${blurred.chromaPerLuma}), so the background does not read as blurred`,
+      ).toBeLessThan(sharp.chromaPerLuma * 0.8);
     });
   }
 
@@ -465,6 +568,8 @@ test.describe('the background behind the tour', () => {
    * the search area is the whole window and "busiest patch" lands on the
    * controls panel: all text and sliders, which is the thing a blur shows up on
    * most clearly of anything in this app.
+   *
+   * `false` for the last argument because there is no canvas here to switch off.
    */
   test('loses its detail and its colour in the narrow layout too', async ({ page }) => {
     await page.setViewportSize({ width: 860, height: 1100 });
@@ -472,31 +577,29 @@ test.describe('the background behind the tour', () => {
     await page.goto('/');
     await page.waitForTimeout(900);
 
-    const { region, before } = await pickBackgroundRegion(page, {
-      x: 0,
-      y: 0,
-      width: 860,
-      height: 1100,
-    });
+    const region = await pickBackgroundRegion(page, { x: 0, y: 0, width: 860, height: 1100 });
+
+    // Left open by the picker, for the same reason as above.
+    await expect(card(page)).toBeVisible();
+
+    const { sharp, blurred, sharpAgain } = await readWithAndWithoutBlur(page, region, false);
+
     expect(
-      before.edges,
+      sharp.edges,
       `nothing below the desktop breakpoint had any detail to blur (picked ${JSON.stringify(region)})`,
     ).toBeGreaterThan(2);
-
-    await page.getByRole('button', { name: /how to use/i }).click();
-    await expect(card(page)).toBeVisible();
-    await page.waitForTimeout(700);
-
-    const during = (await measureLooks(page, [region]))[0]!;
-
     expect(
-      during.edges,
-      `the app below the breakpoint still has ${during.edges}% of its edges (was ${before.edges}%) — it is not blurred`,
-    ).toBeLessThan(before.edges * 0.75);
+      Math.abs(sharpAgain.edges - sharp.edges),
+      `the panel moved between readings — ${sharp.edges}% then ${sharpAgain.edges}% with the blur off both times`,
+    ).toBeLessThanOrEqual(1);
     expect(
-      during.chromaPerLuma,
-      `colour barely changed (${before.chromaPerLuma} -> ${during.chromaPerLuma}), so it does not read as blurred`,
-    ).toBeLessThan(before.chromaPerLuma * 0.8);
+      blurred.edges,
+      `the app below the breakpoint keeps ${blurred.edges}% of its edges with the blur on and ${sharp.edges}% with it off — it is not blurred`,
+    ).toBeLessThan(sharp.edges * 0.75);
+    expect(
+      blurred.chromaPerLuma,
+      `colour barely changed (${sharp.chromaPerLuma} → ${blurred.chromaPerLuma}), so it does not read as blurred`,
+    ).toBeLessThan(sharp.chromaPerLuma * 0.8);
   });
   /*
    * THE 3D CANVAS IS BLURRED BY ITS OWN RULE, NOT BY THE BACKDROP LAYER.
@@ -1335,12 +1438,12 @@ test.describe('guided tour on a phone', () => {
   });
 
   /*
-   * A genuine first-time user: neither overlay has been seen.
+   * A user with nothing suppressed - the state the app opens in, because neither
+   * overlay remembers anything any more.
    *
-   * This is the one state where the disclaimer gate exists at all, and so the
-   * one state where two overlays could be stacked. The tour has to be the only
-   * thing on screen while it is showing, and the gate has to be the only thing
-   * once it is done.
+   * Both are up on every visit now, so this is also the one state where two
+   * overlays could be stacked. The tour has to be the only thing on screen while
+   * it is showing, and the gate the only thing once it is done.
    */
   test('never stacks on the disclaimer gate', async ({ page }) => {
     await asCompleteFirstTimer(page);
@@ -1356,6 +1459,49 @@ test.describe('guided tour on a phone', () => {
 
     await expect(page.getByRole('button', { name: /start exploring/i })).toBeVisible();
     await expect(card(page).getByText(/step 1 of 4/i)).toHaveCount(0);
+  });
+
+  /*
+   * Finishing is the exit the client named, and it is a different one from
+   * skipping: Finish also hands back whatever the user changed while the controls
+   * were live but frozen, so the gate appears over a workspace that is not the
+   * one they started with.
+   *
+   * The skip path above is covered separately, and neither test implies the
+   * other. Two ways out of the tour, one of them checked.
+   */
+  test('the gate comes up when the tour is finished, not only when it is skipped', async ({
+    page,
+  }) => {
+    await asCompleteFirstTimer(page);
+    await page.goto('/');
+
+    await expect(card(page)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toHaveCount(0);
+
+    // Walk to the last step the way a user does, rather than reaching in.
+    for (let i = 0; i < 3; i += 1) {
+      await card(page)
+        .getByRole('button', { name: /^next$/i })
+        .click();
+      await page.waitForTimeout(500);
+    }
+    await expect(card(page).getByText(/step 4 of 4/i)).toBeVisible();
+    await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toHaveCount(0);
+
+    await card(page)
+      .getByRole('button', { name: /finish/i })
+      .click();
+
+    // Not `card(page)` here: that is `getByRole('dialog')`, and the gate is a
+    // dialog too. It would have taken one for the tour still being up, which is
+    // the opposite of what just happened. The step text is on the tour card and
+    // nowhere else, so that is what says the tour has gone.
+    await expect(page.getByText(/step \d of 4/i)).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toBeVisible();
+    // Still a real gate and not a notice: Start stays disabled until the
+    // disclaimer is acknowledged again for this visit.
+    await expect(page.getByRole('button', { name: /start exploring/i })).toBeDisabled();
   });
 
   test('the How to use button is still reachable at 360px', async ({ page }) => {

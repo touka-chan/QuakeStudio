@@ -529,10 +529,14 @@ async function auditView(page, viewport, view) {
 
   try {
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
-    // The first-run dialog is a modal; acknowledging it is what a returning
-    // user has in localStorage, and it is what lets the workspace be reached.
+    // The welcome gate is a modal, and it is supposed to be on screen every
+    // visit now. This flag is the only thing that keeps it out of the way, and
+    // the app never writes it — so an audit has to set it, exactly as the
+    // end-to-end suite does. Otherwise what gets measured here is the gate and
+    // not the workspace, which is how six failures appeared that were never
+    // about the workspace at all.
     await page.evaluate(() => {
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
       // The guided tour also runs before the workspace is reachable, and it holds
       // the disclaimer gate closed while it is on screen. This is the storage a user
       // who has already seen the tour has.

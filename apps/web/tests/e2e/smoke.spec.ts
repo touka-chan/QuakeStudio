@@ -19,7 +19,7 @@ import { expect, test, type Page } from '@playwright/test';
 async function skipFirstRun(page: Page) {
   await page.addInitScript(() => {
     try {
-      localStorage.setItem('quakestudio.firstRunAcknowledged', 'true');
+      localStorage.setItem('quakestudio.disclaimerSuppressed', 'true');
       // The guided tour also runs before the workspace is reachable, and it holds
       // the disclaimer gate closed while it is on screen. This is the storage a user
       // who has already seen the tour has.
@@ -324,7 +324,7 @@ test.describe('first-run dialog', () => {
     await page.addInitScript(() => {
       if (sessionStorage.getItem('__qs_first_load_done')) return;
       sessionStorage.setItem('__qs_first_load_done', '1');
-      localStorage.removeItem('quakestudio.firstRunAcknowledged');
+      localStorage.removeItem('quakestudio.disclaimerSuppressed');
     });
   });
 
@@ -342,14 +342,66 @@ test.describe('first-run dialog', () => {
     await expect(start).toBeEnabled();
   });
 
-  test('does not reappear on a second visit', async ({ page }) => {
+  test('comes back on every visit, which is what the client asked for', async ({ page }) => {
+    // This describe's init script suppresses the gate on EVERY navigation, which
+    // is what makes it a clean workspace for the other tests here — and which
+    // would hide the very thing this one is looking for. Added after, so it runs
+    // after that script and wins.
+    await page.addInitScript(() => {
+      try {
+        localStorage.removeItem('quakestudio.disclaimerSuppressed');
+      } catch {
+        /* nothing to do */
+      }
+    });
+
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
     await page.getByRole('checkbox').check();
     await page.getByRole('button', { name: /start exploring/i }).click();
-
-    await page.reload();
     await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    // Nothing is written down, so a refresh brings it straight back.
+    //
+    // This test used to assert the opposite and pass, because acknowledging
+    // wrote a flag. It described the behaviour at the time, not the behaviour
+    // the product has now, and the two are exactly opposite — so leaving it
+    // alone would have made this change look like it broke the gate.
+    await page.reload();
+    await expect(page.getByRole('dialog')).toBeVisible();
+    // Un-ticked too: the acknowledgement was for this visit, not standing.
+    await expect(page.getByRole('checkbox')).not.toBeChecked();
+  });
+
+  /*
+   * Dismissing the gate must write NOTHING.
+   *
+   * The first version of this looked for one key by name, which is a test that
+   * passes the moment the key is renamed - and it did pass: the old behaviour
+   * restored under the new key, and every check stayed green. It is now a
+   * before-and-after comparison of everything in storage, so any write at all
+   * fails it, whatever it happens to be called.
+   *
+   * That is the property that matters rather than the name of a flag: the gate is
+   * meant to open on every visit, so the only way it can go back to appearing once
+   * is something writing something down.
+   */
+  test('dismissing the gate writes nothing to storage at all', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await page.goto('/');
+
+    const before = await page.evaluate(() => Object.keys(localStorage).sort());
+    await page.getByRole('checkbox').check();
+    await page.getByRole('button', { name: /start exploring/i }).click();
+    const after = await page.evaluate(() => Object.keys(localStorage).sort());
+
+    expect(after, 'dismissing the gate left something behind to remember it').toEqual(before);
+    expect(
+      await page.evaluate(() =>
+        Object.keys(localStorage).filter((k) => /firstrun|disclaimer/i.test(k)),
+      ),
+      'something wrote a gate acknowledgement again',
+    ).toEqual([]);
   });
 });
 

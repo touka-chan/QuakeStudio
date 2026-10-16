@@ -222,7 +222,19 @@ export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
 export const STORAGE_KEYS = {
   theme: 'quakestudio.theme',
   runs: 'quakestudio.runs',
-  firstRunAcknowledged: 'quakestudio.firstRunAcknowledged',
+  /*
+   * Keeps the welcome gate from opening. The app NEVER writes this.
+   *
+   * The gate is shown on every visit - the client asked for it on every restart
+   * and every refresh, the same as the tour - so remembering that someone
+   * acknowledged it once would be remembering how not to do that.
+   *
+   * This exists for the things that legitimately want the workspace without it:
+   * the end-to-end suite, which would otherwise tick a checkbox before every
+   * test, and anyone embedding the tool where the disclaimer has already been
+   * given. Storage being unavailable leaves it false, which shows the gate.
+   */
+  disclaimerSuppressed: 'quakestudio.disclaimerSuppressed',
   /*
    * Suppresses the guided tour. The app NEVER writes this.
    *

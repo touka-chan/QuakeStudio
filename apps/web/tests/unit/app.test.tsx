@@ -33,7 +33,7 @@ vi.mock('@/components/viewport/Viewport', () => ({
 }));
 
 function skipFirstRun() {
-  localStorage.setItem(STORAGE_KEYS.firstRunAcknowledged, 'true');
+  localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
   /*
    * The guided tour runs before the disclaimer gate and holds it closed while
    * it is on screen, so a test that wants the workspace has to get past both.
@@ -142,7 +142,7 @@ describe('first-run dialog', () => {
     expect(screen.getAllByText(/learning tool, not a safety check/i).length).toBeGreaterThan(0);
   });
 
-  it('dismisses and does not reappear once acknowledged', async () => {
+  it('dismisses, and writes nothing that could suppress the next visit', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -150,10 +150,43 @@ describe('first-run dialog', () => {
     await user.click(screen.getByRole('button', { name: /start exploring/i }));
 
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
-    expect(localStorage.getItem(STORAGE_KEYS.firstRunAcknowledged)).toBe('true');
+    // The old assertion here was that the acknowledgement was stored. That was
+    // the behaviour at the time; the gate is meant to open on every visit now,
+    // and writing the flag would silently take it back to appearing once.
+    expect(localStorage.getItem(STORAGE_KEYS.disclaimerSuppressed)).toBeNull();
   });
 
-  it('stays hidden entirely once already acknowledged', () => {
+  it('stays hidden only while something has actually suppressed it', () => {
+    skipFirstRun();
+    render(<App />);
+    expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
+  });
+
+  /*
+   * Re-rendering the app is a reload as far as the user is concerned — a
+   * refresh is the simplest way to check that the gate really does come back.
+   */
+  it('comes back when the app is mounted again', async () => {
+    const user = userEvent.setup();
+    const first = render(<App />);
+
+    await user.click(screen.getByRole('checkbox'));
+    await user.click(screen.getByRole('button', { name: /start exploring/i }));
+    expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
+
+    first.unmount();
+    render(<App />);
+
+    expect(screen.getByRole('button', { name: /start exploring/i })).toBeDisabled();
+    expect(screen.getByRole('checkbox')).not.toBeChecked();
+  });
+
+  /*
+   * The escape hatch still works, and it is the only thing that does: a user
+   * cannot set it, so the only way the gate stays hidden across visits is
+   * something writing to storage by hand.
+   */
+  it('stays hidden while the gate has been suppressed', () => {
     skipFirstRun();
     render(<App />);
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
