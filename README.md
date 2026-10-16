@@ -246,15 +246,73 @@ A persistent **"Editing A / B / C / D"** indicator sits outside the scrolling
 controls panel, so it stays visible however far you scroll down. The metric cards
 follow it, and say which building they belong to.
 
-Adding a third building starts you on **Side by side**. A second row changes the
-scene enough that opening on Ghost puts four translucent sheets in front of each
-other, which reads as one building that is vaguely red rather than as four.
-Choosing Ghost at three or four is then your own decision, and nothing overrides
-it afterwards.
+Adding a third building starts you on **Side by side**. Ghost overlay puts every
+building in the same place, so three or four of them is three or four
+translucent sheets over one another — which reads as a single vaguely red mass
+rather than as separate buildings. Side by side is what the client asked to see
+first, and Ghost is still one click away.
+
+The reset happens **only** on the crossing from two to three. Above that, a user
+who has deliberately chosen Ghost keeps it: a store that keeps overriding a
+choice is a store they cannot rely on.
 
 `lib/layout.ts` is where the buildings are placed, and it is also where the
 camera is framed from - the same numbers, so the camera cannot end up framing a
 different shape to the one on screen.
+
+### The guided tour
+
+Four steps, shown once, and reachable again from the green **How to use** button.
+It points at the controls panel, the play button, the results panel and the
+compare button, in that order.
+
+**Two presentations, because one of them cannot work on a narrow screen.** Above
+the desktop breakpoint it is a spotlight: the page behind goes soft, whatever
+the step is about stays sharp, and the card is placed beside it and never over
+it. Below the breakpoint the app is tab-based — one panel at a time — so a
+spotlight pointing at "the controls panel" would be pointing at something hidden
+behind another tab, and the first thing to break would be a tour pointing at the
+wrong panel. There it is a paged modal instead. The content is shared, so the two
+cannot say different things.
+
+**The highlighted control stays sharp; everything else goes soft.** That is the
+whole effect, and it was much harder to get right than it looks. Three things
+about it are worth knowing before you touch it:
+
+- **The 3D view is blurred by a `filter` on the canvas itself**, not by the
+  page-level layer. `backdrop-filter` samples what has already been composited
+  *behind* an element, and a WebGL canvas promoted to its own compositing layer
+  can come through unfiltered depending on the machine's GPU. A `filter` applied
+  to the element samples nothing, so nothing can skip it.
+- **The layer that softens the page carries no clip and no mask at all.** It
+  used to carry a `clip-path` with a hole cut around the control, and Chromium
+  does not give a `backdrop-filter` to an element that is also clipped — so the
+  hole did not make the control sharp, it removed the blur from the entire page
+  while the untouched page showing through the hole *looked* like it working. An
+  SVG `mask` behaves the same way, and so does a clip on a parent wrapper.
+  Measured on a panel at step 3: 7.2% of edges left with the clip, 2.7% without
+  it, 7.1% with the tour closed.
+- **So the hole moved.** The highlighted control is painted *above* the blur
+  (`html[data-tour-open] [data-tour-active]` in `index.css`), not cut out of it.
+  `position: relative` is there so `z-index` applies at all; it has no offsets
+  and moves nothing. The outline sits above that and the card above that.
+
+**The dim and the click-blocker keep their holes.** A dim with no hole leaves the
+control visibly brighter than a page that has gone soft, which reads as a
+rendering fault. And the blocker is what makes the highlighted control *usable* —
+without its hole a user told to "set the floors" cannot drag the slider. The
+blocker is now the only clipped layer in the tour, which is fine: a clipped
+element with no backdrop filter on it behaves exactly as intended.
+
+`tourBackdrop.ts` holds the blur and the desaturation so both presentations read
+one number. Two mechanisms with their own copy of "the page behind is softened"
+is how the narrow-screen tour ended up with no blur in it at all through an
+entire round of work on the blur.
+
+**The floating button is green, pulses, and can be dragged anywhere on screen.**
+It remembers where you put it, gets pulled back on screen when the window
+shrinks a lot, and disappears while the tour is up — the card already offers
+Skip, and a second exit floating over the overlay reads as live when it is not.
 
 ### Saving and sharing runs
 
@@ -645,6 +703,22 @@ it is best done now rather than once there are more commits.
   `cn` from `"cn"`. After adding a component, move it into
   `src/components/ui/`, replace the import with `from "@/lib/utils"`, then run
   Prettier.
+- **A long-running dev server will happily serve the wrong bytes.** The e2e
+  config reuses whatever is on port 5173 (`reuseExistingServer`), and a file
+  written by a script does not always reach Vite's watcher. The result is a
+  suite that fails on the code and passes in isolation — or passes while testing
+  something you already changed. This has now cost a whole debugging cycle twice.
+
+  When a change is "obviously correct and still failing", ask the server what it
+  actually serves before reading your own source again:
+
+  ```powershell
+  (Invoke-WebRequest http://localhost:5173/src/index.css -UseBasicParsing).Content -match '<the thing you just added>'
+  ```
+
+  If that is `False` and it is `True` in the file, kill whatever holds port 5173
+  and let Playwright start a clean one. A green run means nothing until the server
+  is serving the code you are looking at.
 
 ---
 

@@ -118,11 +118,15 @@ export const useCompareStore = create<CompareState>((set) => ({
       // Move the editing hand to the building just added, so it is obvious that
       // something appeared and that the controls now belong to it.
       //
-      // Crossing from two to three also resets the view. A second row changes
-      // the scene enough that starting on Ghost overlay — four translucent
-      // sheets over one another, which reads as a single red mass rather than
-      // four buildings — is the wrong first impression of a feature the client
-      // asked for. Side by side is what they asked to see.
+      // Crossing from two to three also resets the view. Ghost overlay puts
+      // every building in the same spot, so three or four of them is that many
+      // translucent sheets over one another - a single vaguely red mass rather
+      // than separate buildings, and a poor first impression of a feature the
+      // client asked for. Side by side is what they asked to see.
+      //
+      // This used to be justified by a second row of buildings, which the
+      // layout no longer has. The reason above is the one that is actually
+      // true, and it was checked against the scene rather than remembered.
       //
       // Only on the crossing, and only from two to three. Above that a user
       // who has deliberately chosen Ghost keeps it, because a store that
