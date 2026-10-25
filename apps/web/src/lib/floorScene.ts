@@ -65,27 +65,32 @@ export function floorContents(
 
   switch (occupancy) {
     case 'office':
-      // Three desks. Low and wide, so they read from the default camera.
+      // Three desks — taller, narrower, slightly rotated so they read as
+      // workstations with a monitor raised above the surface.
       return [
-        place(-0.55, -0.3, [0.9, 0.75, 0.65]),
-        place(0.05, 0.35, [0.9, 0.75, 0.65]),
-        place(0.6, -0.25, [0.9, 0.75, 0.65]),
+        place(-0.55, -0.3, [0.75, 0.85, 0.55], 0.25),
+        place(0.05, 0.35, [0.75, 0.85, 0.55], -0.15),
+        place(0.6, -0.25, [0.75, 0.85, 0.55], 0.1),
       ];
     case 'residential':
-      // Two beds, long side running front-to-back.
-      return [place(-0.5, 0.05, [1.3, 0.45, 1.9]), place(0.5, 0.05, [1.3, 0.45, 1.9])];
-    case 'parking':
-      // Four bays: thin, flat rectangles rather than parked cars. At a glance
-      // this reads as a car park, and it stays legible from above.
+      // Two beds — lower and longer, running front-to-back like real beds.
       return [
-        place(-0.72, 0, [0.5, 0.05, 2.1]),
-        place(-0.24, 0, [0.5, 0.05, 2.1]),
-        place(0.24, 0, [0.5, 0.05, 2.1]),
-        place(0.72, 0, [0.5, 0.05, 2.1]),
+        place(-0.5, 0.05, [1.4, 0.38, 1.9], -0.05),
+        place(0.5, 0.05, [1.4, 0.38, 1.9], 0.05),
+      ];
+    case 'parking':
+      // Four parking bays — flatter, wider, shorter height so they read
+      // as parked vehicles / bays rather than thin lines.
+      return [
+        place(-0.72, 0, [0.85, 0.18, 2.05], 0),
+        place(-0.24, 0, [0.85, 0.18, 2.05], -0.02),
+        place(0.24, 0, [0.85, 0.18, 2.05], 0.02),
+        place(0.72, 0, [0.85, 0.18, 2.05], 0),
       ];
     case 'storage':
-      // A 3 × 2 grid of crates.
-      return [-0.6, 0, 0.6].flatMap((x) => [-0.45, 0.45].map((z) => place(x, z, [0.7, 0.7, 0.7])));
+      // A 3 × 2 grid of crates — square, slightly taller, rotated
+      // individually so the grid reads as stacked storage.
+      return [-0.6, 0, 0.6].flatMap((x) => [-0.45, 0.45].map((z) => place(x, z, [0.72, 0.78, 0.72], (x + z) * 0.15)));
     case 'custom':
       // Nothing invented for a floor whose use we do not know.
       return [];
