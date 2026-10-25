@@ -1,5 +1,6 @@
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { LOAD_ASSUMPTIONS, MATERIALS } from '@/config/engineeringAssumptions';
 import { normalizeFloorLoads, participationFor } from '@/config/floorLoads';
 import { formatGrouped } from '@/lib/utils';
 import { seriesColor } from '@/store/compareStore';
@@ -13,6 +14,14 @@ import type { BuildingConfig, SimulationResult } from '@/types';
    share, and one stacked bar per floor. CSS bars, not Recharts, for the same
    reason the metric cards are eager — this block is the headline of the
    feature and must not wait on a chart chunk.
+
+   TWO SOURCES OF WEIGHT, ONE BLOCK
+
+   Floor loads ON — the classic branch: each floor's dead load plus the
+   counted share of its live load. Floor loads OFF — the building's bare
+   structure: the weight behind every bar is the material's bare floor mass,
+   no occupancy was consulted, and the counted-live tile reads a dash rather
+   than pretending a share exists.
 
    A saved run from before floor loads has no `floorWeightsKN`. It says so.
    It does not divide a total of zero into a plausible-looking bar chart.
@@ -35,6 +44,7 @@ export function WeightSummary({
   const weights = result.floorWeightsKN ?? [];
   const livePerFloor = result.floorLiveCountedKN ?? [];
   const recorded = weights.length > 0 && result.totalWeightKN > 0;
+  const loadsOn = building.loadsEnabled !== false;
 
   if (!recorded) {
     return (
@@ -63,9 +73,118 @@ export function WeightSummary({
     );
   }
 
-  const loads = normalizeFloorLoads(building.floors, building.floorLoads);
   const floors = weights.length;
   const maxWeight = Math.max(...weights, 0);
+
+  if (!loadsOn) {
+    const bare = MATERIALS[building.material];
+    return (
+      <section
+        className="rounded-card border border-line bg-surface p-4"
+        aria-labelledby="weight-heading"
+      >
+        <div className="flex items-baseline justify-between gap-2">
+          <h2 id="weight-heading" className="text-base font-semibold">
+            Floor weights
+          </h2>
+          <span className="flex items-baseline gap-2">
+            <Badge variant="secondary" className="text-[10px]">
+              Bare structure
+            </Badge>
+            <span className="text-xs text-muted-foreground">
+              {showOwner && side ? `Building ${side} · ` : ''}
+              {floors} {floors === 1 ? 'floor' : 'floors'}
+            </span>
+          </span>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <div className="rounded-app bg-surface-2 px-3 py-2">
+            <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+              Total weight
+            </p>
+            <p className="font-mono-nums mt-0.5 text-lg font-semibold">
+              {formatGrouped(result.totalWeightKN)}
+              <span className="ml-1 text-xs font-normal text-muted-foreground">kN</span>
+            </p>
+          </div>
+          <div className="rounded-app bg-surface-2 px-3 py-2">
+            <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+              Counted live
+            </p>
+            <p className="mt-0.5 text-lg font-semibold">
+              —<span className="ml-1.5 text-xs font-normal text-muted-foreground">not counted</span>
+            </p>
+          </div>
+        </div>
+
+        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+          Floor loads are off for this building: no use is counted, and each floor weighs its bare
+          structure — {formatGrouped(bare.bareMassPerAreaKgM2)} kg/m² for {bare.label.toLowerCase()}{' '}
+          — times its area. A longer bar is a heavier floor.
+        </p>
+
+        <ul
+          className="mt-3 space-y-1.5"
+          aria-label="Bare structure weight of each floor, highest first"
+        >
+          {Array.from({ length: floors }, (_, index) => floors - 1 - index).map((index) => {
+            const weight = weights[index] ?? 0;
+            const floor = index + 1;
+            const fullWidth = maxWeight > 0 ? (weight / maxWeight) * 100 : 0;
+
+            return (
+              <li
+                key={floor}
+                className="flex items-center gap-2"
+                aria-label={`Floor ${floor}: ${formatGrouped(weight)} kilonewtons of bare structure`}
+              >
+                <span className="w-24 shrink-0 truncate text-[11px] text-muted-foreground">
+                  Floor {floor}
+                </span>
+                <span
+                  className="h-2.5 flex-1 overflow-hidden rounded-full bg-surface-2"
+                  aria-hidden="true"
+                  title={`Bare structure ${formatGrouped(weight)} kN`}
+                >
+                  <span
+                    className="block h-full"
+                    style={{ width: `${fullWidth}%`, backgroundColor: 'var(--load-dead)' }}
+                  />
+                </span>
+                <span className="font-mono-nums w-16 shrink-0 text-right text-xs">
+                  {formatGrouped(weight)}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <span
+              className="size-2 rounded-full"
+              style={{ backgroundColor: 'var(--load-dead)' }}
+              aria-hidden="true"
+            />
+            Bare structure
+          </span>
+          {showOwner && side ? (
+            <span className="ml-auto flex items-center gap-1.5">
+              <span
+                className="size-2 rounded-full"
+                style={{ backgroundColor: seriesColor(side) }}
+                aria-hidden="true"
+              />
+              Building {side}
+            </span>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
+  const loads = normalizeFloorLoads(building.floors, building.floorLoads);
   const totalLive = livePerFloor.reduce((sum, value) => sum + value, 0);
   const liveShare = result.totalWeightKN > 0 ? (totalLive / result.totalWeightKN) * 100 : 0;
 

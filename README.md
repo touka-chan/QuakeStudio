@@ -197,6 +197,34 @@ Controls worth knowing about:
 visible but unavailable — Phase 7 scope, pending engineering approval. It is
 labelled as such rather than hidden, so the boundary of the model is explicit.
 
+### Floors & loads
+
+Every floor carries a use — office, residential, parking, storage or a custom
+row — with its own dead and live loads, and one **live-load participation** ψ
+(default 25%) deciding how much live load is earthquake weight. The floor list
+shows the arithmetic for the open floor: `W = (dead + ψ × live) × area`.
+
+**Count floor loads — per building, on or off.** The switch sits at the top of
+the tab. OFF means the uses are not counted at all: every floor then weighs its
+material's **bare structure** — a placeholder mass per material (concrete 600,
+steel 400, composite 500, wood 250 kg/m², all pending review in
+[assumptions.md §5b](docs/assumptions.md)) — times its plan area. The load
+rows collapse to a note that says what replaced them and are restored, not
+reset, when the switch goes back on. Everything derived from the engine says
+which basis it is reporting: the weight panel marks itself **Bare structure**
+and shows the counted-live tile as "not counted" instead of inventing a share;
+the CSV export labels its floor section and prints the bare-basis mass; the
+comparison table reads "0 % (loads off)" on that column. Saved runs and the
+JSON export carry the switch (`loadsEnabled`, absent = on, so runs saved by
+older builds import exactly as they always did), and loading a run shows its
+recorded result without re-solving it.
+
+**Uses a material is not typically built on are flagged, not blocked.** Parking
+or storage on a wood floor gets an amber review note in the floor list and the
+open editor, plus a "Review needed" chip that counts such floors. The weights
+still count the loads as entered everywhere — the flag is for an engineer's
+decision, and red stays reserved for interface errors.
+
 ### Comparison
 
 `Compare with another building` adds a second configuration and runs **both**
@@ -371,7 +399,10 @@ See [`apps/web/src/storage/README.md`](apps/web/src/storage/README.md) for the
 (displacement in mm, drift in percent, ground acceleration in m/s²). Displacement
 columns come from the same `SimulationResult` the charts render, so the file and
 the screen cannot disagree. The header block also states each headline figure
-*exactly as displayed*, which makes the match checkable.
+*exactly as displayed*, which makes the match checkable. A building with its
+floor loads off gets its own labelled section: the floor rows show the bare
+structure per material instead of the uses, and the live-share line states
+that zero is exact because nothing live was counted.
 
 ---
 
@@ -582,10 +613,10 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **494 tests** |
+| `npm test` | Vitest unit + component tests - **507 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests — **119 specs** (+ 5 PWA specs via `test:pwa`) |
+| `npm run e2e` | Playwright end-to-end tests - **125 specs** (+ 5 PWA specs via `test:pwa`) |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
 | `npm run web:audit` | Audit every viewport in a browser — 6 widths × 6 views, no device needed |
 | `npm run analysis:drift` | Measure where story drift actually lands, for the colour bands |

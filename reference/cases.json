@@ -698,6 +698,124 @@
         ]
       },
       "motion": { "preset": "impulse", "pgaG": 0.35, "durationS": 20 }
+    },
+    {
+      "id": "loads-off-bare-concrete",
+      "why": "FLOOR LOADS OFF: six floors, same geometry as the participation pair, with floor loads disabled and deliberately heavy Storage rows that must be IGNORED. Every floor weighs the bare concrete mass (600 kg/m2 placeholder per assumptions.md section 5a), so the OFF branch of the weight assembly is checked against the same case run loads-on first.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "loadsEnabled": false,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "storage",
+            "deadLoadKPa": 6,
+            "liveLoadKPa": 10,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-off-wood-bare",
+      "why": "FLOOR LOADS OFF on wood with Parking rows that are FLAGGED for review (wood floors do not typically carry parking; the flag allows and annotates). The mass must come from the wood bare table (250 kg/m2 placeholder), the lightest material, so this is also the load-off corner of the material sweep.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "wood",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "loadsEnabled": false,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "parking",
+            "deadLoadKPa": 5,
+            "liveLoadKPa": 2.5,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "parking",
+            "deadLoadKPa": 5,
+            "liveLoadKPa": 2.5,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "impulse", "pgaG": 0.35, "durationS": 20 }
     }
   ]
 }

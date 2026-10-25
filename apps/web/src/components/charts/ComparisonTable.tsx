@@ -81,6 +81,12 @@ const MEASURES: Measure[] = [
     label: 'Counted live share',
     cell: (s) => {
       if (!recorded(s.result)) return 'not recorded';
+      if (s.building.loadsEnabled === false) {
+        // Zero is true — nothing live was counted — but a bare "0 %" next to
+        // percentages from other buildings reads like a participation of
+        // zero, so the cell says why the share is zero instead.
+        return '0 % (loads off)';
+      }
       const live = (s.result.floorLiveCountedKN ?? []).reduce((sum, value) => sum + value, 0);
       const share = s.result.totalWeightKN > 0 ? (live / s.result.totalWeightKN) * 100 : 0;
       return `${share.toFixed(0)} %`;

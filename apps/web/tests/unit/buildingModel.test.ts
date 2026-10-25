@@ -130,6 +130,92 @@ describe('buildModel', () => {
     );
     expect(model.floorMassKg.length).toBe(4);
     expect(model.totalWeightKN).toBeCloseTo(expectedWeight * 4, 10);
+    // Absent the field the schema back-fills true, so an old run reads as ON.
+    expect(model.loadsEnabled).toBe(true);
+  });
+
+  it('weighs every floor by its bare structure while loads are off', () => {
+    const building: BuildingConfig = {
+      ...BASE,
+      floors: 4,
+      widthM: 20,
+      depthM: 10,
+      material: 'steel',
+      floorLoads: allOfficeFloorLoads(4),
+      liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
+      loadsEnabled: false,
+    };
+    const model = buildModel(building);
+
+    const area = 20 * 10;
+    // What one bare steel floor weighs: the material's placeholder mass times
+    // the area, converted to kilonewtons by g.
+    const bareWeight =
+      (MATERIALS.steel.bareMassPerAreaKgM2 * area * LOAD_ASSUMPTIONS.gravityMs2) / 1000;
+
+    for (const weight of model.floorWeightsKN) {
+      expect(weight).toBeCloseTo(bareWeight, 10);
+    }
+    // The dead/live split keeps speaking the result schema's language: all of
+    // a bare floor's weight is structure, none of it is counted live.
+    for (const dead of model.floorDeadKN) {
+      expect(dead).toBeCloseTo(bareWeight, 10);
+    }
+    for (const live of model.floorLiveCountedKN) {
+      expect(live).toBe(0);
+    }
+    expect(model.totalWeightKN).toBeCloseTo(bareWeight * 4, 10);
+    expect(model.participation).toBe(LOAD_ASSUMPTIONS.liveLoadParticipation); // reported, not used
+    expect(model.loadsEnabled).toBe(false);
+  });
+
+  it('ignores the load rows entirely while loads are off, and keeps K calibrated', () => {
+    const common: BuildingConfig = {
+      ...BASE,
+      floors: 3,
+      widthM: 10,
+      depthM: 10,
+      material: 'wood',
+      liveLoadParticipation: 0.25,
+      loadsEnabled: false,
+      floorLoads: [
+        {
+          floor: 1,
+          occupancy: 'storage',
+          deadLoadKPa: LOAD_ASSUMPTIONS.maxDeadLoadKPa,
+          liveLoadKPa: LOAD_ASSUMPTIONS.maxLiveLoadKPa,
+          liveOverridden: true,
+        },
+        {
+          floor: 2,
+          occupancy: 'storage',
+          deadLoadKPa: LOAD_ASSUMPTIONS.maxDeadLoadKPa,
+          liveLoadKPa: LOAD_ASSUMPTIONS.maxLiveLoadKPa,
+          liveOverridden: true,
+        },
+        {
+          floor: 3,
+          occupancy: 'storage',
+          deadLoadKPa: LOAD_ASSUMPTIONS.maxDeadLoadKPa,
+          liveLoadKPa: LOAD_ASSUMPTIONS.maxLiveLoadKPa,
+          liveOverridden: true,
+        },
+      ],
+    };
+    const withHeavyRows = buildModel(common);
+    const withPlainRows = buildModel({ ...common, floorLoads: allOfficeFloorLoads(3) });
+
+    // Both floors weigh exactly what the bare wood mass dictates, so the load
+    // rows make no difference — even at their maximum.
+    expect(withHeavyRows.floorWeightsKN).toEqual(withPlainRows.floorWeightsKN);
+    expect(withHeavyRows.floorMassKg).toEqual(withPlainRows.floorMassKg);
+
+    // And the same switch on flips the basis back to the rows.
+    const loaded = buildModel({ ...common, loadsEnabled: true });
+    expect(loaded.floorWeightsKN[0]).toBeGreaterThan(withHeavyRows.floorWeightsKN[0]!);
+    // Stiffness was calibrated from the reference building, not from these
+    // masses, so turning loads off must not re-tune it.
+    expect(loaded.storyStiffnessNm).toBeCloseTo(withHeavyRows.storyStiffnessNm, 9);
   });
 
   it('rejects a floor with no weight instead of producing NaN', () => {

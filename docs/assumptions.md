@@ -27,6 +27,8 @@ there and the app follows.
 | 1.5 | Floor live load — custom | user-entered, preset 2.4 kPa | ☐ | The picker allows any value; interface, not an assumption |
 | 1.6 | Floor dead load (slab, finishes, services) | 4.8 kPa default, editable per floor | ☐ | **Needs a real figure** — estimate |
 | 1.7 | Live-load participation `ψ` | 0.25 for every use | ☐ | **Needs review** — real use has subcategories (eg. 0.5 where partitions apply); a single flat value is deliberate for now, see §5a |
+| 1.8 | Bare floor mass (used when a building's floor loads are OFF) | concrete 600, steel 400, composite 500, wood 250 kg/m² | ☐ | **Restored placeholder** — the mass-per-area figure parked when floor loads were added, now revived for the loads-off basis only; needs a real structural estimate — §5b |
+| 1.9 | Use–material compatibility flag | parking or storage on a wood floor: flagged for review, still allowed | ☐ | A review flag, not an engine rule; red stays reserved for interface errors — §5b |
 | 2.1 | Damping ratio — concrete | 5% | ☐ | Within the spec's 2–5% range |
 | 2.2 | Damping ratio — steel | 2% | ☐ | Typically the least damped |
 | 2.3 | Damping ratio — composite | 3% | ☐ | |
@@ -64,6 +66,12 @@ use (office 2.4, residential 1.9, parking 2.4, storage 6.0 kPa, or a custom
 value); `ψ` (live-load participation) is 0.25 and editable per floor in the
 UI's counts. The counted figure is what appears in the floor list and in the
 Weight-summary table, and there is a §5a below on what `ψ` hides.
+
+**A building can also be simulated with its floor loads switched off**
+(per-building switch, §5b). Off means the occupancy story above is not counted
+at all: every floor then weighs its material's bare floor mass times its area,
+`W_i = m_bare × A × g / 1000`. The load rows are kept and restored when the
+switch goes back on.
 
 ```
 M·ü + C·u̇ + K·u = −M·1·a_g(t)
@@ -168,6 +176,48 @@ it up on a storage row without the code pretending to enforce a rule. What the
 adviser should confirm is whether per-use participation (from the provisions
 themselves, the same review pass as the live loads) should replace the flat
 default, or whether a single adjustable value is the honest teaching version.
+
+## 5b. The bare structure — what "floor loads off" means
+
+A building can be simulated **without its floor loads counted**, per building.
+This exists so the load story can be split cleanly in two: first "what the
+structure weighs", then "what the use adds". OFF cannot mean *massless* — the
+eigenproblem divides by the square root of mass — so OFF has a defined
+replacement basis:
+
+| Material | Bare floor mass (kg/m²) | Basis per floor = mass × plan area |
+|---|---|---|
+| Concrete | 600 | placeholder — needs engineer review |
+| Steel | 400 | placeholder — needs engineer review |
+| Composite | 500 | placeholder — needs engineer review |
+| Wood | 250 | placeholder — needs engineer review |
+
+These figures bridge the two stories: they are the same
+mass-per-area placeholders the floor-loads feature parked, revived ONLY for the
+loads-off basis. A dead-load of "the floor itself" still exists inside the
+loads-on story; OFF does not consult it. Stiffness stays calibrated from the
+reference building either way — loads (or their absence) change mass only.
+
+The switch is per building, travels with saved runs and exports
+(`loadsEnabled`, absent = on, so older files read as they always did), and the
+derived displays say which basis they are reporting: the weight panel marks
+itself "Bare structure" and reports the counted-live tile as "not counted"
+rather than inventing a share; the CSV export labels the section and prints
+the bare-basis mass; the comparison table's live-share column reads
+"0 % (loads off)" on a bare side.
+
+### Compatibility flags (a review note, not a rule)
+
+| Use | Material | What happens |
+|---|---|---|
+| Parking or Storage | Wood | The floor is marked for an engineer's decision (list chip + editor note). The load still counts exactly as entered. |
+
+Heavy public use on timber is not typical construction, and the point of the
+app is honest numbers, not gatekeeping: red stays reserved for interface
+errors, so the flag is amber and informative. The map lives in
+`INCOMPATIBLE_USES` and is exported to the reference constants so any future
+review tooling reads the same list. What the adviser should confirm is whether
+more pairs belong here (and whether storage on light-gauge steel should join).
 
 ---
 
@@ -397,9 +447,12 @@ would otherwise be puzzled.
 
 ## 9. Validation status
 
-Not yet performed. Phase 5 adds a NumPy/SciPy reference solver and compares at
-least 10 cases (floors 3/5/10/15 × materials), reporting percent error and
-RMSE against the TypeScript engine.
-
-Results go in [`validation-report.md`](validation-report.md), which doubles as
-part of the adviser's hand-off package.
+The TypeScript engine is validated against the NumPy/SciPy reference solver on
+every run of `npm run validate`. The matrix started at the Phase-5 floors ×
+materials grid, grew floor-load cases with that feature (uniform, top/bottom
+heavy, mixed uses, ψ at 0 and 1, custom values), and now carries two
+loads-off cases — a bare concrete twin of the participation pair, and bare
+wood with flagged parking rows that must be ignored. The gate is a relative
+error of 1e-6; the report records the worst case at
+[`validation-report.md`](validation-report.md), which doubles as part of the
+adviser's hand-off package.

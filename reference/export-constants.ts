@@ -24,6 +24,7 @@ import {
   FRAME_TYPES,
   GEOMETRY,
   GROUND_MOTION,
+  INCOMPATIBLE_USES,
   LOAD_ASSUMPTIONS,
   MATERIALS,
   SOLVER,
@@ -45,7 +46,7 @@ const outputPath = resolve(here, 'constants.json');
  */
 const constants = {
   /** Bumped when the shape below changes, so a stale constants.json is obvious. */
-  schemaVersion: 2,
+  schemaVersion: 3,
   exportedFrom: 'apps/web/src/config/engineeringAssumptions.ts',
 
   gravityMs2: GRAVITY_MS2,
@@ -53,6 +54,10 @@ const constants = {
   materials: MATERIALS,
   frameTypes: FRAME_TYPES,
   loadAssumptions: LOAD_ASSUMPTIONS,
+
+  // The review-flag map, not an engine rule: exported so the reference and any
+  // future reviewer tooling read the same compatibility list the UI marks with.
+  incompatibleUses: INCOMPATIBLE_USES,
 
   solver: {
     dtS: SOLVER.dtS,

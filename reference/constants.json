@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "exportedFrom": "apps/web/src/config/engineeringAssumptions.ts",
   "gravityMs2": 9.80665,
   "materials": {
@@ -7,25 +7,29 @@
       "label": "Concrete",
       "dampingRatio": 0.05,
       "periodCt": 0.072,
-      "periodExponentX": 0.8
+      "periodExponentX": 0.8,
+      "bareMassPerAreaKgM2": 600
     },
     "steel": {
       "label": "Steel",
       "dampingRatio": 0.02,
       "periodCt": 0.072,
-      "periodExponentX": 0.8
+      "periodExponentX": 0.8,
+      "bareMassPerAreaKgM2": 400
     },
     "composite": {
       "label": "Composite",
       "dampingRatio": 0.03,
       "periodCt": 0.072,
-      "periodExponentX": 0.8
+      "periodExponentX": 0.8,
+      "bareMassPerAreaKgM2": 500
     },
     "wood": {
       "label": "Wood",
       "dampingRatio": 0.05,
       "periodCt": 0.072,
-      "periodExponentX": 0.8
+      "periodExponentX": 0.8,
+      "bareMassPerAreaKgM2": 250
     }
   },
   "frameTypes": {
@@ -75,6 +79,14 @@
       }
     },
     "sourceNote": "Values from published summaries of NSCP 2015 Table 205-1. Confirm against the official code."
+  },
+  "incompatibleUses": {
+    "parking": [
+      "wood"
+    ],
+    "storage": [
+      "wood"
+    ]
   },
   "solver": {
     "dtS": 0.01,

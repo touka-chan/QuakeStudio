@@ -389,6 +389,60 @@ describe('floor loads', () => {
     expect(screen.getAllByText(/30% of the live load/i).length).toBeGreaterThan(0);
   });
 
+  it('turns floor loads off, collapses the rows, and keeps them saved', async () => {
+    const user = await openLoads();
+
+    // Park a distinctive use on floor 1 first, so restoring shows the rows
+    // survived the switch either way.
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    await user.click(screen.getByRole('radio', { name: /^storage$/i }));
+
+    await user.click(screen.getByRole('switch', { name: /count floor loads/i }));
+
+    expect(useConfigStore.getState().building.loadsEnabled).toBe(false);
+    expect(screen.queryByRole('radio', { name: /^storage$/i })).not.toBeInTheDocument();
+    expect(screen.getByText(/what the building weighs instead/i)).toBeInTheDocument();
+    // 600 kg/m² is the concrete bare placeholder the card explains.
+    expect(screen.getByText('600 kg/m²')).toBeInTheDocument();
+    expect(useConfigStore.getState().building.floorLoads[0]!.occupancy).toBe('storage');
+
+    // And switching back on brings the same rows, not fresh defaults.
+    await user.click(screen.getByRole('switch', { name: /count floor loads/i }));
+    expect(useConfigStore.getState().building.loadsEnabled).toBe(true);
+    expect(screen.getByRole('radio', { name: /^storage$/i })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    );
+  });
+
+  it('flags parking on wood for review without blocking it', async () => {
+    const user = await openLoads();
+
+    const wood = { ...useConfigStore.getState().building, material: 'wood' as const };
+    act(() => {
+      useConfigStore.setState({ building: wood, displayBuilding: wood });
+    });
+
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    await user.click(screen.getByRole('radio', { name: /^parking$/i }));
+
+    // Both places the flag lives: the list header chip and the open editor.
+    expect(await screen.findByText(/review needed: 1 floor/i)).toBeInTheDocument();
+    expect(screen.getByText(/pair an engineer should review/i)).toBeInTheDocument();
+    // Flagged, not forbidden: the floor really is parking, on wood.
+    expect(useConfigStore.getState().building.floorLoads[0]!.occupancy).toBe('parking');
+  });
+
+  it('flags nothing when the use fits the material', async () => {
+    const user = await openLoads();
+
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    await user.click(screen.getByRole('radio', { name: /^parking$/i }));
+
+    expect(screen.queryByText(/review needed/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/pair an engineer should review/i)).not.toBeInTheDocument();
+  });
+
   it('opens the assumptions dialog on the floor-loads tab', async () => {
     const user = await openLoads();
 
@@ -557,6 +611,28 @@ describe('results panel', () => {
       screen.queryByRole('heading', { name: /displacement over time/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /floor weights/i })).toBeInTheDocument();
+  });
+
+  it('labels the weights bare structure while loads are off', () => {
+    const off = { ...DEFAULT_BUILDING_CONFIG, loadsEnabled: false };
+    useConfigStore.setState({
+      building: off,
+      displayBuilding: off,
+      result: seededResult(),
+      status: 'idle',
+    });
+    render(<AppShell forceDesktopLayout />);
+
+    // Badge, caption and legend all speak the bare basis; the counted-live
+    // tile and the dead/live legend of the loads-on branch are gone.
+    expect(screen.getAllByText(/bare structure/i).length).toBeGreaterThan(1);
+    expect(screen.getByText('not counted')).toBeInTheDocument();
+    expect(screen.getByText(/600 kg\/m²/)).toBeInTheDocument();
+    expect(screen.queryByText(/% of weight/i)).not.toBeInTheDocument();
+    expect(screen.queryByText('Counted live load')).not.toBeInTheDocument();
+    // The rows still carry floors, minus the use that is not being consulted.
+    expect(screen.getByLabelText(/floor 5: .+ bare structure/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^floor 1 · office$/i)).not.toBeInTheDocument();
   });
 
   it('says an old run has no weights instead of inventing them', () => {

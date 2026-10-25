@@ -120,6 +120,7 @@ describe('export / import round trip', () => {
     expect(bundle.appVersion).toBe(APP_VERSION);
     // The loads travel with the building; the weights travel with the result.
     expect(bundle.runs[0]!.building.floorLoads).toHaveLength(bundle.runs[0]!.building.floors);
+    expect(bundle.runs[0]!.building.loadsEnabled).toBe(true);
     expect(bundle.runs[0]!.result.totalWeightKN).toBeGreaterThan(0);
   });
 
@@ -155,9 +156,44 @@ describe('export / import round trip', () => {
       ),
     ).toBe(true);
     expect(restored!.building.liveLoadParticipation).toBe(0.25);
+    // A record older than the switch counted its loads; migration keeps it so.
+    expect(restored!.building.loadsEnabled).toBe(true);
     expect(restored!.result.floorWeightsKN).toEqual([]);
     expect(restored!.result.floorDeadKN).toEqual([]);
     expect(restored!.result.totalWeightKN).toBe(0);
+  });
+
+  it('carries a loads-off building through the round trip', () => {
+    const record = makeRecord();
+    const json = JSON.stringify({
+      format: EXPORT_FORMAT,
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      appVersion: APP_VERSION,
+      runs: [{ ...record, building: { ...record.building, loadsEnabled: false } }],
+    });
+
+    const [restored] = parseRunJson(json);
+    // The switch is exactly what the receiving side must not second-guess: it
+    // decides whether those weights are occupancy loads or bare structure.
+    expect(restored!.building.loadsEnabled).toBe(false);
+  });
+
+  it('reads a v2 building written before the switch as loads-on', () => {
+    const record = makeRecord();
+    const building = { ...record.building } as { loadsEnabled?: boolean };
+    delete building.loadsEnabled;
+
+    const json = JSON.stringify({
+      format: EXPORT_FORMAT,
+      version: 2,
+      exportedAt: new Date().toISOString(),
+      appVersion: APP_VERSION,
+      runs: [{ ...record, building }],
+    });
+
+    const [restored] = parseRunJson(json);
+    expect(restored!.building.loadsEnabled).toBe(true);
   });
 });
 

@@ -1,5 +1,6 @@
 import { MATERIALS, FRAME_TYPES, SOLVER } from '@/config/engineeringAssumptions';
 import {
+  bareFloorWeightKN,
   floorAreaM2,
   massKgFromWeightKN,
   normalizeFloorLoads,
@@ -34,6 +35,13 @@ import {
 
    and the floors may all be different, so M is a general diagonal matrix.
 
+   THE EXCEPTION IS A BUILDING WITH FLOOR LOADS OFF: `building.loadsEnabled` is
+   a per-building switch, and with it off the occupancy loads are not counted
+   at all — every floor weighs its material's bare structure
+   (`bareFloorWeightKN`), so the material matters again for weight. Bare
+   masses are uniform, but M is still assembled the same general way, and the
+   reduction below handles both.
+
    STIFFNESS IS CALIBRATED FROM A REFERENCE BUILDING whose floors are all
    Office at the default loads. That is what makes adding load change the
    response without making the building stronger: K is fixed for a given
@@ -62,6 +70,11 @@ export type StructuralModel = {
   readonly totalWeightKN: number;
   /** Fraction of live load counted as earthquake weight, 0..1. */
   readonly participation: number;
+  /**
+   * Whether the occupancy loads produced these weights. False means the
+   * weights are the material's bare floor mass, not the load rows'.
+   */
+  readonly loadsEnabled: boolean;
   /** Story stiffness in N/m. Uniform in the MVP. */
   readonly storyStiffnessNm: number;
   /** The mass used to calibrate stiffness, in kg. See the header note. */
@@ -140,22 +153,43 @@ export function buildModel(building: BuildingConfig): StructuralModel {
   const loads = normalizeFloorLoads(n, building.floorLoads);
   const participation = participationFor(building);
 
-  // ---- Mass, from the floor loads ----------------------------------------
-  const floorDeadKN = loads.map((load) => load.deadLoadKPa * areaM2);
-  const floorLiveCountedKN = loads.map((load) => participation * load.liveLoadKPa * areaM2);
+  /*
+   * Whether the occupancy loads are counted at all. This is a per-building
+   * switch: OFF consults neither the floor uses nor their dead-load inputs,
+   * and every floor weighs what its material's bare structure weighs. The
+   * `?? true` is belt-and-braces — the building schema already backs an
+   * absent field with true at the boundary — because a massless building must
+   * be unreachable by accident.
+   */
+  const loadsOn = building.loadsEnabled !== false;
+
+  // ---- Mass, from the floor loads (or the bare structure) ----------------
+  /*
+   * In OFF mode the dead/live split still speaks the result schema's language:
+   * all of a bare floor's weight is structure, none of it is counted live —
+   * which is the truth the weight displays report, not a rounding.
+   */
+  const floorDeadKN = loads.map((load) =>
+    loadsOn ? load.deadLoadKPa * areaM2 : bareFloorWeightKN(areaM2, building.material),
+  );
+  const floorLiveCountedKN = loads.map((load) =>
+    loadsOn ? participation * load.liveLoadKPa * areaM2 : 0,
+  );
   const floorWeightsKN = floorDeadKN.map((dead, index) => dead + floorLiveCountedKN[index]!);
   const totalWeightKN = floorWeightsKN.reduce((sum, weight) => sum + weight, 0);
   /*
    * A floor with no weight has no mass, and the eigenproblem divides by its
-   * square root. Zero loads are reachable (dead load 0, live load 0 or ψ 0), so
-   * this is reported as a model error rather than allowed to become NaN in
-   * every chart. Dead load includes the floor itself, so a real floor is never
-   * weightless.
+   * square root. Zero loads are reachable while loads are ON (dead load 0,
+   * live load 0 or ψ 0), so this is reported as a model error rather than
+   * allowed to become NaN in every chart. While loads are OFF it cannot fire:
+   * the bare masses are constants above zero, and the geometry floor keeps
+   * the area positive. Dead load includes the floor itself, so a real floor
+   * is never weightless.
    */
   const weightless = floorWeightsKN.findIndex((weight) => !(weight > 0));
   if (weightless >= 0) {
     throw new Error(
-      `Floor ${weightless + 1} has no weight. Set a dead load or count some live load on every floor.`,
+      `Floor ${weightless + 1} has no weight. ${loadsOn ? 'Set a dead load or count some live load on every floor.' : 'This needs floor loads switched on — the bare structure always has mass.'}`,
     );
   }
   const massValues = Float64Array.from(floorWeightsKN.map(massKgFromWeightKN));
@@ -200,6 +234,7 @@ export function buildModel(building: BuildingConfig): StructuralModel {
     floorLiveCountedKN,
     totalWeightKN,
     participation,
+    loadsEnabled: loadsOn,
     storyStiffnessNm: storyStiffness,
     referenceMassKg,
     mass: diagonal(massValues),

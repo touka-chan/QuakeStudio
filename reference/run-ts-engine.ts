@@ -24,9 +24,14 @@ const here = dirname(fileURLToPath(import.meta.url));
 const casesPath = resolve(here, 'cases.json');
 const outputPath = resolve(here, 'ts-results.json');
 
-type CaseBuilding = Omit<BuildingConfig, 'id' | 'name' | 'floorLoads' | 'liveLoadParticipation'> & {
+type CaseBuilding = Omit<
+  BuildingConfig,
+  'id' | 'name' | 'floorLoads' | 'liveLoadParticipation' | 'loadsEnabled'
+> & {
   floorLoads?: BuildingConfig['floorLoads'];
   liveLoadParticipation?: number;
+  /** Absent means ON — the schema parse supplies the default, as for imports. */
+  loadsEnabled?: boolean;
 };
 
 type CaseFile = {

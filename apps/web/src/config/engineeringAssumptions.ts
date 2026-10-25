@@ -50,15 +50,25 @@ export type MaterialAssumption = {
   readonly periodCt: number;
   /** x in the empirical period formula T1 = Ct * H^x. PLACEHOLDER – needs engineer review */
   readonly periodExponentX: number;
+  /**
+   * Mass of the bare floor, in kg/m² — the floor as built (structure and
+   * finishes), with no use counted on it. This is what a building weighs when
+   * its floor loads are switched OFF, and it is the reason the material still
+   * matters on a building that carries no occupancy loads. PLACEHOLDER –
+   * needs engineer review.
+   */
+  readonly bareMassPerAreaKgM2: number;
 };
 
 /**
  * Material properties.
  *
- * There is deliberately no mass per unit area here any more. A floor's weight
- * now comes from its own dead and live loads (see LOAD_ASSUMPTIONS and
- * `config/floorLoads.ts`), which is what lets one floor be a parking deck and
- * the next an office. Damping and the period formula are what remain genuinely
+ * A floor's weight comes from its own dead and live loads (see
+ * LOAD_ASSUMPTIONS and `config/floorLoads.ts`), which is what lets one floor
+ * be a parking deck and the next an office. `bareMassPerAreaKgM2` above is the
+ * exception a user can still pick: with floor loads OFF, the whole building
+ * falls back to the material's bare floor mass, so damping, the period
+ * formula, and that mass are the three things that remain genuinely
  * material-dependent.
  *
  * Damping ratios sit in the 2–5% range the spec allows for. Steel and
@@ -70,24 +80,28 @@ export const MATERIALS: Record<MaterialId, MaterialAssumption> = {
     dampingRatio: 0.05, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
+    bareMassPerAreaKgM2: 600, // PLACEHOLDER – needs engineer review
   },
   steel: {
     label: 'Steel',
     dampingRatio: 0.02, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
+    bareMassPerAreaKgM2: 400, // PLACEHOLDER – needs engineer review
   },
   composite: {
     label: 'Composite',
     dampingRatio: 0.03, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
+    bareMassPerAreaKgM2: 500, // PLACEHOLDER – needs engineer review
   },
   wood: {
     label: 'Wood',
     dampingRatio: 0.05, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
+    bareMassPerAreaKgM2: 250, // PLACEHOLDER – needs engineer review
   },
 };
 
@@ -206,6 +220,21 @@ export const LOAD_ASSUMPTIONS = {
   occupancies: Record<Occupancy, OccupancyAssumption>;
   sourceNote: string;
 };
+
+/**
+ * Uses a material's floor framing is not expected to carry.
+ *
+ * Educational honesty, not a rule the engine enforces: the weights are counted
+ * exactly as entered, and the UI marks the floor for an engineer's decision.
+ * Wood framing is the one case in this set — heavy public uses on timber are
+ * not typical construction, so Parking or Storage on a wood floor is flagged.
+ */
+export const INCOMPATIBLE_USES = {
+  parking: ['wood'],
+  storage: ['wood'],
+} as const satisfies Partial<Record<Occupancy, readonly MaterialId[]>>;
+
+export type IncompatibleUses = typeof INCOMPATIBLE_USES;
 
 // ===========================================================================
 // 3. GEOMETRY & UI LIMITS

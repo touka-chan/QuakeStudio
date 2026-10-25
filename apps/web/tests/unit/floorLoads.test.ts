@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
-import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
-import { allOfficeFloorLoads, normalizeFloorLoads, presetLiveLoadKPa } from '@/config/floorLoads';
+import { LOAD_ASSUMPTIONS, MATERIALS, type MaterialId } from '@/config/engineeringAssumptions';
+import {
+  allOfficeFloorLoads,
+  bareFloorMassKg,
+  bareFloorWeightKN,
+  incompatibleUsesFor,
+  needsReviewFor,
+  normalizeFloorLoads,
+  presetLiveLoadKPa,
+} from '@/config/floorLoads';
 import { DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG } from '@/config/templates';
 import { buildModel } from '@/engine/buildingModel';
 import { simulate } from '@/engine/solver';
@@ -357,5 +365,42 @@ describe('schema migration', () => {
       ),
     });
     expect(parsed.success).toBe(false);
+  });
+});
+
+describe('bare structure (loads off)', () => {
+  // Every figure traces to MATERIALS' bareMassPerAreaKgM2, which is a
+  // PLACEHOLDER row in docs/assumptions.md §5a pending engineer review — the
+  // numbers are checked here for arithmetic, not for engineering truth.
+  it('converts a bare floor mass to weight through g', () => {
+    for (const [id, material] of Object.entries(MATERIALS)) {
+      const massKg = material.bareMassPerAreaKgM2 * AREA;
+      const weightKN = bareFloorWeightKN(AREA, id as MaterialId);
+      expect(weightKN).toBeCloseTo((massKg * LOAD_ASSUMPTIONS.gravityMs2) / 1000, 10);
+      expect(bareFloorMassKg(AREA, id as MaterialId)).toBeCloseTo(massKg, 8);
+    }
+  });
+
+  it('scales with area and never goes negative', () => {
+    expect(bareFloorWeightKN(0, 'concrete')).toBe(0);
+    expect(bareFloorWeightKN(-3, 'steel')).toBe(0);
+    expect(bareFloorWeightKN(AREA, 'composite')).toBeCloseTo(
+      (MATERIALS.composite.bareMassPerAreaKgM2 * AREA * LOAD_ASSUMPTIONS.gravityMs2) / 1000,
+      10,
+    );
+  });
+
+  it('flags exactly the wood pairs the assumptions document lists', () => {
+    expect(needsReviewFor('parking', 'wood')).toBe(true);
+    expect(needsReviewFor('storage', 'wood')).toBe(true);
+    // The flag is scoped to the flagged material, so nothing else is marked.
+    expect(needsReviewFor('parking', 'concrete')).toBe(false);
+    expect(needsReviewFor('parking', 'steel')).toBe(false);
+    expect(needsReviewFor('parking', 'composite')).toBe(false);
+    expect(needsReviewFor('office', 'wood')).toBe(false);
+    expect(needsReviewFor('residential', 'wood')).toBe(false);
+    expect(needsReviewFor('custom', 'wood')).toBe(false);
+    expect(incompatibleUsesFor('parking')).toEqual(['wood']);
+    expect(incompatibleUsesFor('office')).toEqual([]);
   });
 });

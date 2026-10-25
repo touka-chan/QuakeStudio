@@ -152,3 +152,11 @@ bar next to it; the results panel's weight block names the total in kN. The
 same rules this review set (plain, short, second person; placeholder language;
 no safety voices) are unchanged, and the series letter A–D on roofs, charts and
 tables is unchanged.
+
+Addendum, same day — the loads-on/off switch reintroduces exactly one `kg/m²`
+appearance, and only while loads are off: the bare-structure card in the
+Floors & loads tab and the weight panel's off-state caption name a floor's
+bare mass per material (a placeholder row, labelled as needing review). A
+building that counts its loads still reads only in `kPa` and `kN`; the
+review flag says "pair an engineer should review" rather than warning the
+student away, and red remains reserved for interface errors.

@@ -259,6 +259,7 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       // as Office at the default loads — one place for that default to live.
       floorLoads: allOfficeFloorLoads(found.building.floors),
       liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
+      loadsEnabled: true,
     };
 
     if (tourOpen()) {

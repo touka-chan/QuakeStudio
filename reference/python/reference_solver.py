@@ -83,10 +83,11 @@ def load_constants(path: Path = CONSTANTS_PATH) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         data = json.load(handle)
 
-    if data.get("schemaVersion") != 2:
+    if data.get("schemaVersion") != 3:
         raise ValueError(
             f"constants.json has schemaVersion {data.get('schemaVersion')!r}, "
-            "expected 2. Re-run `npm run validate:constants`."
+            "expected 3 (bare floor mass + incompatible-use flags). "
+            "Re-run `npm run validate:constants`."
         )
     return data
 
@@ -109,6 +110,9 @@ class Building:
     damping_ratio: float | None = None
     floor_loads: tuple[dict[str, Any], ...] = ()
     live_load_participation: float | None = None
+    # Whether the occupancy loads are counted at all. None means ON: runs and
+    # cases written before the switch existed never turned loads off.
+    loads_enabled: bool | None = None
 
 
 def fundamental_period_s(building: Building, material: dict[str, Any]) -> float:
@@ -318,14 +322,32 @@ def build_model(building: Building, constants: dict[str, Any]) -> dict[str, Any]
     loads = normalise_floor_loads(building, constants)
     participation = participation_for(building, constants)
 
-    # ---- Mass, from the floor loads ---------------------------------------
-    floor_dead_kn = [load["deadLoadKPa"] * area_m2 for load in loads]
-    floor_live_counted_kn = [
-        participation * load["liveLoadKPa"] * area_m2 for load in loads
-    ]
-    floor_weights_kn = [
-        dead + live for dead, live in zip(floor_dead_kn, floor_live_counted_kn)
-    ]
+    # ---- Mass, from the floor loads (or the bare structure) ---------------
+    #
+    # loads_enabled is None on runs and cases written before the switch
+    # existed: they counted loads, so None means ON — never a massless
+    # building. In OFF mode the occupancy loads and the dead-load inputs are
+    # not consulted at all; every floor weighs its material's bare floor mass
+    # times its area, converted to kilonewtons the same way the TypeScript's
+    # bareFloorWeightKN does: mass × gravity / 1000, in that order, so the
+    # two sides agree to the last bit and not merely to the gate.
+    if building.loads_enabled is not False:
+        floor_dead_kn = [load["deadLoadKPa"] * area_m2 for load in loads]
+        floor_live_counted_kn = [
+            participation * load["liveLoadKPa"] * area_m2 for load in loads
+        ]
+        floor_weights_kn = [
+            dead + live for dead, live in zip(floor_dead_kn, floor_live_counted_kn)
+        ]
+    else:
+        bare_mass_kgm2 = float(material["bareMassPerAreaKgM2"])
+        floor_weights_kn = [
+            (bare_mass_kgm2 * max(0.0, area_m2)) * gravity / 1000.0
+            for _floor in range(n)
+        ]
+        # All of a bare floor's weight is structure; none of it is counted live.
+        floor_dead_kn = list(floor_weights_kn)
+        floor_live_counted_kn = [0.0] * n
     floor_masses_kg = [weight * 1000.0 / gravity for weight in floor_weights_kn]
     mass = np.diag(floor_masses_kg)
 
@@ -626,5 +648,8 @@ def building_from_case(case: dict[str, Any]) -> Building:
             None
             if raw.get("liveLoadParticipation") is None
             else float(raw["liveLoadParticipation"])
+        ),
+        loads_enabled=(
+            None if raw.get("loadsEnabled") is None else bool(raw["loadsEnabled"])
         ),
     )

@@ -1,4 +1,14 @@
-import { Briefcase, Car, Copy, Home, Info, Package, Pencil, RotateCcw } from 'lucide-react';
+import {
+  Briefcase,
+  Car,
+  Copy,
+  Home,
+  Info,
+  Package,
+  Pencil,
+  RotateCcw,
+  TriangleAlert,
+} from 'lucide-react';
 import { useEffect, useId, useState } from 'react';
 
 import { FieldRow } from './FieldRow';
@@ -14,7 +24,13 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { LOAD_ASSUMPTIONS, OCCUPANCY_IDS, type Occupancy } from '@/config/engineeringAssumptions';
+import { Switch } from '@/components/ui/switch';
+import {
+  LOAD_ASSUMPTIONS,
+  MATERIALS,
+  OCCUPANCY_IDS,
+  type Occupancy,
+} from '@/config/engineeringAssumptions';
 import {
   allOfficeFloorLoads,
   applyOccupancy,
@@ -24,6 +40,7 @@ import {
   floorWeightKN,
   normalizeFloorLoads,
   participationFor,
+  needsReviewFor,
   withDeadLoad,
   withLiveLoad,
   type FloorLoadValue,
@@ -45,6 +62,18 @@ import type { BuildingConfig } from '@/types';
    The panel shows that arithmetic rather than only its result, because the
    point of the feature is to see why a storage floor is heavier than an
    office one.
+
+   THE ON/OFF SWITCH
+   "Count floor loads" is a per-building switch. ON is the arithmetic above;
+   OFF consults none of it — every floor weighs its material's bare structure
+   (config/floorLoads.ts), and the load rows collapse to a saved-not-used
+   card. OFF exists so the bare/loaded comparison asks the engine, not the
+   user, to subtract.
+
+   COMPATIBILITY FLAGS
+   A use that is not typical on the building's material (wood + parking or
+   storage) is marked with an amber review note. It never blocks an edit or a
+   simulation — the weights still count exactly as entered everywhere.
 
    SIDE-AWARE
    In comparison mode the editor writes to whichever building the switcher
@@ -80,6 +109,15 @@ export function FloorLoadsControls({ side = 'A' }: { side?: CompareSide }) {
   const loads = normalizeFloorLoads(floors, building.floorLoads);
   const participation = participationFor(building);
   const areaM2 = floorAreaM2(building.widthM, building.depthM);
+  const loadsOn = building.loadsEnabled !== false;
+
+  // Floors whose use is flagged against this building's material (wood carrying
+  // parking or storage, the one pair in INCOMPATIBLE_USES). A review flag, never
+  // a block: the loads still count exactly as entered.
+  const reviewFloors = loadsOn
+    ? loads.filter((load) => needsReviewFor(load.occupancy, building.material))
+    : [];
+  const countLoadsId = useId();
 
   // The panel always has a floor open, even when the 3D has no pinned floor.
   const selected = Math.min(Math.max(activeFloor ?? floors, 1), floors);
@@ -110,12 +148,39 @@ export function FloorLoadsControls({ side = 'A' }: { side?: CompareSide }) {
 
   return (
     <div className="space-y-4">
+      {/* Count floor loads — a per-building switch; “on” is what every run
+          before it did, so loading an old saved run never changes this. */}
+      <div className="rounded-app border border-line p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <label htmlFor={countLoadsId} className="text-xs font-semibold">
+              Count floor loads
+            </label>
+            <p
+              id={`${countLoadsId}-desc`}
+              className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground"
+            >
+              {loadsOn
+                ? 'Every floor keeps its own use and dead/live loads, and they set its weight.'
+                : 'No use is counted. Every floor weighs its material’s bare structure instead.'}
+            </p>
+          </div>
+          <Switch
+            id={countLoadsId}
+            checked={loadsOn}
+            onCheckedChange={(on) => apply({ loadsEnabled: on })}
+            aria-describedby={`${countLoadsId}-desc`}
+          />
+        </div>
+      </div>
+
       <div className="flex gap-2 rounded-app border border-line bg-surface-2 p-3">
         <Info className="mt-0.5 size-4 shrink-0 text-info" aria-hidden="true" />
         <div className="min-w-0 text-xs leading-relaxed text-muted-foreground">
           <p>
-            These loads decide how heavy each floor is. Only part of the live load is counted as
-            earthquake weight.
+            {loadsOn
+              ? 'These loads decide how heavy each floor is. Only part of the live load is counted as earthquake weight.'
+              : 'Floor loads are off: the uses below are kept but not counted, and every floor weighs its bare structure.'}
           </p>
           <button
             type="button"
@@ -127,88 +192,133 @@ export function FloorLoadsControls({ side = 'A' }: { side?: CompareSide }) {
         </div>
       </div>
 
-      <div className="rounded-app border border-line p-3">
-        <FieldRow
-          label="Live load counted"
-          value={Math.round(participation * 100)}
-          min={0}
-          max={100}
-          step={5}
-          onChange={(percent) => apply({ liveLoadParticipation: percent / 100 })}
-          display={`${Math.round(participation * 100)}%`}
-          help="Only this share of each floor's live load is treated as earthquake weight. Dead load always counts in full."
-        />
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-          {participation === 0
-            ? 'Only dead load counts at 0%. Live load still describes the floor, but adds no earthquake weight.'
-            : participation === 1
-              ? 'The full live load counts at 100%. This is an upper bound, not the code assumption.'
-              : `Counted live load is ${Math.round(participation * 100)}% of the live load on every floor.`}
-        </p>
-      </div>
+      {loadsOn ? (
+        <div className="rounded-app border border-line p-3">
+          <FieldRow
+            label="Live load counted"
+            value={Math.round(participation * 100)}
+            min={0}
+            max={100}
+            step={5}
+            onChange={(percent) => apply({ liveLoadParticipation: percent / 100 })}
+            display={`${Math.round(participation * 100)}%`}
+            help="Only this share of each floor's live load is treated as earthquake weight. Dead load always counts in full."
+          />
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+            {participation === 0
+              ? 'Only dead load counts at 0%. Live load still describes the floor, but adds no earthquake weight.'
+              : participation === 1
+                ? 'The full live load counts at 100%. This is an upper bound, not the code assumption.'
+                : `Counted live load is ${Math.round(participation * 100)}% of the live load on every floor.`}
+          </p>
+        </div>
+      ) : (
+        <div className="rounded-app border border-dashed border-line bg-surface-2/50 p-3">
+          <p className="text-xs font-semibold">What the building weighs instead</p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            No use is counted. Each floor weighs its material&apos;s bare mass, times its plan area
+            ({fmt(areaM2, 2)} m²):
+          </p>
+          <ul className="mt-1.5 space-y-0.5 text-[11px]">
+            {Object.entries(MATERIALS).map(([key, assumption]) => (
+              <li key={key} className="flex justify-between gap-3">
+                <span className="font-mono-nums">
+                  {assumption.label}
+                  <span className="text-muted-foreground"> · bare floor</span>
+                </span>
+                <span className="font-mono-nums">{assumption.bareMassPerAreaKgM2} kg/m²</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-[11px] leading-relaxed text-muted-foreground">
+            These figures are placeholders pending engineering review. The load rows are saved, not
+            reset — switch counting back on to edit and count them again.
+          </p>
+        </div>
+      )}
 
-      <div>
-        <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Floor loads
-        </h3>
-        <ul className="space-y-1" aria-label="Floors, highest first">
-          {[...loads].reverse().map((load) => {
-            const isSelected = load.floor === selected;
-            const counted = countedLoadKPa(load.deadLoadKPa, load.liveLoadKPa, participation);
-            const Icon = OCCUPANCY_ICON[load.occupancy];
-            return (
-              <li key={load.floor}>
-                <button
-                  type="button"
-                  onClick={() => setActiveFloor(load.floor)}
-                  aria-expanded={isSelected}
-                  aria-controls={isSelected ? 'floor-load-editor' : undefined}
-                  className={`flex w-full items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
-                    isSelected
-                      ? 'border-primary/50 bg-surface-2'
-                      : 'border-transparent hover:border-line hover:bg-surface-2/60'
-                  }`}
-                >
-                  <span
-                    className="grid size-6 shrink-0 place-items-center rounded text-foreground"
-                    style={{ backgroundColor: `var(--load-${load.occupancy})` }}
-                    aria-hidden="true"
+      {loadsOn ? (
+        <div>
+          <h3 className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+            Floor loads
+          </h3>
+          {reviewFloors.length > 0 ? (
+            <p className="mb-1.5 flex items-start gap-1.5 rounded-app border border-warning/40 bg-warning-bg px-2.5 py-2 text-[11px] leading-relaxed text-warning-text">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                Review needed: {reviewFloors.length}{' '}
+                {reviewFloors.length === 1 ? 'floor' : 'floors'} pair a use with a material this use
+                is not typically built on. The weights still count the loads as entered.
+              </span>
+            </p>
+          ) : null}
+          <ul className="space-y-1" aria-label="Floors, highest first">
+            {[...loads].reverse().map((load) => {
+              const isSelected = load.floor === selected;
+              const counted = countedLoadKPa(load.deadLoadKPa, load.liveLoadKPa, participation);
+              const Icon = OCCUPANCY_ICON[load.occupancy];
+              return (
+                <li key={load.floor}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFloor(load.floor)}
+                    aria-expanded={isSelected}
+                    aria-controls={isSelected ? 'floor-load-editor' : undefined}
+                    className={`flex w-full items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
+                      isSelected
+                        ? 'border-primary/50 bg-surface-2'
+                        : 'border-transparent hover:border-line hover:bg-surface-2/60'
+                    }`}
                   >
-                    <Icon className="size-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-xs font-medium">
-                      Floor {load.floor}
-                      <span className="font-normal text-muted-foreground">
-                        {' '}
-                        · {LOAD_ASSUMPTIONS.occupancies[load.occupancy].label}
+                    <span
+                      className="grid size-6 shrink-0 place-items-center rounded text-foreground"
+                      style={{ backgroundColor: `var(--load-${load.occupancy})` }}
+                      aria-hidden="true"
+                    >
+                      <Icon className="size-3.5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-medium">
+                        Floor {load.floor}
+                        <span className="font-normal text-muted-foreground">
+                          {' '}
+                          · {LOAD_ASSUMPTIONS.occupancies[load.occupancy].label}
+                        </span>
                       </span>
                     </span>
-                  </span>
-                  <span className="font-mono-nums shrink-0 text-xs text-muted-foreground">
-                    {fmt(counted)} kPa
-                  </span>
-                </button>
+                    {needsReviewFor(load.occupancy, building.material) ? (
+                      <TriangleAlert
+                        className="size-3.5 shrink-0 text-warning-text"
+                        role="img"
+                        aria-label="Needs an engineering review on this building's material"
+                      />
+                    ) : null}
+                    <span className="font-mono-nums shrink-0 text-xs text-muted-foreground">
+                      {fmt(counted)} kPa
+                    </span>
+                  </button>
 
-                {isSelected ? (
-                  <FloorEditor
-                    key={load.floor}
-                    floor={load.floor}
-                    load={selectedLoad}
-                    participation={participation}
-                    areaM2={areaM2}
-                    onChange={updateFloor}
-                    onApplyToAll={applyToEveryFloor}
-                    onCopy={apply}
-                    onResetAll={resetAllLoads}
-                    allFloors={loads}
-                  />
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-      </div>
+                  {isSelected ? (
+                    <FloorEditor
+                      key={load.floor}
+                      floor={load.floor}
+                      load={selectedLoad}
+                      participation={participation}
+                      areaM2={areaM2}
+                      material={building.material}
+                      onChange={updateFloor}
+                      onApplyToAll={applyToEveryFloor}
+                      onCopy={apply}
+                      onResetAll={resetAllLoads}
+                      allFloors={loads}
+                    />
+                  ) : null}
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -220,6 +330,7 @@ function FloorEditor({
   load,
   participation,
   areaM2,
+  material,
   onChange,
   onApplyToAll,
   onCopy,
@@ -230,6 +341,7 @@ function FloorEditor({
   load: FloorLoadValue;
   participation: number;
   areaM2: number;
+  material: BuildingConfig['material'];
   onChange: (load: FloorLoadValue) => void;
   onApplyToAll: () => void;
   onCopy: (patch: Partial<BuildingConfig>) => void;
@@ -242,6 +354,9 @@ function FloorEditor({
   const weight = floorWeightKN(areaM2, load.deadLoadKPa, load.liveLoadKPa, participation);
   const counted = countedLoadKPa(load.deadLoadKPa, load.liveLoadKPa, participation);
   const psiPercent = Math.round(participation * 100);
+  // A review flag, not a rule: the governing check lives with the engineer,
+  // not in this editor. See INCOMPATIBLE_USES for what is flagged and why.
+  const needsReview = needsReviewFor(load.occupancy, material);
 
   function copyToTargets() {
     const updated = allFloors.map((entry) =>
@@ -297,6 +412,15 @@ function FloorEditor({
           );
         })}
       </div>
+
+      {needsReview ? (
+        <p className="rounded-app border border-warning/40 bg-warning-bg px-2.5 py-2 text-[11px] leading-relaxed text-warning-text">
+          {LOAD_ASSUMPTIONS.occupancies[load.occupancy].label} on{' '}
+          {MATERIALS[material].label.toLowerCase()} is a pair an engineer should review — this use
+          on this material is not typical construction. The weight below is still counted exactly as
+          entered.
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-2">
         <NumberField

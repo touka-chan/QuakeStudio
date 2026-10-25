@@ -102,12 +102,25 @@ const buildingConfigBaseSchema = z.object({
   floorLoads: z.array(floorLoadSchema).optional(),
   /** Fraction of live load counted as earthquake weight, 0..1. */
   liveLoadParticipation: z.number().min(0).max(1).optional(),
+  /**
+   * Whether the floor loads are counted at all.
+   *
+   * Optional on the way in because runs written before the switch existed all
+   * counted loads; absent means ON, never a weightless building. With it OFF
+   * the occupancy loads are not counted at all and every floor weighs its
+   * bare structure by material — see `config/floorLoads.ts`.
+   */
+  loadsEnabled: z.boolean().optional(),
 });
 
 export const buildingConfigSchema = buildingConfigBaseSchema.transform((value) => ({
   ...value,
   floorLoads: normalizeFloorLoads(value.floors, value.floorLoads as FloorLoadValue[] | undefined),
   liveLoadParticipation: value.liveLoadParticipation ?? LOAD_ASSUMPTIONS.liveLoadParticipation,
+  // The default lives HERE, at the boundary, so an old saved run or an
+  // imported file cannot produce a building whose loads silently stop being
+  // counted. An explicit false is the only way a building loses its loads.
+  loadsEnabled: value.loadsEnabled ?? true,
 }));
 
 export type BuildingConfig = z.infer<typeof buildingConfigSchema>;

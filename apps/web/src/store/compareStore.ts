@@ -195,6 +195,8 @@ export function defaultCompareBuilding(index: number, a = currentBuilding()): Bu
     // floor count. The normalizer copies the nearest floor, so a taller B is
     // not silently all-Office while its lower floors carry A's parking load.
     // A fresh array, not A's: two buildings must never share one mutable list.
+    // The loads-on/off switch spreads with the rest, deliberately: a bare
+    // building compared against bare ones is a comparison of materials.
     floorLoads: normalizeFloorLoads(floors, a.floorLoads),
     // Alternate the frame against A's, so there is a second thing varying.
     frameType: a.frameType === 'moment' ? 'braced' : 'moment',

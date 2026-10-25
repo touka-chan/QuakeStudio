@@ -1,6 +1,6 @@
 import { Capacitor } from '@capacitor/core';
 
-import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { LOAD_ASSUMPTIONS, MATERIALS } from '@/config/engineeringAssumptions';
 import { normalizeFloorLoads, participationFor } from '@/config/floorLoads';
 import { APP_VERSION } from '@/types';
 import { formatMm, formatPct } from '@/lib/utils';
@@ -51,37 +51,71 @@ export function buildCsv(
   lines.push('#');
   lines.push('# --- Floor loads ---');
   const participation = participationFor(building);
-  lines.push(`# Live-load participation (psi),${participation}`);
 
+  /*
+   * Which basis produced the stored weights is the most important honesty
+   * fact in the header. A loads-off run's weights are the material's bare
+   * structure, not the use rows', so the rows below show that basis rather
+   * than the saved dead/live values, which this run did not consult.
+   */
+  const loadsOn = building.loadsEnabled !== false;
   const weightsRecorded = (result.floorWeightsKN?.length ?? 0) > 0;
-  if (!weightsRecorded) {
-    // The loads below are the all-Office defaults a v1 record is migrated to.
-    // Saying so keeps them from reading as loads that run actually used.
-    lines.push('# Migrated from a version before floor loads; the loads below are defaults.');
-  }
-  lines.push(
-    '# Floor,Use,Dead load (kPa),Live load (kPa),Counted live (kPa)' +
-      // Weight is a property of the run, not of the current configuration. An
-      // old run gets the load columns it did record, and no invented weight.
-      (weightsRecorded ? ',Weight (kN),Mass (kg)' : ''),
-  );
+  if (!loadsOn) {
+    lines.push('# Floor loads counted,off — weights are the bare structure per material.');
+    lines.push(`# Bare floor mass (kg/m2),${MATERIALS[building.material].bareMassPerAreaKgM2}`);
+    if (!weightsRecorded) {
+      lines.push('# Migrated from a version before floor loads; the loads below are defaults.');
+    }
+    lines.push('# Floor,Bare structure weight (kN),Mass (kg)');
+    const bareMasses = MATERIALS[building.material].bareMassPerAreaKgM2;
+    const loads = normalizeFloorLoads(building.floors, building.floorLoads);
+    for (const load of loads) {
+      const index = load.floor - 1;
+      const weight = result.floorWeightsKN?.[index];
+      const mass = result.floorMassesKg?.[index];
+      lines.push(
+        `# ${load.floor},${bareMasses}` +
+          (weightsRecorded && weight !== undefined
+            ? `,${weight.toFixed(4)},${(mass ?? 0).toFixed(4)}`
+            : ''),
+      );
+    }
+    if (!weightsRecorded) lines.push('# Floor weights not recorded in this run.');
+    lines.push('#');
+    lines.push(`# Live-load participation (psi), not used while floor loads are off`);
+  } else {
+    lines.push('# Floor loads counted,on');
+    lines.push(`# Live-load participation (psi),${participation}`);
 
-  const loads = normalizeFloorLoads(building.floors, building.floorLoads);
-  for (const load of loads) {
-    const use = LOAD_ASSUMPTIONS.occupancies[load.occupancy].label;
-    const counted = load.liveLoadKPa * participation;
-    const index = load.floor - 1;
-    const weight = result.floorWeightsKN?.[index];
-    const mass = result.floorMassesKg?.[index];
+    if (!weightsRecorded) {
+      // The loads below are the all-Office defaults a v1 record is migrated to.
+      // Saying so keeps them from reading as loads that run actually used.
+      lines.push('# Migrated from a version before floor loads; the loads below are defaults.');
+    }
     lines.push(
-      `# ${load.floor},${use},${load.deadLoadKPa},${load.liveLoadKPa},${counted.toFixed(4)}` +
-        (weightsRecorded && weight !== undefined
-          ? `,${weight.toFixed(4)},${(mass ?? 0).toFixed(4)}`
-          : ''),
+      '# Floor,Use,Dead load (kPa),Live load (kPa),Counted live (kPa)' +
+        // Weight is a property of the run, not of the current configuration. An
+        // old run gets the load columns it did record, and no invented weight.
+        (weightsRecorded ? ',Weight (kN),Mass (kg)' : ''),
     );
+
+    const loads = normalizeFloorLoads(building.floors, building.floorLoads);
+    for (const load of loads) {
+      const use = LOAD_ASSUMPTIONS.occupancies[load.occupancy].label;
+      const counted = load.liveLoadKPa * participation;
+      const index = load.floor - 1;
+      const weight = result.floorWeightsKN?.[index];
+      const mass = result.floorMassesKg?.[index];
+      lines.push(
+        `# ${load.floor},${use},${load.deadLoadKPa},${load.liveLoadKPa},${counted.toFixed(4)}` +
+          (weightsRecorded && weight !== undefined
+            ? `,${weight.toFixed(4)},${(mass ?? 0).toFixed(4)}`
+            : ''),
+      );
+    }
+    if (!weightsRecorded) lines.push('# Floor weights not recorded in this run.');
+    lines.push('#');
   }
-  if (!weightsRecorded) lines.push('# Floor weights not recorded in this run.');
-  lines.push('#');
   lines.push('# --- Earthquake ---');
   lines.push(`# Preset,${motion.preset}`);
   lines.push(`# Peak ground acceleration (g),${motion.pgaG}`);
@@ -112,6 +146,11 @@ export function buildCsv(
         result.totalWeightKN > 0 ? ((live / result.totalWeightKN) * 100).toFixed(4) : '0.0000'
       }`,
     );
+    if (!loadsOn) {
+      // Zero is the true share: no live load was consulted for this run. The
+      // note above already says why, so this only keeps the number honest.
+      lines.push('# (0% is exact while floor loads are off — nothing live was counted.)');
+    }
   }
   lines.push('#');
   lines.push('# Displacement columns are in MILLIMETRES, relative to the ground.');

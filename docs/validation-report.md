@@ -8,7 +8,7 @@ Generated 2026-10-25 by `python/reference/python/compare.py`. Every number below
 
 ## Verdict: PASS
 
-The TypeScript engine and the independent Python reference agree to **6.4e-11%** at worst across 24 cases — tolerance was 1.0e-06%.
+The TypeScript engine and the independent Python reference agree to **6.4e-11%** at worst across 26 cases — tolerance was 1.0e-06%.
 
 | Quantity | Worst disagreement |
 |---|---|
@@ -104,6 +104,8 @@ Comparisons are relative and symmetric — `|a − b| / max(|a|, |b|)` — so a 
 | `loads-participation-zero` | 6 | concrete / moment | harmonic | 0.6854 s | 0.6854 s | 2.3e-15 % | 3.7e-14 % | 5.4e-14 % | 7.4e-14 % |
 | `loads-participation-one` | 6 | concrete / moment | harmonic | 0.8395 s | 0.8395 s | 2.3e-15 % | 6.5e-14 % | 1.3e-13 % | 6.6e-14 % |
 | `loads-custom-values` | 7 | wood / braced | impulse | 0.7440 s | 0.7440 s | 2.0e-15 % | 1.5e-14 % | 4.2e-14 % | 3.1e-13 % |
+| `loads-off-bare-concrete` | 6 | concrete / moment | harmonic | 0.7589 s | 0.7589 s | 2.9e-15 % | 1.0e-13 % | 2.6e-13 % | 1.4e-13 % |
+| `loads-off-wood-bare` | 6 | wood / moment | impulse | 0.4899 s | 0.4899 s | 1.2e-15 % | 6.2e-15 % | 1.1e-14 % | 3.7e-14 % |
 
 Errors are percentages; `0` means the two agree to within floating-point noise.
 
@@ -135,10 +137,12 @@ Agreeing on the default model proves very little. The matrix is built around the
 - **`loads-participation-zero`** — FLOOR LOADS: psi = 0, so only dead load counts. The lightest and fastest of the six-floor pair; checks the participation factor reaches the mass matrix.
 - **`loads-participation-one`** — FLOOR LOADS: psi = 1, so the full live load counts. Same geometry as participation-zero; every period must be longer by the mass ratio.
 - **`loads-custom-values`** — FLOOR LOADS: every floor Custom at 6.5 kPa dead and 4.2 kPa live, psi 0.35. Checks that typed values and a non-default participation survive the whole pipeline.
+- **`loads-off-bare-concrete`** — FLOOR LOADS OFF: six floors, same geometry as the participation pair, with floor loads disabled and deliberately heavy Storage rows that must be IGNORED. Every floor weighs the bare concrete mass (600 kg/m2 placeholder per assumptions.md section 5a), so the OFF branch of the weight assembly is checked against the same case run loads-on first.
+- **`loads-off-wood-bare`** — FLOOR LOADS OFF on wood with Parking rows that are FLAGGED for review (wood floors do not typically carry parking; the flag allows and annotates). The mass must come from the wood bare table (250 kg/m2 placeholder), the lightest material, so this is also the load-off corner of the material sweep.
 
 ## Engine performance
 
-All 24 cases solve in well under a second combined (worst single case under 10 ms). Fast enough to re-run on every parameter change, which is what makes this usable for exploration rather than a one-off check.
+All 26 cases solve in well under a second combined (worst single case under 10 ms). Fast enough to re-run on every parameter change, which is what makes this usable for exploration rather than a one-off check.
 
 ## What would make this stronger
 

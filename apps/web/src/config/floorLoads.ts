@@ -1,4 +1,11 @@
-import { LOAD_ASSUMPTIONS, OCCUPANCY_IDS, type Occupancy } from './engineeringAssumptions';
+import {
+  INCOMPATIBLE_USES,
+  LOAD_ASSUMPTIONS,
+  OCCUPANCY_IDS,
+  MATERIALS,
+  type MaterialId,
+  type Occupancy,
+} from './engineeringAssumptions';
 
 /* =========================================================================
    Floor loads — pure helpers
@@ -7,12 +14,16 @@ import { LOAD_ASSUMPTIONS, OCCUPANCY_IDS, type Occupancy } from './engineeringAs
    the Zod schema, the UI and the Python export can all share one definition of
    what a floor weighs.
 
-   THE FORMULA (docs/assumptions.md §10):
+   THE FORMULA (docs/assumptions.md §2):
 
        A       = width × depth                        (m²)
        W_i     = (DL_i + ψ × LL_i) × A                (kN)
        m_i     = W_i × 1000 / g                       (kg)
        ψ       = liveLoadParticipation (default 0.25)
+
+   With a building's floor loads OFF, the occupancy formula is not used at all
+   and every floor weighs its bare structure instead — see
+   `bareFloorWeightKN` below for how the material supplies the mass.
 
    Only the load is allowed to change mass. Stiffness is calibrated from a
    reference building whose floors are all Office at the default loads, so a
@@ -190,6 +201,43 @@ export function floorWeightKN(
 /** Weight in kN → mass in kg. */
 export function massKgFromWeightKN(weightKN: number): number {
   return (weightKN * 1000) / LOAD_ASSUMPTIONS.gravityMs2;
+}
+
+/*
+ * BARE STRUCTURE — what a floor weighs when floor loads are OFF.
+ *
+ * The mass cannot be zero: the eigenproblem divides by its square root, which
+ * is exactly why the engine refuses a weightless floor. So "loads off" has a
+ * defined meaning rather than an impossible one — the occupancy loads are not
+ * counted at all, and the floor weighs what its material's bare structure
+ * weighs. Those figures live on MATERIALS, and are the same placeholder
+ * mass-per-area values the review checklist has tracked since before the
+ * floor-loads feature existed.
+ */
+
+/** Mass of one bare floor, in kg: the material's floor mass times the area. */
+export function bareFloorMassKg(areaM2: number, material: MaterialId): number {
+  return MATERIALS[material].bareMassPerAreaKgM2 * Math.max(0, areaM2);
+}
+
+/** Earthquake weight of one bare floor, in kN (weight = mass × gravity). */
+export function bareFloorWeightKN(areaM2: number, material: MaterialId): number {
+  return (bareFloorMassKg(areaM2, material) * LOAD_ASSUMPTIONS.gravityMs2) / 1000;
+}
+
+/**
+ * Materials a floor's use is flagged against, or [] when the use is expected.
+ *
+ * This is a review flag, not a rule the engine enforces — see
+ * INCOMPATIBLE_USES for what the flag claims.
+ */
+export function incompatibleUsesFor(occupancy: Occupancy): readonly MaterialId[] {
+  return (INCOMPATIBLE_USES as Partial<Record<Occupancy, readonly MaterialId[]>>)[occupancy] ?? [];
+}
+
+/** True when a floor's use is not expected on this building's material. */
+export function needsReviewFor(occupancy: Occupancy, material: MaterialId): boolean {
+  return incompatibleUsesFor(occupancy).includes(material);
 }
 
 /**

@@ -26,7 +26,7 @@ import type { BuildingConfig, GroundMotionConfig } from '@/types';
 /** The fields a template chooses. Loads are added from the defaults. */
 type TemplateBuilding = Omit<
   BuildingConfig,
-  'id' | 'name' | 'floorLoads' | 'liveLoadParticipation'
+  'id' | 'name' | 'floorLoads' | 'liveLoadParticipation' | 'loadsEnabled'
 >;
 
 export type BuildingTemplate = {
@@ -152,6 +152,7 @@ export const DEFAULT_BUILDING_CONFIG: BuildingConfig = (() => {
     dampingRatio: undefined,
     floorLoads: allOfficeFloorLoads(found.building.floors),
     liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
+    loadsEnabled: true,
   };
 })();
 
