@@ -13,6 +13,7 @@ import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
 import { useUiStore } from '@/store/uiStore';
 import { FloorObjects } from './FloorObjects';
+import { CarGroup } from './CarGroup';
 
 /* =========================================================================
    Building mesh — a stack of floors that sway.
@@ -189,11 +190,18 @@ export function BuildingMesh() {
             </lineSegments>
 
             {cutaway && load && loadsOn ? (
-              <FloorObjects
-                items={floorContents(load.occupancy, widthM, depthM)}
-                geometry={geometries.unit}
-                color={palette['--content'] ?? '#64748b'}
-              />
+              load.occupancy === 'parking' ? (
+                <CarGroup
+                  items={floorContents(load.occupancy, widthM, depthM)}
+                  color={palette['--load-parking'] ?? '#3b82f6'}
+                />
+              ) : (
+                <FloorObjects
+                  items={floorContents(load.occupancy, widthM, depthM)}
+                  geometry={geometries.unit}
+                  color={palette['--content'] ?? '#64748b'}
+                />
+              )
             ) : null}
             {/*
              * The columns are structure, not loads: they keep drawing in

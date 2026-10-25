@@ -21,6 +21,7 @@ import type { BuildingConfig } from '@/types';
 import { CameraFrame } from './CameraFrame';
 import { CutawayToggle } from './CutawayToggle';
 import { FloorObjects } from './FloorObjects';
+import { CarGroup } from './CarGroup';
 import { GroundSlab } from './GroundSlab';
 import { ShakeArrow } from './ShakeArrow';
 
@@ -953,12 +954,20 @@ function SwayingBuilding({
             </lineSegments>
 
             {cutaway && !ghost && load && loadsOn ? (
-              <FloorObjects
-                items={floorContents(load.occupancy, building.widthM, building.depthM)}
-                geometry={geometry.unit}
-                color={palette['--content'] ?? '#64748b'}
-                opacity={ghost ? 0.5 : 1}
-              />
+              load.occupancy === 'parking' ? (
+                <CarGroup
+                  items={floorContents(load.occupancy, building.widthM, building.depthM)}
+                  color={palette['--load-parking'] ?? '#3b82f6'}
+                  opacity={ghost ? 0.5 : 1}
+                />
+              ) : (
+                <FloorObjects
+                  items={floorContents(load.occupancy, building.widthM, building.depthM)}
+                  geometry={geometry.unit}
+                  color={palette['--content'] ?? '#64748b'}
+                  opacity={ghost ? 0.5 : 1}
+                />
+              )
             ) : null}
             {/* Columns are structure: they stay in cutaway while loads are off. */}
             {cutaway && !ghost && index > 0 ? (
