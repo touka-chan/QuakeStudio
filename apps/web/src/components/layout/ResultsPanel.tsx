@@ -2,10 +2,12 @@ import { Columns2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ComparisonTable } from '@/components/charts/ComparisonTable';
 import { LazyCharts } from '@/components/charts/LazyCharts';
 import { MetricCard } from '@/components/charts/MetricCard';
-import { formatMm, formatPct } from '@/lib/utils';
+import { WeightSummary } from '@/components/charts/WeightSummary';
+import { formatGrouped, formatMm, formatPct } from '@/lib/utils';
 import {
   defaultCompareBuilding,
   seriesColor,
@@ -13,6 +15,7 @@ import {
   useCompareStore,
 } from '@/store/compareStore';
 import { useConfigStore, resolveNow } from '@/store/configStore';
+import type { BuildingConfig } from '@/types';
 
 /* =========================================================================
    Results panel — the right zone.
@@ -81,20 +84,6 @@ export function ResultsPanel() {
 
   return (
     <ScrollArea className="qs-scroll-x min-h-0 flex-1">
-      {/*
-        The right gutter and the extra bottom padding are both for the floating
-        "How to use" button.
-
-        The gutter matters on a phone, where this panel is the thing on the
-        right and the button covers the right 60px of it — right through the
-        "Compare with another building" control. Bottom padding alone cannot
-        fix it, because content in the middle of the scroll passes underneath
-        too; that is what the responsive audit caught when it reported a
-        control as unclickable even after scrolling it into view.
-
-        Both are mobile-only: a desktop layout is wide enough that the audit
-        finds nothing underneath.
-      */}
       <div className="space-y-4 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
         <header className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold tracking-wide uppercase">Results</h2>
@@ -145,70 +134,137 @@ export function ResultsPanel() {
           </p>
         ) : null}
 
-        {isLoading ? <ResultsSkeleton /> : null}
+        {isLoading ? (
+          <ResultsSkeleton />
+        ) : (
+          <Tabs defaultValue="summary" className="gap-0">
+            <TabsList className="w-full">
+              <TabsTrigger value="summary">Summary</TabsTrigger>
+              <TabsTrigger value="response">Response</TabsTrigger>
+            </TabsList>
 
-        {/* ---- Metric cards ----
-            One column on a phone, three from `sm` up.
+            {/* ---- Summary ------------------------------------------------- */}
+            <TabsContent value="summary" className="mt-4 space-y-4">
+              {/* ---- Metric cards ----
+                  Stacked at every width. Three columns would leave each card
+                  under 102px of content, and "DISPLACEMENT" needs about 96px
+                  before padding — stacking keeps the labels readable without
+                  shrinking the numbers. */}
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <MetricCard
+                  label="Peak displacement"
+                  value={formatMm(peakAtTop * M2S_TO_MM)}
+                  unit="mm"
+                  detail={`Floor ${topFloor}, relative to ground`}
+                  help="The furthest any floor moved sideways, measured from the ground beneath it."
+                  testId="metric-peak-disp"
+                />
+                <MetricCard
+                  label="Max story drift"
+                  value={formatPct(driftPct)}
+                  unit="%"
+                  detail={`Story ${worstStory}`}
+                  tone="caution"
+                  help="The biggest gap between one floor and the floor below it, as a percentage of floor height."
+                  testId="metric-max-drift"
+                />
+                <MetricCard
+                  label="Natural period"
+                  value={period.toFixed(2)}
+                  unit="s"
+                  detail="1st mode"
+                  help="How long the building takes to sway back and forth once, at its natural rhythm."
+                  testId="metric-period"
+                />
+              </div>
 
-            Measured at 360px: three columns left each card 102px of content,
-            and "DISPLACEMENT" needs about 96px before padding. That is not a
-            font-size problem — there is no size at which three of these
-            labels read well on a narrow screen. Stacking is the fix: the
-            numbers stay at full size instead of shrinking to survive. */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <MetricCard
-            label="Peak displacement"
-            value={formatMm(peakAtTop * M2S_TO_MM)}
-            unit="mm"
-            detail={`Floor ${topFloor}, relative to ground`}
-            help="The furthest any floor moved sideways, measured from the ground beneath it."
-            testId="metric-peak-disp"
-          />
-          <MetricCard
-            label="Max story drift"
-            value={formatPct(driftPct)}
-            unit="%"
-            detail={`Story ${worstStory}`}
-            tone="caution"
-            help="The biggest gap between one floor and the floor below it, as a percentage of floor height."
-            testId="metric-max-drift"
-          />
-          <MetricCard
-            label="Natural period"
-            value={period.toFixed(2)}
-            unit="s"
-            detail="1st mode"
-            help="How long the building takes to sway back and forth once, at its natural rhythm."
-            testId="metric-period"
-          />
-        </div>
+              <WeightSummary
+                building={building}
+                result={result}
+                side={editing}
+                showOwner={compareEnabled}
+              />
 
-        <LazyCharts />
+              {/* The table stays eager: it carries the numbers, and there is
+                  nothing to gain by deferring it. */}
+              <ComparisonTable />
 
-        {/* The table stays eager: it carries the numbers, and there is nothing
-            to gain by deferring it. */}
-        <ComparisonTable />
+              <div className="space-y-2">
+                <Button
+                  className="h-11 w-full"
+                  variant={compareEnabled ? 'outline' : 'default'}
+                  onClick={toggleCompare}
+                  data-tour="compare"
+                >
+                  <Columns2 aria-hidden="true" />
+                  {compareEnabled ? 'Stop comparing' : 'Compare with another building'}
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  {compareEnabled
+                    ? // Generated from the count, because "Both buildings" under
+                      // four columns is a caption that is quietly wrong.
+                      `${count} buildings felt the same earthquake. Pick one on the left to edit it.`
+                    : 'Adds a second, third or fourth configuration and runs them all under one earthquake.'}
+                </p>
+              </div>
+            </TabsContent>
 
-        <div className="space-y-2">
-          <Button
-            className="h-11 w-full"
-            variant={compareEnabled ? 'outline' : 'default'}
-            onClick={toggleCompare}
-            data-tour="compare"
-          >
-            <Columns2 aria-hidden="true" />
-            {compareEnabled ? 'Stop comparing' : 'Compare with another building'}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            {compareEnabled
-              ? // Generated from the count, because "Both buildings" under four
-                // columns is a caption that is quietly wrong.
-                `${count} buildings felt the same earthquake. Pick one on the left to edit it.`
-              : 'Adds a second, third or fourth configuration and runs them all under one earthquake.'}
-          </p>
-        </div>
+            {/* ---- Response ------------------------------------------------ */}
+            <TabsContent value="response" className="mt-4 space-y-4">
+              <LazyCharts />
+              <ResponseNotes building={building} />
+            </TabsContent>
+          </Tabs>
+        )}
       </div>
     </ScrollArea>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/**
+ * The dimensions and definitions behind the charts.
+ *
+ * Kept on the Response tab rather than the Summary: the Summary answers "how
+ * heavy is it and how much did it move", while this is the reference a reader
+ * reaches for when they want to check a number rather than read a headline.
+ */
+function ResponseNotes({ building }: { building: BuildingConfig }) {
+  const heightM = building.floors * building.floorHeightM;
+  const areaM2 = building.widthM * building.depthM;
+
+  return (
+    <section className="rounded-card border border-line bg-surface p-4">
+      <h2 className="text-base font-semibold">Dimensions and formulas</h2>
+      <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">Height</dt>
+        <dd className="font-mono-nums text-right">
+          {building.floors} × {building.floorHeightM} m = {heightM.toFixed(1)} m
+        </dd>
+        <dt className="text-muted-foreground">Floor area</dt>
+        <dd className="font-mono-nums text-right">
+          {building.widthM} × {building.depthM} m = {formatGrouped(areaM2, 2)} m²
+        </dd>
+        <dt className="text-muted-foreground">Floor weight</dt>
+        <dd className="font-mono-nums text-right">W = (dead + ψ × live) × A</dd>
+      </dl>
+      <div className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+        <p>
+          <span className="font-medium text-foreground">Displacement</span> is sideways movement
+          from the ground, in millimetres. Each line is one floor.
+        </p>
+        <p>
+          <span className="font-medium text-foreground">Story drift</span> is the difference between
+          one floor&apos;s peak and the floor below&apos;s, as a percentage of floor height. The
+          difference is taken between the peaks, not instant by instant.
+        </p>
+        <p>
+          <span className="font-medium text-foreground">Period</span> is the time for one full sway
+          at the building&apos;s natural rhythm. A longer period is not by itself better or worse.
+        </p>
+      </div>
+    </section>
   );
 }
 

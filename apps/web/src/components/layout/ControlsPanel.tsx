@@ -2,10 +2,12 @@ import { Plus, X } from 'lucide-react';
 
 import { BuildingControls } from '@/components/controls/BuildingControls';
 import { EarthquakeControls } from '@/components/controls/EarthquakeControls';
+import { FloorLoadsControls } from '@/components/controls/FloorLoadsControls';
 import { TemplatePicker } from '@/components/controls/TemplatePicker';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   defaultCompareBuilding,
   MAX_BUILDINGS,
@@ -22,12 +24,18 @@ import { describeBuilding } from '@/lib/describeBuilding';
 /* =========================================================================
    Controls panel — the left zone.
    -------------------------------------------------------------------------
-   Owns its own scrolling so the viewport and playback bar never move when the
-   panel content changes length.
+   Three tabs, because the panel now has three jobs:
 
-   "Site & ground" is shown collapsed and disabled. Making the Phase 7 scope
-   visible but unavailable is more honest than hiding it: students can see
-   what is coming without being able to rely on it.
+     Building        shape, material and frame
+     Floors & loads  what each floor is used for, and how heavy that makes it
+     Earthquake      the shake and the disabled Phase 7 site factors
+
+   The tabs replaced a single long scroll. Adding floor loads to that scroll
+   put the earthquake controls two screens below the building they apply to,
+   and the extra length is exactly what made the old panel hard to scan.
+
+   "Site & ground" stays visible but disabled: showing what is planned is more
+   honest than hiding it, as long as it cannot be relied on.
    ========================================================================= */
 
 export function ControlsPanel() {
@@ -37,8 +45,8 @@ export function ControlsPanel() {
   const addSide = useCompareStore((s) => s.addSide);
   const building = useConfigStore((s) => s.building);
   const compareBuildings = useConfigStore((s) => s.compareBuildings);
-  const compareEnabled = count > 1;
 
+  const compareEnabled = count > 1;
   const editingIndex = sideIndex(editing);
   const editingName = describeBuilding(
     editingIndex === 0 ? building : (compareBuildings[editingIndex - 1] ?? building),
@@ -80,136 +88,125 @@ export function ControlsPanel() {
   }
 
   return (
-    <>
-      {/*
-        Outside the ScrollArea on purpose.
-
-        The A/B switcher scrolls away with the rest of the panel, and the
-        building group heading only says "Building B" while that group is in
-        view. A user who scrolls down to the earthquake settings, changes a
-        slider, and scrolls back up had no way to tell which building they had
-        just edited — and comparison mode exists precisely to compare two
-        buildings. Found by the heuristic evaluation
-        (docs/heuristic-evaluation.md, H6).
-      */}
-      {compareEnabled ? (
-        <div
-          className="flex shrink-0 items-center gap-2 border-b border-line px-4 py-2"
-          // Announces the switch, so a screen-reader user learns that the
-          // controls below now target the other building.
-          role="status"
-          aria-live="polite"
-        >
-          <span className="text-xs tracking-wide text-muted-foreground uppercase">Editing</span>
-          <span
-            className="grid size-5 place-items-center rounded text-xs font-semibold text-white"
-            style={{ backgroundColor: seriesColor(editing) }}
+    <Tabs defaultValue="building" className="min-h-0 flex-1 gap-0">
+      <div className="shrink-0 space-y-2 border-b border-line px-4 py-2">
+        {compareEnabled ? (
+          <div
+            className="flex items-center gap-2"
+            // Announces the switch, so a screen-reader user learns that the
+            // controls below now target the other building. The switcher itself
+            // stays OUT of this live region: announcing a click on it would
+            // read back the whole group every time.
+            role="status"
+            aria-live="polite"
           >
-            {editing}
-          </span>
-          <span className="min-w-0 truncate text-sm">{editingName}</span>
-        </div>
-      ) : null}
+            <span className="flex items-center gap-1.5 text-xs tracking-wide text-muted-foreground uppercase">
+              Editing
+              <span
+                className="grid size-5 place-items-center rounded text-xs font-semibold text-white"
+                style={{ backgroundColor: seriesColor(editing) }}
+                aria-hidden="true"
+              >
+                {editing}
+              </span>
+            </span>
+            <span className="min-w-0 flex-1 truncate text-xs">{editingName}</span>
+            {!compareEnabled ? null : count < MAX_BUILDINGS ? null : (
+              <span className="text-[11px] text-muted-foreground">Four is the limit</span>
+            )}
+          </div>
+        ) : null}
 
-      {/*
-        `min-h-0 flex-1`, not `h-full`.
+        {compareEnabled ? (
+          <CompareSwitcher
+            count={count}
+            editing={editing}
+            onChange={setEditing}
+            onAdd={addAnother}
+            onRemove={removeAnother}
+            canAdd={count < MAX_BUILDINGS}
+            buildings={[building, ...compareBuildings]}
+          />
+        ) : null}
 
-        Comparison mode puts a `shrink-0` "Editing A/B" header above this, and
-        `h-full` is 100% of the whole panel — so the scroll area was one header
-        taller than its container and the bottom of the panel (Site & ground,
-        and the Phase 7 controls) was pushed out of view and clipped. That only
-        showed up once comparison was switched on, which is why it looked like a
-        comparison bug rather than a layout one.
-      */}
-      <ScrollArea className="min-h-0 flex-1">
-        {/*
-          Two pieces of padding, both for the floating "How to use" button, and
-          neither of them decoration.
+        <TabsList className="w-full">
+          <TabsTrigger value="building">Building</TabsTrigger>
+          <TabsTrigger value="loads" data-tour="loads">
+            Floors &amp; loads
+          </TabsTrigger>
+          <TabsTrigger value="earthquake">Earthquake</TabsTrigger>
+        </TabsList>
+      </div>
 
-          `pr-16` on a phone reserves a gutter down the right-hand side. The
-          button stands 12px from the edge and is 48px wide, so it covers the
-          right 60px of whatever is showing — and on a 360px screen that band
-          runs right through the material buttons. Bottom padding alone cannot
-          fix this, because the content is not only at the end of the scroll:
-          anything in the middle passes under the button too. That is what the
-          responsive audit caught when it reported the "Wood" button as
-          unclickable even after scrolling it into view.
-
-          `pb-32` stops the last of the content coming to rest underneath it.
-
-          Both are mobile-only: on a desktop layout the panels are far wider
-          and the audit finds nothing underneath.
-        */}
-        <div className="space-y-6 p-4 pr-16 pb-32 lg:pr-4 lg:pb-24">
-          {compareEnabled ? (
-            <CompareSwitcher
-              count={count}
-              editing={editing}
-              onChange={setEditing}
-              onAdd={addAnother}
-              onRemove={removeAnother}
-              canAdd={count < MAX_BUILDINGS}
-              buildings={[building, ...compareBuildings]}
-            />
-          ) : (
-            <TemplatePicker />
-          )}
-
-          <Separator />
-
-          <ControlGroup
-            step="Step 1"
-            title={compareEnabled ? `Building ${editing}` : 'Building'}
-            description="Shape and materials of the building."
-          >
-            <BuildingControls side={compareEnabled ? editing : 'A'} />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup
-            step="Step 2"
-            title="Earthquake"
-            description="How strong the ground shakes, and for how long."
-          >
-            <EarthquakeControls />
-          </ControlGroup>
-
-          <Separator />
-
-          <ControlGroup
-            step="Step 3"
-            title="Site & ground"
-            description="Soil, foundation and distance to the fault change how strongly a building feels the shaking. These need engineering approval before they can be included."
-            disabled
-          >
-            <p className="rounded-app border border-dashed border-line bg-surface-2 px-3 py-2.5 text-xs text-muted-foreground">
-              Soil, foundation and fault distance are planned for a later version. They need to be
-              reviewed by the engineering adviser first.
+      {/* ---- Building ------------------------------------------------------ */}
+      <TabsContent value="building" className="min-h-0 flex-1">
+        <ScrollArea className="h-full">
+          <div className="space-y-5 p-4 pb-24">
+            {!compareEnabled ? <TemplatePicker /> : null}
+            <p className="text-xs text-muted-foreground">
+              Shape and materials of the building. Every floor is the same size.
             </p>
-          </ControlGroup>
-        </div>
-      </ScrollArea>
-    </>
+            <BuildingControls side={compareEnabled ? editing : 'A'} />
+          </div>
+        </ScrollArea>
+      </TabsContent>
+
+      {/* ---- Floors & loads ------------------------------------------------ */}
+      <TabsContent value="loads" className="min-h-0 flex-1">
+        <ScrollArea className="h-full">
+          <div className="p-4 pb-24">
+            <FloorLoadsControls side={compareEnabled ? editing : 'A'} />
+          </div>
+        </ScrollArea>
+      </TabsContent>
+
+      {/* ---- Earthquake ---------------------------------------------------- */}
+      <TabsContent value="earthquake" className="min-h-0 flex-1">
+        <ScrollArea className="h-full">
+          <div className="space-y-5 p-4 pb-24">
+            <p className="text-xs text-muted-foreground">
+              How strong the ground shakes, and for how long. The record is shared by every building
+              in the comparison.
+            </p>
+            <EarthquakeControls />
+
+            <Separator />
+
+            <section aria-labelledby="site-ground-heading" className="opacity-60">
+              <h2
+                id="site-ground-heading"
+                className="text-sm font-semibold tracking-wide uppercase"
+              >
+                Site &amp; ground
+              </h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Soil, foundation and distance to the fault change how strongly a building feels the
+                shaking. These need engineering approval before they can be included.
+              </p>
+              <p className="mt-3 rounded-app border border-dashed border-line bg-surface-2 px-3 py-2.5 text-xs text-muted-foreground">
+                Soil, foundation and fault distance are planned for a later version. They need to be
+                reviewed by the engineering adviser first.
+              </p>
+            </section>
+          </div>
+        </ScrollArea>
+      </TabsContent>
+    </Tabs>
   );
 }
 
 /* ------------------------------------------------------------------------- */
 
 /**
- * The A / B / C / D switch, shown instead of the template picker while
- * comparing.
+ * The A / B / C / D switch.
  *
- * Deliberately plain: one labelled button per building, in the series colour
- * that the chart and the table also use, so a building looks the same
- * everywhere. The letter is on the button as well as in the colour, which is
- * what makes it readable for a colour deficiency and on a bad screen.
+ * Compact enough to live above the tabs, because switching buildings has to
+ * be possible while editing floor loads — not only from the Building tab.
  *
- * Adding is a second click, not a dropdown. The client asked for two buildings
- * to appear first and for the rest to be a deliberate act — and with four
- * materials, the default four are the same building in concrete, steel,
- * composite and wood, which is the comparison worth making before anyone has
- * touched anything.
+ * One button per building, in the series colour the chart and the table also
+ * use, so a building looks the same everywhere. The letter is on the button as
+ * well as in the colour, which is what makes it readable for a colour
+ * deficiency and on a bad screen.
  */
 function CompareSwitcher({
   count,
@@ -235,122 +232,61 @@ function CompareSwitcher({
   }));
 
   return (
-    <div>
-      {/*
-        "Switch", not "Editing". The sticky header above already says
-        "Editing B", and two labels reading the same word in one panel is
-        noise — worse, it makes the indicator's state ambiguous: a user cannot
-        tell which one is the live answer.
-      */}
-      <p className="mb-1.5 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-        Switch
-      </p>
-      <div role="radiogroup" aria-label="Which building to edit" className="flex flex-col gap-1">
-        {sides.map((side, i) => {
-          const selected = side.id === editing;
-          // A is not removable. Going back to a single building is "stop
-          // comparing", and that button lives once, in the results panel — two
-          // controls with the same label in two panels is not a shortcut, it is
-          // a question the user has to answer before they can carry on.
-          const removable = i > 0;
-          return (
-            <div key={side.id} className="flex items-center gap-1">
+    <div
+      role="radiogroup"
+      aria-label="Which building to edit"
+      className="flex w-full flex-col gap-1"
+    >
+      {sides.map((side, i) => {
+        const selected = side.id === editing;
+        // A is not removable. Going back to a single building is "stop
+        // comparing", and that button lives once, in the results panel.
+        const removable = i > 0;
+        return (
+          <div key={side.id} className="flex items-center gap-1">
+            <button
+              type="button"
+              role="radio"
+              aria-checked={selected}
+              aria-label={`Building ${side.id}: ${side.name}`}
+              onClick={() => onChange(side.id)}
+              className={`flex min-w-0 flex-1 items-center gap-1.5 rounded-app border px-1.5 py-1 text-left text-xs transition-colors ${
+                selected ? 'border-line bg-surface-2' : 'border-transparent'
+              }`}
+            >
+              <span
+                className="grid size-4 shrink-0 place-items-center rounded text-[10px] font-semibold text-white"
+                style={{ backgroundColor: side.color }}
+                aria-hidden="true"
+              >
+                {side.id}
+              </span>
+              <span className="min-w-0 truncate">{side.name}</span>
+            </button>
+            {removable ? (
               <button
                 type="button"
-                role="radio"
-                aria-checked={selected}
-                // The coloured badge is decorative, so without this a screen
-                // reader would announce only the building name and give no clue
-                // which building of the comparison is being edited.
-                aria-label={`Building ${side.id}: ${side.name}`}
-                onClick={() => onChange(side.id)}
-                className={`flex flex-1 items-center gap-2 rounded-app border px-2.5 py-2 text-left transition-colors ${
-                  selected ? 'border-line bg-surface-2' : 'border-transparent'
-                }`}
+                onClick={() => onRemove(side.id)}
+                aria-label={`Remove building ${side.id}`}
+                className="grid size-5 place-items-center rounded text-muted-foreground hover:bg-surface-2 hover:text-foreground"
               >
-                <span
-                  className="grid size-5 shrink-0 place-items-center rounded text-xs font-semibold text-white"
-                  style={{ backgroundColor: side.color }}
-                  aria-hidden="true"
-                >
-                  {side.id}
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-xs font-medium">{side.name}</span>
-                </span>
+                <X className="size-3" aria-hidden="true" />
               </button>
-              {/*
-                A per-building remove, not a second "stop comparing".
-
-                At four buildings the useful move is dropping one of them, and a
-                single stop button can only collapse the whole thing back to
-                one — losing three buildings' worth of work to remove the one
-                you are done with.
-              */}
-              {removable ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => onRemove(side.id)}
-                  aria-label={`Remove building ${side.id}`}
-                  className="size-8 shrink-0 p-0 text-muted-foreground"
-                >
-                  <X aria-hidden="true" />
-                </Button>
-              ) : null}
-            </div>
-          );
-        })}
-      </div>
-
+            ) : null}
+          </div>
+        );
+      })}
       {canAdd ? (
-        <Button variant="outline" size="sm" onClick={onAdd} className="mt-2 w-full">
-          <Plus aria-hidden="true" />
-          Add a building
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onAdd}
+          aria-label="Add a building"
+          className="ml-auto size-7 p-0 text-muted-foreground"
+        >
+          <Plus aria-hidden="true" className="size-4" />
         </Button>
       ) : null}
-      {/*
-        A sentence rather than a tooltip, because the limit is the sort of thing
-        a user finds out by pressing a button that does nothing. Four buildings
-        is the number of materials, so it is a real ceiling and worth saying so.
-      */}
-      {!canAdd ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Four is the limit: there are four materials to compare.
-        </p>
-      ) : null}
     </div>
-  );
-}
-
-function ControlGroup({
-  step,
-  title,
-  description,
-  children,
-  disabled,
-}: {
-  step: string;
-  title: string;
-  description: string;
-  children: React.ReactNode;
-  disabled?: boolean;
-}) {
-  return (
-    <section aria-labelledby={`group-${step.replace(/\s/g, '-')}`}>
-      <div className="mb-3 flex items-baseline justify-between gap-2">
-        <h2
-          id={`group-${step.replace(/\s/g, '-')}`}
-          className="text-sm font-semibold tracking-wide uppercase"
-        >
-          {title}
-        </h2>
-        <span className="font-mono-nums text-xs text-muted-foreground">{step}</span>
-      </div>
-      <p className="mb-3.5 text-xs text-muted-foreground">{description}</p>
-      <div className={disabled ? 'pointer-events-none opacity-60 select-none' : undefined}>
-        {children}
-      </div>
-    </section>
   );
 }

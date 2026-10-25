@@ -2,15 +2,15 @@ import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import App from '@/App';
 import { AppShell } from '@/components/layout/AppShell';
-import { GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { GRAVITY_MS2, GROUND_MOTION_PRESETS, STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { DEFAULT_BUILDING_CONFIG, DEFAULT_MOTION_CONFIG } from '@/config/templates';
 import { readStoredTheme, resolveTheme, storeTheme } from '@/lib/theme';
 import { defaultCompareBuilding, useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
 import { __testing as tourTesting } from '@/store/tourStore';
+import { useUiStore } from '@/store/uiStore';
 import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
@@ -31,6 +31,44 @@ import type { SimulationResult } from '@/types';
 vi.mock('@/components/viewport/Viewport', () => ({
   Viewport: () => <div data-testid="viewport-stub">3D viewport</div>,
 }));
+
+/**
+ * A complete result for the default building.
+ *
+ * jsdom has no Worker, so the real solver never answers and the store would sit
+ * on its empty placeholder for the whole file. Every UI assertion would then be
+ * made against a skeleton — which is how a results test can pass while showing
+ * no results at all. A seeded result makes the panel deterministic.
+ *
+ * The weight fields are filled in for the same reason: a result built before
+ * floor loads existed is a real case the UI must survive, but it is tested
+ * explicitly rather than being the accidental state of every other test.
+ */
+function seededResult(floors = DEFAULT_BUILDING_CONFIG.floors): SimulationResult {
+  const weights = Array.from({ length: floors }, (_, i) => 700 + i * 120);
+  const dead = Array.from({ length: floors }, (_, i) => 550 + i * 100);
+  const live = weights.map((weight, i) => weight - (dead[i] ?? 0));
+  return {
+    time: [0, 0.05, 0.1, 0.15],
+    floorDisp: Array.from({ length: floors }, (_, i) => [
+      0,
+      0.002 * (i + 1),
+      0.004 * (i + 1),
+      0.002 * (i + 1),
+    ]),
+    peakDisp: Array.from({ length: floors }, (_, i) => 0.004 * (i + 1)),
+    maxDisp: 0.004 * floors,
+    driftRatio: Array.from({ length: floors }, () => 0.004),
+    maxDriftRatio: 0.004,
+    periodsS: [0.52, 0.18],
+    groundAccel: [0, 0.1, 0, -0.1],
+    floorWeightsKN: weights,
+    floorDeadKN: dead,
+    floorLiveCountedKN: live,
+    totalWeightKN: weights.reduce((sum, value) => sum + value, 0),
+    floorMassesKg: weights.map((weight) => (weight * 1000) / GRAVITY_MS2),
+  };
+}
 
 function skipFirstRun() {
   localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
@@ -54,10 +92,14 @@ function skipTour() {
 beforeEach(() => {
   localStorage.clear();
   document.documentElement.classList.remove('dark');
+  useUiStore.setState({ assumptionsOpen: false, assumptionsTab: 'about', cutaway: false });
   useConfigStore.setState({
     building: DEFAULT_BUILDING_CONFIG,
     compareBuildings: [],
+    result: seededResult(),
     results: [],
+    status: 'idle',
+    error: null,
     templateId: DEFAULT_BUILDING_CONFIG.id,
     activeFloor: null,
     /*
@@ -118,7 +160,7 @@ describe('first-run dialog', () => {
 
   it('blocks the start button until the disclaimer is acknowledged', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     const start = screen.getByRole('button', { name: /start exploring/i });
     expect(start).toBeDisabled();
@@ -128,7 +170,7 @@ describe('first-run dialog', () => {
   });
 
   it('shows the three learning steps', () => {
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     // Scope to the dialog: the mobile tab bar also has a "Build" tab.
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('Build')).toBeInTheDocument();
@@ -137,14 +179,14 @@ describe('first-run dialog', () => {
   });
 
   it('states plainly that this is not a safety check', () => {
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     // The sentence is split across a <strong>, so match on the phrase alone.
     expect(screen.getAllByText(/learning tool, not a safety check/i).length).toBeGreaterThan(0);
   });
 
   it('dismisses, and writes nothing that could suppress the next visit', async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: /start exploring/i }));
@@ -158,7 +200,7 @@ describe('first-run dialog', () => {
 
   it('stays hidden only while something has actually suppressed it', () => {
     skipFirstRun();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
   });
 
@@ -168,14 +210,14 @@ describe('first-run dialog', () => {
    */
   it('comes back when the app is mounted again', async () => {
     const user = userEvent.setup();
-    const first = render(<App />);
+    const first = render(<AppShell forceDesktopLayout />);
 
     await user.click(screen.getByRole('checkbox'));
     await user.click(screen.getByRole('button', { name: /start exploring/i }));
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
 
     first.unmount();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     expect(screen.getByRole('button', { name: /start exploring/i })).toBeDisabled();
     expect(screen.getByRole('checkbox')).not.toBeChecked();
@@ -188,7 +230,7 @@ describe('first-run dialog', () => {
    */
   it('stays hidden while the gate has been suppressed', () => {
     skipFirstRun();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
   });
 });
@@ -222,9 +264,10 @@ describe('app shell', () => {
   });
 
   it('shows a loading state until the first result arrives', () => {
+    // Cold load: the store has not been seeded with a solved result yet.
+    useConfigStore.setState({ status: 'computing', result: { ...seededResult(), time: [] } });
     render(<AppShell forceDesktopLayout />);
     const panel = screen.getByRole('complementary', { name: /simulation results/i });
-    // No Worker in jsdom, so the skeleton is what a cold load looks like.
     expect(within(panel).getByText(/updating/i)).toBeInTheDocument();
   });
 
@@ -232,6 +275,130 @@ describe('app shell', () => {
     render(<AppShell forceDesktopLayout />);
     const shell = screen.getByRole('main', { name: /simulation viewport/i });
     expect(within(shell).getByRole('slider', { name: /simulation time/i })).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('desktop notice', () => {
+  beforeEach(skipFirstRun);
+
+  it('shows the notice instead of a squeezed workspace below 1024px', () => {
+    // jsdom's matchMedia reports false for every query, which is exactly the
+    // narrow-screen case.
+    render(<AppShell />);
+    expect(
+      screen.getByRole('heading', { name: /built for a laptop or desktop/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('complementary', { name: /controls/i })).not.toBeInTheDocument();
+  });
+
+  it('continues into the desktop workspace, and does not remember that choice', async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<AppShell />);
+
+    await user.click(screen.getByRole('button', { name: /continue anyway/i }));
+    expect(screen.getByRole('complementary', { name: /controls/i })).toBeInTheDocument();
+
+    // "Continue anyway" is a way through this visit, not a setting. A reload
+    // (a fresh mount here) gets the honest notice again.
+    unmount();
+    render(<AppShell />);
+    expect(screen.getByRole('button', { name: /continue anyway/i })).toBeInTheDocument();
+  });
+});
+
+/* ------------------------------------------------------------------------ */
+
+describe('floor loads', () => {
+  beforeEach(skipFirstRun);
+
+  async function openLoads() {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+    await user.click(screen.getByRole('tab', { name: /floors & loads/i }));
+    return user;
+  }
+
+  it('changes a floor use, its live load and the weight shown', async () => {
+    const user = await openLoads();
+
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    await user.click(screen.getByRole('radio', { name: /^storage$/i }));
+
+    const floor = useConfigStore.getState().building.floorLoads[0]!;
+    expect(floor.occupancy).toBe('storage');
+    expect(floor.liveLoadKPa).toBe(6);
+
+    // Default building is 14 × 10 m. Storage: 4.8 + 0.25 × 6.0 = 6.3 kPa,
+    // so 6.3 × 140 = 882 kN.
+    expect(await screen.findByText(/6\.3 kPa counted/i)).toBeInTheDocument();
+    expect(screen.getByText(/882 kN/)).toBeInTheDocument();
+  });
+
+  it('applies one floor to every floor, and resets them all to Office', async () => {
+    const user = await openLoads();
+
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    await user.click(screen.getByRole('radio', { name: /^storage$/i }));
+    await user.click(screen.getByRole('button', { name: /apply to all floors/i }));
+
+    expect(
+      useConfigStore
+        .getState()
+        .building.floorLoads.every(
+          (floor) => floor.occupancy === 'storage' && floor.liveLoadKPa === 6,
+        ),
+    ).toBe(true);
+
+    await user.click(screen.getByRole('button', { name: /reset every floor to office/i }));
+    expect(
+      useConfigStore
+        .getState()
+        .building.floorLoads.every(
+          (floor) => floor.occupancy === 'office' && floor.liveLoadKPa === 2.4,
+        ),
+    ).toBe(true);
+    expect(useConfigStore.getState().building.liveLoadParticipation).toBe(0.25);
+  });
+
+  it('edits a live load by hand and marks the floor Custom', async () => {
+    const user = await openLoads();
+
+    await user.click(screen.getByRole('button', { name: /floor 1/i }));
+    const live = screen.getByLabelText(/^live load$/i);
+    await user.clear(live);
+    await user.type(live, '3.5');
+
+    const floor = useConfigStore.getState().building.floorLoads[0]!;
+    expect(floor.liveLoadKPa).toBe(3.5);
+    expect(floor.occupancy).toBe('custom');
+    // Both the badge and the use radio are called "Custom"; the badge is the
+    // one that reports the override.
+    expect(screen.getByText('Custom', { selector: '[data-slot="badge"]' })).toBeInTheDocument();
+  });
+
+  it('changes how much live load is counted', async () => {
+    const user = await openLoads();
+
+    const slider = screen.getByRole('slider', { name: /live load counted/i });
+    slider.focus();
+    await user.keyboard('{ArrowRight}');
+
+    expect(useConfigStore.getState().building.liveLoadParticipation).toBeCloseTo(0.3, 6);
+    expect(screen.getAllByText(/30% of the live load/i).length).toBeGreaterThan(0);
+  });
+
+  it('opens the assumptions dialog on the floor-loads tab', async () => {
+    const user = await openLoads();
+
+    await user.click(screen.getByRole('button', { name: /how we count load/i }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('tab', { name: /floor loads/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(within(dialog).getByRole('heading', { name: /occupancy presets/i })).toBeInTheDocument();
   });
 });
 
@@ -289,8 +456,10 @@ describe('building controls', () => {
     expect(screen.getByRole('radiogroup', { name: /frame type/i })).toBeInTheDocument();
   });
 
-  it('marks the Phase 7 site controls as unavailable rather than hiding them', () => {
+  it('marks the Phase 7 site controls as unavailable rather than hiding them', async () => {
+    const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
+    await user.click(screen.getByRole('tab', { name: /earthquake/i }));
     expect(screen.getByText(/soil, foundation and fault distance/i)).toBeInTheDocument();
   });
 });
@@ -303,6 +472,7 @@ describe('earthquake controls', () => {
   it('shows only the controls that apply to the chosen motion preset', async () => {
     const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
+    await user.click(screen.getByRole('tab', { name: /earthquake/i }));
 
     // Harmonic preset: frequency applies, a random seed does not.
     expect(screen.getByRole('slider', { name: /shaking frequency/i })).toBeInTheDocument();
@@ -322,8 +492,10 @@ describe('earthquake controls', () => {
     expect(screen.queryByRole('slider', { name: /random seed/i })).not.toBeInTheDocument();
   });
 
-  it('explains the active preset in plain language', () => {
+  it('explains the active preset in plain language', async () => {
+    const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
+    await user.click(screen.getByRole('tab', { name: /earthquake/i }));
     const panel = screen.getByRole('complementary', { name: /controls/i });
     // Take the expected wording from the config itself, so a copy edit cannot
     // silently make this test meaningless.
@@ -354,17 +526,64 @@ describe('results panel', () => {
     expect(within(panel).getByText('Natural period')).toBeInTheDocument();
   });
 
-  it('shows both charts', () => {
+  it('shows both charts on the response tab', async () => {
+    const user = userEvent.setup();
     render(<AppShell forceDesktopLayout />);
-    expect(screen.getByRole('heading', { name: /displacement over time/i })).toBeInTheDocument();
+
+    // Summary is the default; the response lives behind its own tab so the
+    // weight block and the numbers are not pushed below two charts.
+    await user.click(screen.getByRole('tab', { name: /response/i }));
+
+    /*
+     * The charts mount behind React.lazy, so the first find waits out a module
+     * fetch as well as a render. Under a parallel suite that fetch has taken
+     * whole seconds, and the 1s default flaked the file against its neighbours.
+     */
     expect(
-      screen.getByRole('heading', { name: /peak displacement by floor/i }),
+      await screen.findByRole('heading', { name: /displacement over time/i }, { timeout: 10_000 }),
+    ).toBeInTheDocument();
+    expect(
+      await screen.findByRole(
+        'heading',
+        { name: /peak displacement by floor/i },
+        { timeout: 5_000 },
+      ),
     ).toBeInTheDocument();
   });
 
-  it('never uses safety language anywhere in the drift legend', () => {
+  it('keeps the summary tab free of charts', async () => {
     render(<AppShell forceDesktopLayout />);
-    const legendHeading = screen.getAllByText('Story drift')[0]!;
+    expect(
+      screen.queryByRole('heading', { name: /displacement over time/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /floor weights/i })).toBeInTheDocument();
+  });
+
+  it('says an old run has no weights instead of inventing them', () => {
+    const old = seededResult();
+    useConfigStore.setState({
+      result: {
+        ...old,
+        floorWeightsKN: [],
+        floorDeadKN: [],
+        floorLiveCountedKN: [],
+        totalWeightKN: 0,
+        floorMassesKg: [],
+      },
+      status: 'idle',
+    });
+
+    render(<AppShell forceDesktopLayout />);
+    expect(screen.getByText('Weights not recorded')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /re-run with these loads/i })).toBeInTheDocument();
+    expect(screen.queryByText(/^Total weight$/i)).not.toBeInTheDocument();
+  });
+
+  it('never uses safety language anywhere in the drift legend', async () => {
+    const user = userEvent.setup();
+    render(<AppShell forceDesktopLayout />);
+    await user.click(screen.getByRole('tab', { name: /response/i }));
+    const legendHeading = (await screen.findAllByText('Story drift'))[0]!;
     const legend = legendHeading.closest('div')?.parentElement;
     expect(legend?.textContent).not.toMatch(/safe|unsafe|danger|fail|collapse/i);
   });
@@ -565,6 +784,11 @@ describe('results panel', () => {
       maxDriftRatio: 0.004 * scale,
       periodsS: [0.5 * scale],
       groundAccel: [0, 1],
+      floorWeightsKN: Array.from({ length: 5 }, () => 1000),
+      floorDeadKN: Array.from({ length: 5 }, () => 800),
+      floorLiveCountedKN: Array.from({ length: 5 }, () => 200),
+      totalWeightKN: 5000,
+      floorMassesKg: Array.from({ length: 5 }, () => 5000 / GRAVITY_MS2),
     });
 
     act(() => {
@@ -606,6 +830,11 @@ describe('results panel', () => {
       maxDriftRatio: 0.004 * scale,
       periodsS: [0.5 * scale, 0.2 * scale],
       groundAccel: [0, 1],
+      floorWeightsKN: Array.from({ length: floors }, () => 1000),
+      floorDeadKN: Array.from({ length: floors }, () => 800),
+      floorLiveCountedKN: Array.from({ length: floors }, () => 200),
+      totalWeightKN: floors * 1000,
+      floorMassesKg: Array.from({ length: floors }, () => 1000 / GRAVITY_MS2),
     });
 
     act(() => {
@@ -704,6 +933,23 @@ describe('results panel', () => {
     expect(
       within(table).getAllByLabelText(/Building B: \+50 percent against A/).length,
     ).toBeGreaterThan(0);
+  });
+
+  it('adds weight, counted live share and mass to the comparison', () => {
+    render(<AppShell forceDesktopLayout />);
+    enableComparison(1.5);
+
+    const table = screen.getByRole('table');
+    expect(within(table).getByText('Total weight')).toBeInTheDocument();
+    expect(within(table).getByText('Counted live share')).toBeInTheDocument();
+    expect(within(table).getByText('Total mass')).toBeInTheDocument();
+
+    // Both hand-built results carry 5 × 1,000 kN, of which 5 × 200 kN is
+    // counted live. They are equal, so the comparison is "same" — the point
+    // here is that the values exist at all.
+    expect(within(table).getAllByText('5,000 kN')).toHaveLength(2);
+    expect(within(table).getAllByText('20 %')).toHaveLength(2);
+    expect(within(table).getAllByText('2.5 t')).toHaveLength(2);
   });
 
   it('shows "same" rather than a spurious percentage when the sides match', () => {

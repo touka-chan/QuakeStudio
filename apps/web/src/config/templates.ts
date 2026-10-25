@@ -1,9 +1,11 @@
 import {
   DEFAULT_BUILDING,
   DEFAULT_GROUND_MOTION,
+  LOAD_ASSUMPTIONS,
   type FrameTypeId,
   type MaterialId,
 } from './engineeringAssumptions';
+import { allOfficeFloorLoads } from './floorLoads';
 import type { BuildingConfig, GroundMotionConfig } from '@/types';
 
 /* =========================================================================
@@ -14,7 +16,18 @@ import type { BuildingConfig, GroundMotionConfig } from '@/types';
 
    Templates set the BUILDING only. The earthquake is chosen separately and is
    shared by both sides in comparison mode (Phase 4).
+
+   A template deliberately does not carry floor loads. Floors start as Office
+   at the default loads, and `DEFAULT_BUILDING_CONFIG` fills them in — a
+   template that listed seven identical floor loads would be seven places for
+   the defaults to drift.
    ========================================================================= */
+
+/** The fields a template chooses. Loads are added from the defaults. */
+type TemplateBuilding = Omit<
+  BuildingConfig,
+  'id' | 'name' | 'floorLoads' | 'liveLoadParticipation'
+>;
 
 export type BuildingTemplate = {
   id: string;
@@ -22,14 +35,14 @@ export type BuildingTemplate = {
   label: string;
   /** One line explaining what this building is for, in plain language. */
   description: string;
-  building: Omit<BuildingConfig, 'id' | 'name'>;
+  building: TemplateBuilding;
 };
 
 const template = (
   id: string,
   label: string,
   description: string,
-  building: Omit<BuildingConfig, 'id' | 'name'>,
+  building: TemplateBuilding,
 ): BuildingTemplate => ({ id, label, description, building });
 
 export const BUILDING_TEMPLATES: readonly BuildingTemplate[] = [
@@ -137,6 +150,8 @@ export const DEFAULT_BUILDING_CONFIG: BuildingConfig = (() => {
     name: found.label,
     ...found.building,
     dampingRatio: undefined,
+    floorLoads: allOfficeFloorLoads(found.building.floors),
+    liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
   };
 })();
 

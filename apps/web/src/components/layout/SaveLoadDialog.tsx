@@ -351,12 +351,15 @@ export function SaveLoadDialog({
 /** Put a loaded run back into the app. */
 function applyRun(record: RunRecord): void {
   const config = useConfigStore.getState();
-  config.setBuilding({ ...record.building, id: `${record.building.id}-loaded` });
-  config.setMotion({ ...record.motion });
-  // The engine is re-run from the config, so the result in the record is used
-  // only for reproducibility checking, not displayed directly.
-  useConfigStore.setState({ results: [], activeFloor: null });
+  // A saved run is a record of what was simulated, so it is restored as a
+  // whole — including its result. Recomputing from the configuration would
+  // make an old run look as if it had recorded floor weights when it had not.
   useCompareStore.getState().disable();
+  config.loadRun(
+    { ...record.building, id: `${record.building.id}-loaded` },
+    { ...record.motion },
+    record.result,
+  );
 }
 
 /** A friendly message for an import failure, including the partial case. */

@@ -24,6 +24,16 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
   reporter: 'list',
+  /*
+   * Capped, not left to the CPU-count default.
+   *
+   * Every test mounts a WebGL canvas, and the first full-suite runs at the
+   * six-worker default passed individually and timed out together — six
+   * concurrent compositors starve the GPU until a click waits for an element
+   * that is right there. Two keeps interaction tests honest on a laptop;
+   * CI gets a wider box and more workers, plus retries.
+   */
+  workers: process.env.CI ? 4 : 2,
   use: {
     baseURL,
     trace: 'on-first-retry',

@@ -3,36 +3,45 @@ import { useFrame } from '@react-three/fiber';
 import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
+import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { normalizeFloorLoads } from '@/config/floorLoads';
+import { driftBand } from '@/lib/driftScale';
+import { floorContents, SLAB_THICKNESS_M, storyColumns } from '@/lib/floorScene';
 import { sampleDisplacement } from '@/lib/time';
 import { useCssVar, useCssVars } from '@/lib/useCssVar';
-import { driftBand } from '@/lib/driftScale';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
+import { useUiStore } from '@/store/uiStore';
+import { FloorObjects } from './FloorObjects';
 
 /* =========================================================================
-   Building mesh — a stack of boxes, one per floor.
+   Building mesh — a stack of floors that sway.
    -------------------------------------------------------------------------
-   PHASE 3: floors now SWAY. The animation reads playback time inside
-   `useFrame` and writes straight to each floor group's transform. It never
-   calls setState, so a 60 fps animation causes zero React renders — that is
-   what keeps 20 floors at 60 fps.
+   TWO READS OF THE SAME BUILDING
 
-   Both the chart cursor and this view sample displacement from the SAME
-   `result.floorDisp` array via `sampleDisplacement`, so they cannot drift
-   apart. There is no second copy of the response anywhere.
+     Solid    the floor is a full-height box: the building as a mass.
+     Cutaway  the floor is a 0.22 m slab on four corner columns, with the
+              objects that belong to its use on top.
 
-   Drift colouring: each floor is coloured by its interstory drift ratio
-   through the shared magnitude-map scale. The value is also printed in the
-   hover tooltip and on the chart, so colour is never the only cue.
+   OCCUPANCY IS THE BASE COLOUR, DRIFT IS THE SECONDARY CUE
+   Before floor loads, a floor was coloured by its story drift. That made the
+   3D view answer one question. Now a floor also has a use, and the use is the
+   thing the student chose and can change. So the slab takes the use tint, and
+   the drift colour moves to its outline: still visible, still on the same
+   scale as the chart, but no longer the only thing the eye can read.
+
+   The animation reads playback time inside `useFrame` and writes straight to
+   each floor group's transform. It never calls setState, so a 60 fps animation
+   causes zero React renders. Both the chart cursor and this view sample
+   displacement from the same `result.floorDisp` array.
    ========================================================================= */
-
-const SIDE_DARKEN = 0.8;
 
 export function BuildingMesh() {
   const building = useConfigStore((s) => s.building);
   const result = useConfigStore((s) => s.result);
   const activeFloor = useConfigStore((s) => s.activeFloor);
   const setActiveFloor = useConfigStore((s) => s.setActiveFloor);
+  const cutaway = useUiStore((s) => s.cutaway);
 
   const palette = useCssVars([
     '--undeformed',
@@ -42,6 +51,12 @@ export function BuildingMesh() {
     '--drift-3',
     '--drift-4',
     '--drift-5',
+    '--load-office',
+    '--load-residential',
+    '--load-parking',
+    '--load-storage',
+    '--load-custom',
+    '--content',
   ]);
 
   const hoverLabel = useCssVar('--text');
@@ -50,14 +65,22 @@ export function BuildingMesh() {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const { widthM, depthM, floorHeightM, floors } = building;
-  const slabHeight = floorHeightM * 0.86;
+  const loads = useMemo(
+    () => normalizeFloorLoads(floors, building.floorLoads),
+    [floors, building.floorLoads],
+  );
+
+  // The solid shell is nearly a full storey; the cutaway slab is a real slab.
+  const slabHeight = cutaway ? SLAB_THICKNESS_M : floorHeightM * 0.86;
   const totalHeight = floors * floorHeightM;
 
   const geometries = useMemo(() => {
     const box = new THREE.BoxGeometry(widthM, slabHeight, depthM);
     const outline = new THREE.EdgesGeometry(box);
     const restOutline = new THREE.EdgesGeometry(new THREE.BoxGeometry(widthM, totalHeight, depthM));
-    return { box, outline, restOutline };
+    // One unit box serves every object and every column on every floor.
+    const unit = new THREE.BoxGeometry(1, 1, 1);
+    return { box, outline, restOutline, unit };
   }, [widthM, depthM, slabHeight, totalHeight]);
 
   useLayoutEffect(() => {
@@ -65,11 +88,21 @@ export function BuildingMesh() {
       geometries.box.dispose();
       geometries.outline.dispose();
       geometries.restOutline.dispose();
+      geometries.unit.dispose();
     };
   }, [geometries]);
 
-  // Colour per floor. Recomputed only when the result changes — not per frame.
-  const floorColors = useMemo(
+  // Occupancy tint per floor. Recomputed only when a load or the theme changes.
+  const slabColors = useMemo(
+    () =>
+      loads.map(
+        (load) => palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe',
+      ),
+    [loads, palette],
+  );
+
+  // Drift on the outline, so it survives alongside the occupancy tint.
+  const driftColors = useMemo(
     () =>
       Array.from({ length: floors }, (_, index) => {
         const drift = result.driftRatio[index] ?? 0;
@@ -106,6 +139,8 @@ export function BuildingMesh() {
         const floor = index + 1;
         const isActive = activeFloor === floor;
         const isHovered = hovered === floor;
+        const load = loads[index];
+        const occupancyLabel = load ? LOAD_ASSUMPTIONS.occupancies[load.occupancy].label : 'Office';
 
         return (
           <group
@@ -132,22 +167,39 @@ export function BuildingMesh() {
               }}
             >
               <meshLambertMaterial
-                color={floorColors[index]}
+                color={slabColors[index]}
                 emissive={isActive ? palette['--selection'] : '#000000'}
                 emissiveIntensity={isActive ? 0.35 : 0}
               />
             </mesh>
 
             <lineSegments geometry={geometries.outline}>
-              <lineBasicMaterial
-                color={isActive ? palette['--selection'] : darken(floorColors[index]!)}
-              />
+              <lineBasicMaterial color={isActive ? palette['--selection'] : driftColors[index]} />
             </lineSegments>
+
+            {cutaway && load ? (
+              <>
+                <FloorObjects
+                  items={floorContents(load.occupancy, widthM, depthM)}
+                  geometry={geometries.unit}
+                  color={palette['--content'] ?? '#64748b'}
+                />
+                {index > 0 ? (
+                  <FloorObjects
+                    items={storyColumns(widthM, depthM, floorHeightM)}
+                    geometry={geometries.unit}
+                    color={palette['--content'] ?? '#64748b'}
+                    opacity={0.55}
+                  />
+                ) : null}
+              </>
+            ) : null}
 
             {/* Hover readout. Rendered as 3D text so it follows the cursor. */}
             {isHovered ? (
               <FloorCallout
                 floor={floor}
+                useLabel={occupancyLabel}
                 width={widthM}
                 color={hoverLabel}
                 peakMm={(result.peakDisp[index] ?? 0) * 1000}
@@ -163,31 +215,22 @@ export function BuildingMesh() {
 
 /* ------------------------------------------------------------------------- */
 
-/** Multiply an RGB hex by a factor, for the darker side-face shade. */
-function darken(hex: string, factor = SIDE_DARKEN): string {
-  const match = /^#?([0-9a-f]{6})$/i.exec(hex.trim());
-  if (!match) return hex;
-  const value = parseInt(match[1]!, 16);
-  const r = Math.round(((value >> 16) & 0xff) * factor);
-  const g = Math.round(((value >> 8) & 0xff) * factor);
-  const b = Math.round((value & 0xff) * factor);
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
-
 /**
  * Hover readout for one floor.
  *
- * Shows the numbers, not just the colour — a student must never have to
- * interpret a hue to find out what happened.
+ * Shows the use and the numbers, not just the colour — a student must never
+ * have to interpret a hue to find out what happened.
  */
 function FloorCallout({
   floor,
+  useLabel,
   width,
   color,
   peakMm,
   driftPct,
 }: {
   floor: number;
+  useLabel: string;
   width: number;
   color: string;
   peakMm: number;
@@ -201,7 +244,7 @@ function FloorCallout({
       >
         <p className="font-semibold">
           Floor {floor}
-          {floor === 1 ? ' (ground floor)' : ''}
+          {floor === 1 ? ' (ground floor)' : ''} · {useLabel}
         </p>
         <p className="font-mono-nums mt-1">
           Peak {peakMm.toFixed(1)} mm

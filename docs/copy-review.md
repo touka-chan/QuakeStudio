@@ -139,3 +139,16 @@ template". Students first.
 - **Phase 7 site controls** are shown but disabled, with the reason stated
   inline. A hidden control is a mystery; a disabled one with a reason is a
   decision the client can revisit.
+
+---
+
+## 24 October 2026 — after the floor-loads feature
+
+The units list above predates per-floor loads and is no longer complete: floor
+loads read in `kPa`, weights in `kN`, and `kg/m²` no longer appears anywhere —
+mass is derived (weight × 1000 / g) and never shown as a headline figure. The
+floor list shows each floor's counted load (DL + ψ·LL) in kPa with the counted
+bar next to it; the results panel's weight block names the total in kN. The
+same rules this review set (plain, short, second person; placeholder language;
+no safety voices) are unchanged, and the series letter A–D on roofs, charts and
+tables is unchanged.

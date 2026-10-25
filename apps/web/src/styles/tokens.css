@@ -95,6 +95,26 @@
   --shaking-arrow: #ca8a04;
   --shaking-arrow-label: #854d0e;
   --selection: var(--primary);
+  /* Cutaway contents and columns: present enough to give the floor a scale,
+     quiet enough that the occupancy tint still reads as the floor's colour. */
+  --content: #475569;
+
+  /* ---- Floor use tints -------------------------------------------------
+     Slabs and chips share these. They are deliberately pale: the 3D scene
+     is read as massing first and use second, and a saturated slab would
+     fight the shaking arrow and the selected-floor outline. Every one is
+     paired with a dark-theme override below. */
+  --load-office: #dbeafe;
+  --load-residential: #dcfce7;
+  --load-parking: #e2e8f0;
+  --load-storage: #ebddc3;
+  --load-custom: #f1f5f9;
+
+  /* Stacked weight bar: dead vs counted live. Blue and amber are the two
+     hues the design direction already uses for magnitude, and they stay
+     distinguishable in both themes and for red-green deficiency. */
+  --load-dead: #0072b2;
+  --load-live: #facc15;
 
   /* ---- Typography ---- */
   --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, sans-serif;
@@ -156,6 +176,18 @@
 
   --shaking-arrow: #facc15;
   --shaking-arrow-label: #fde047;
+  --content: #cbd5e1;
+
+  /* Floor use tints, darkened so a slab still reads as a surface rather
+     than a light box glowing through the dark viewport. */
+  --load-office: #1e3a5f;
+  --load-residential: #14351f;
+  --load-parking: #1e293b;
+  --load-storage: #3a2c14;
+  --load-custom: #1f2937;
+
+  --load-dead: #56b4e9;
+  --load-live: #facc15;
 }
 
 /* =========================================================================

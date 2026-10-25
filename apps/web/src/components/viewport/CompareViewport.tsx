@@ -1,20 +1,26 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import * as THREE from 'three';
 
 import { buildingHeight } from '@/lib/camera';
+import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { normalizeFloorLoads } from '@/config/floorLoads';
 import { layoutSideBySide, type Layout } from '@/lib/layout';
 import { describeBuilding } from '@/lib/describeBuilding';
 import { arrowReferenceWidthM, SIDE_CLEARANCE_RATIO } from '@/lib/sceneScale';
 import { driftBand } from '@/lib/driftScale';
+import { floorContents, SLAB_THICKNESS_M, storyColumns } from '@/lib/floorScene';
 import { useCssVar, useCssVars } from '@/lib/useCssVar';
 import { sampleDisplacement } from '@/lib/time';
 import { seriesColor, sideAt, useCompareStore, type CompareSide } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { usePlaybackStore } from '@/store/playbackStore';
+import { useUiStore } from '@/store/uiStore';
 import type { BuildingConfig } from '@/types';
 import { CameraFrame } from './CameraFrame';
+import { CutawayToggle } from './CutawayToggle';
+import { FloorObjects } from './FloorObjects';
 import { GroundSlab } from './GroundSlab';
 import { ShakeArrow } from './ShakeArrow';
 
@@ -187,6 +193,13 @@ export function CompareViewport() {
       ? {
           peakMm: (hoveredSubject.result.peakDisp[hovered.floor - 1] ?? 0) * 1000,
           driftPct: (hoveredSubject.result.driftRatio[hovered.floor - 1] ?? 0) * 100,
+          useLabel:
+            LOAD_ASSUMPTIONS.occupancies[
+              normalizeFloorLoads(
+                hoveredSubject.building.floors,
+                hoveredSubject.building.floorLoads,
+              )[hovered.floor - 1]?.occupancy ?? 'office'
+            ].label,
         }
       : null;
 
@@ -310,6 +323,9 @@ export function CompareViewport() {
       </Canvas>
 
       <ViewToggle view={view} onChange={setView} />
+      <div className="absolute top-3 right-3">
+        <CutawayToggle />
+      </div>
       <RoofBadgeLayer subjects={subjects} nodes={badgeNodes} />
       <FloorCalloutLayer
         node={calloutNode}
@@ -604,7 +620,7 @@ function FloorCalloutLayer({
 }: {
   node: React.RefObject<HTMLDivElement | null>;
   hovered: Hovered;
-  data: { peakMm: number; driftPct: number } | null;
+  data: { peakMm: number; driftPct: number; useLabel: string } | null;
   color: string;
 }) {
   return (
@@ -618,7 +634,7 @@ function FloorCalloutLayer({
         <>
           <p className="font-semibold">
             <span className="font-mono-nums">{hovered.side}</span> · Floor {hovered.floor}
-            {hovered.floor === 1 ? ' (ground floor)' : ''}
+            {hovered.floor === 1 ? ' (ground floor)' : ''} · {data.useLabel}
           </p>
           <p className="font-mono-nums mt-1">
             Peak {data.peakMm.toFixed(1)} mm
@@ -779,13 +795,42 @@ function SwayingBuilding({
     '--drift-4',
     '--drift-5',
     '--selection',
+    '--load-office',
+    '--load-residential',
+    '--load-parking',
+    '--load-storage',
+    '--load-custom',
+    '--content',
   ]);
 
   const floorRefs = useRef<(THREE.Group | null)[]>([]);
   const floors = building.floors;
   const floorHeightM = building.floorHeightM;
+  const cutaway = useUiStore((s) => s.cutaway);
 
-  const floorColors = useMemo(
+  const loads = useMemo(
+    () => normalizeFloorLoads(floors, building.floorLoads),
+    [floors, building.floorLoads],
+  );
+
+  /*
+   * Occupancy is the face colour; drift is the outline.
+   *
+   * In comparison mode the old code painted the whole building by drift, on
+   * the reasoning that one shared scale IS the comparison. That is still true
+   * of the outline: two floors with the same outline have the same drift. But
+   * the floor's use is now a second thing the picture must carry, and a solid
+   * drift wash swallowed it. The badge above each roof still carries identity.
+   */
+  const slabColors = useMemo(
+    () =>
+      loads.map(
+        (load) => palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe',
+      ),
+    [loads, palette],
+  );
+
+  const driftColors = useMemo(
     () =>
       Array.from({ length: floors }, (_, index) => {
         const drift = result?.driftRatio[index] ?? 0;
@@ -794,22 +839,24 @@ function SwayingBuilding({
     [floors, result, palette],
   );
 
-  // Identity colour, for the outline and the tag rather than the floor faces.
-  const identityColor = useCssVar(
-    side === 'A'
-      ? '--series-a'
-      : side === 'B'
-        ? '--series-b'
-        : side === 'C'
-          ? '--series-c'
-          : '--series-d',
-  );
-  const slabHeight = floorHeightM * 0.86;
+  const slabHeight = cutaway ? SLAB_THICKNESS_M : floorHeightM * 0.86;
 
   const geometry = useMemo(() => {
     const box = new THREE.BoxGeometry(building.widthM, slabHeight, building.depthM);
-    return { box, outline: new THREE.EdgesGeometry(box) };
+    return {
+      box,
+      outline: new THREE.EdgesGeometry(box),
+      unit: new THREE.BoxGeometry(1, 1, 1),
+    };
   }, [building.widthM, building.depthM, slabHeight]);
+
+  useLayoutEffect(() => {
+    return () => {
+      geometry.box.dispose();
+      geometry.outline.dispose();
+      geometry.unit.dispose();
+    };
+  }, [geometry]);
 
   // Written inline rather than in a shared helper: useFrame mutating Three.js
   // transforms is the point, and keeping it in the component (as BuildingMesh
@@ -834,6 +881,7 @@ function SwayingBuilding({
         // Same selection state the single-building view highlights, so a floor
         // pinned in the chart is also visibly pinned here.
         const isActive = activeFloor === floor;
+        const load = loads[index];
 
         /*
          * Built here rather than inline in the JSX.
@@ -874,7 +922,7 @@ function SwayingBuilding({
               }
             >
               <meshLambertMaterial
-                color={floorColors[index]}
+                color={slabColors[index]}
                 emissive={isActive ? (palette['--selection'] ?? '#000000') : '#000000'}
                 emissiveIntensity={isActive ? 0.35 : 0}
                 transparent={ghost}
@@ -884,12 +932,31 @@ function SwayingBuilding({
             </mesh>
             <lineSegments geometry={geometry.outline}>
               <lineBasicMaterial
-                color={identityColor}
+                color={isActive ? (palette['--selection'] ?? '#000000') : driftColors[index]}
                 transparent
                 opacity={ghost ? 0.95 : 0.55}
                 depthTest={!ghost}
               />
             </lineSegments>
+
+            {cutaway && !ghost && load ? (
+              <>
+                <FloorObjects
+                  items={floorContents(load.occupancy, building.widthM, building.depthM)}
+                  geometry={geometry.unit}
+                  color={palette['--content'] ?? '#64748b'}
+                  opacity={ghost ? 0.5 : 1}
+                />
+                {index > 0 ? (
+                  <FloorObjects
+                    items={storyColumns(building.widthM, building.depthM, floorHeightM)}
+                    geometry={geometry.unit}
+                    color={palette['--content'] ?? '#64748b'}
+                    opacity={0.55}
+                  />
+                ) : null}
+              </>
+            ) : null}
           </group>
         );
       })}

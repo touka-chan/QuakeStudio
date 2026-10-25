@@ -94,6 +94,14 @@ Verified running on an Android emulator: WebGL live, simulation worker\ncomputin
 it works on a phone in aeroplane mode with no server and no network. Copy the
 file to a phone, open it, allow "install from unknown sources", done.
 
+**What a phone shows now, deliberately:** the same Continue-anyway notice as
+the browser at that width — the workspace is a desktop workspace, and the
+earlier tab-based phone layout is gone with it. Choosing to continue mounts
+that workspace with sideways scrolling; nothing is remembered between visits.
+The pre-desktop-first on-device audit (12 of 14 walked, both failures fixed)
+described the tab layout and predates this gate, so it needs a re-walk before
+the APK is handed out to a new cohort.
+
 This is the build for a lab with a captive network, or for handing a student a
 single file. It shares one codebase with the web app, so a fix lands on both.
 
@@ -166,14 +174,20 @@ the colour is a one-line edit.
 ## What the app does
 
 **Desktop (≥1024px)** is three zones: controls on the left, the 3D viewport and
-playback bar in the middle, results on the right. **Below 1024px** those become
-Build / Simulate / Results tabs, one at a time.
+playback bar in the middle, results on the right — always at once, which is
+what makes comparison possible at all. **Below 1024px** the app opens on a
+notice saying it is built for a larger screen, with **Continue anyway** for
+anyone who needs it: the same three zones at their real proportions, reached by
+sideways scrolling. The choice is never remembered, so the notice is the
+first thing a narrow visit meets every time.
 
 Controls worth knowing about:
 
 - **Template picker** — six starting points, each with a one-line description.
-  Editing any field afterwards switches the label to "Custom". It is replaced by
-  an **A / B switcher** while comparison is on.
+  Editing any field afterwards switches the label to "Custom". While comparison
+  is on it is replaced by an **A / B / C / D switcher**, one row per building
+  with its remove control, above the tab strip; the frozen strip above the
+  panel keeps the Editing indicator in view however far you scroll.
 - **Glossary** — every jargon term has a ⓘ that explains it in one sentence.
 - **Motion exaggeration** (×20) — real displacement is millimetres, which is
   invisible at this scale. The slider magnifies the 3D view only; **the numbers
@@ -243,8 +257,9 @@ All of them are solved in a **single** worker request. Two separate requests
 would race and leave one side showing numbers from different inputs.
 
 A persistent **"Editing A / B / C / D"** indicator sits outside the scrolling
-controls panel, so it stays visible however far you scroll down. The metric cards
-follow it, and say which building they belong to.
+controls panel, so it stays visible however far you scroll down. The metric
+cards follow it, and the results panel's header names the building they
+describe.
 
 Adding a third building starts you on **Side by side**. Ghost overlay puts every
 building in the same place, so three or four of them is three or four
@@ -262,9 +277,10 @@ different shape to the one on screen.
 
 ### The guided tour
 
-Four steps, shown on **every visit** rather than once, and reachable again from
-the green **How to use** button. It points at the controls panel, the play
-button, the results panel and the compare button, in that order.
+Five steps, shown on **every visit** rather than once, and reachable again from
+the green **How to use** button. It points at the controls panel, the
+floors-and-loads tab, the play button, the results panel and the compare
+button, in that order.
 
 **The welcome gate comes after it, on every visit too.** Neither overlay
 remembers anything: acknowledging the disclaimer used to write a flag, and that
@@ -282,11 +298,11 @@ coming back should meet it again rather than trust that they once did.
 **Two presentations, because one of them cannot work on a narrow screen.** Above
 the desktop breakpoint it is a spotlight: the page behind goes soft, whatever
 the step is about stays sharp, and the card is placed beside it and never over
-it. Below the breakpoint the app is tab-based — one panel at a time — so a
-spotlight pointing at "the controls panel" would be pointing at something hidden
-behind another tab, and the first thing to break would be a tour pointing at the
-wrong panel. There it is a paged modal instead. The content is shared, so the two
-cannot say different things.
+it. Below the breakpoint the workspace is reached through the Continue-anyway
+gate and scrolls sideways — most of it is never in view at once, so a spotlight
+that draws its geometry against the window would be measuring a layout the
+reader does not see. There it is a paged modal instead. The content is shared,
+so the two cannot say different things.
 
 **The highlighted control stays sharp; everything else goes soft.** That is the
 whole effect, and it was much harder to get right than it looks. Three things
@@ -377,10 +393,13 @@ controls you can see.
 
 The Python reference deliberately shares *constants* (exported to
 `reference/constants.json`) but **not code**: it solves the generalised
-eigenproblem with LAPACK instead of reducing to M⁻¹K + Jacobi, factorises with
+eigenproblem with LAPACK instead of the TS side's symmetric mass reduction
+`D = M⁻¹ᐟ²·K·M⁻¹ᐟ²` followed by the cyclic Jacobi sweep, factorises with
 LAPACK Cholesky rather than a hand-rolled routine, and steps the whole matrix
 with NumPy. Two implementations that share no code can disagree; that is the
-point.
+point. The reduction is symmetric on purpose — forming `M⁻¹K` is only
+symmetric when every floor mass is equal, and per-floor loads broke that
+equality.
 
 ### Playback
 
@@ -563,10 +582,10 @@ Run from the repository root.
 | `npm run format` | Prettier, write |
 | `npm run format:check` | Prettier, verify only |
 | `npm run typecheck` | TypeScript, no emit |
-| `npm test` | Vitest unit + component tests — **411 tests** |
+| `npm test` | Vitest unit + component tests — **494 tests** |
 | `npm run test:watch` | Vitest in watch mode |
 | `npm run e2e:install` | **Download Playwright's Chromium (~500 MB, once)** |
-| `npm run e2e` | Playwright end-to-end tests — **84 specs** |
+| `npm run e2e` | Playwright end-to-end tests — **119 specs** (+ 5 PWA specs via `test:pwa`) |
 | `npm run test:pwa` | Install/offline tests, against a production build — **5 specs** |
 | `npm run web:audit` | Audit every viewport in a browser — 6 widths × 6 views, no device needed |
 | `npm run analysis:drift` | Measure where story drift actually lands, for the colour bands |

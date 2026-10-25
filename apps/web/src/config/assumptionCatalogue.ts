@@ -2,7 +2,9 @@ import {
   FRAME_TYPES,
   GEOMETRY,
   GROUND_MOTION,
+  LOAD_ASSUMPTIONS,
   MATERIALS,
+  OCCUPANCY_IDS,
   SOLVER,
   type FrameTypeId,
   type MaterialId,
@@ -32,7 +34,8 @@ export type AssumptionRow = {
   /** Stable id, for tests and anchors. */
   readonly id: string;
   /** Group heading in the UI. */
-  readonly group: 'Materials' | 'Frame types' | 'Geometry' | 'Solver' | 'Ground motion';
+  readonly group:
+    'Materials' | 'Frame types' | 'Floor loads' | 'Geometry' | 'Solver' | 'Ground motion';
   readonly label: string;
   /** Already formatted for display, including the unit. */
   readonly value: string;
@@ -67,17 +70,13 @@ function num(value: number, decimals = 4): string {
 /* ---------------------------------------------------------------- materials */
 
 /**
- * The three coefficients that define a material, plus the shared period
- * formula. Written as data so the loop below cannot miss a material.
+ * The coefficients that define a material, plus the shared period formula.
+ * Written as data so the loop below cannot miss a material.
+ *
+ * Mass per unit area is NOT here: a floor's weight now comes from its own
+ * loads. See LOAD_ASSUMPTIONS below and `config/floorLoads.ts`.
  */
 const MATERIAL_FIELDS = [
-  {
-    field: 'massPerAreaKgM2',
-    label: 'Mass per unit floor area',
-    units: 'kg/m²',
-    note: 'How heavy each floor is. Heavier buildings respond more slowly to the same shaking.',
-    decimals: 0,
-  },
   {
     field: 'dampingRatio',
     label: 'Damping ratio',
@@ -150,6 +149,57 @@ function frameRows(): AssumptionRow[] {
     note: 'Applied after the target period is set, so a braced frame ends up with a shorter period than the formula predicts.',
     placeholder: true,
   }));
+}
+
+/* -------------------------------------------------------------- floor loads */
+
+/**
+ * The load model, read from LOAD_ASSUMPTIONS.
+ *
+ * This group is the one the adviser asked for: it states the dead load, the
+ * live-load participation factor, and the live load assumed for each use, so a
+ * reviewer can check the numbers the engine multiplies together.
+ */
+function floorLoadRows(): AssumptionRow[] {
+  const rows: AssumptionRow[] = [
+    {
+      id: 'load-default-dead',
+      group: 'Floor loads',
+      label: 'Default dead load',
+      value: num(LOAD_ASSUMPTIONS.defaultDeadLoadKPa, 2),
+      raw: LOAD_ASSUMPTIONS.defaultDeadLoadKPa,
+      units: 'kPa',
+      note: 'Slab, ceiling, finishes and services on every floor before any use is chosen.',
+      placeholder: true,
+    },
+    {
+      id: 'load-live-participation',
+      group: 'Floor loads',
+      label: 'Live-load participation (ψ)',
+      value: `${num(LOAD_ASSUMPTIONS.liveLoadParticipation * 100, 0)}%`,
+      raw: LOAD_ASSUMPTIONS.liveLoadParticipation,
+      units: 'of live load counted',
+      note: 'Only this fraction of the live load is counted as earthquake weight. At 0% a floor weighs only its dead load; at 100% the full live load is counted.',
+      placeholder: true,
+    },
+  ];
+
+  for (const occupancy of OCCUPANCY_IDS) {
+    const assumption = LOAD_ASSUMPTIONS.occupancies[occupancy];
+    if (occupancy === 'custom') continue; // Custom has no preset of its own.
+    rows.push({
+      id: `load-live-${occupancy}`,
+      group: 'Floor loads',
+      label: `${assumption.label} — live load`,
+      value: num(assumption.liveKPa, 2),
+      raw: assumption.liveKPa,
+      units: 'kPa',
+      note: assumption.description,
+      placeholder: true,
+    });
+  }
+
+  return rows;
 }
 
 /* ---------------------------------------------------------------- geometry */
@@ -299,6 +349,7 @@ function motionRows(): AssumptionRow[] {
 export const ASSUMPTIONS: readonly AssumptionRow[] = [
   ...materialRows(),
   ...frameRows(),
+  ...floorLoadRows(),
   ...geometryRows(),
   ...solverRows(),
   ...motionRows(),
@@ -307,6 +358,7 @@ export const ASSUMPTIONS: readonly AssumptionRow[] = [
 export const ASSUMPTION_GROUPS = [
   'Materials',
   'Frame types',
+  'Floor loads',
   'Geometry',
   'Solver',
   'Ground motion',

@@ -1,4 +1,4 @@
-import { formatMm, formatPct } from '@/lib/utils';
+import { formatGrouped, formatMm, formatPct } from '@/lib/utils';
 import { describeBuilding } from '@/lib/describeBuilding';
 import { seriesColor, useCompareStore, type CompareSide } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
@@ -64,6 +64,42 @@ const MEASURES: Measure[] = [
     label: 'Height',
     cell: (s) => `${(s.top * s.building.floorHeightM).toFixed(1)} m`,
     raw: (s) => s.top * s.building.floorHeightM,
+  },
+  {
+    label: 'Total weight',
+    /*
+     * A saved run from before floor loads has no weight. Saying "not recorded"
+     * beside buildings that do have one is the honest comparison; inventing a
+     * weight from the current config would compare a measured building with a
+     * hypothetical one and label both as results.
+     */
+    cell: (s) =>
+      recorded(s.result) ? `${formatGrouped(s.result.totalWeightKN)} kN` : 'not recorded',
+    raw: (s) => (recorded(s.result) ? s.result.totalWeightKN : null),
+  },
+  {
+    label: 'Counted live share',
+    cell: (s) => {
+      if (!recorded(s.result)) return 'not recorded';
+      const live = (s.result.floorLiveCountedKN ?? []).reduce((sum, value) => sum + value, 0);
+      const share = s.result.totalWeightKN > 0 ? (live / s.result.totalWeightKN) * 100 : 0;
+      return `${share.toFixed(0)} %`;
+    },
+    // A change of a share against another share is not a percentage change
+    // with a useful meaning, so this row deliberately has no comparison.
+    raw: () => null,
+  },
+  {
+    label: 'Total mass',
+    cell: (s) => {
+      if (!recorded(s.result)) return 'not recorded';
+      const kg = (s.result.floorMassesKg ?? []).reduce((sum, value) => sum + value, 0);
+      return `${formatGrouped(kg / 1000)} t`;
+    },
+    raw: (s) => {
+      if (!recorded(s.result)) return null;
+      return (s.result.floorMassesKg ?? []).reduce((sum, value) => sum + value, 0) / 1000;
+    },
   },
   {
     label: 'Material',
@@ -167,7 +203,7 @@ export function ComparisonTable() {
     >
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
         <h2 id="compare-heading" className="text-base font-semibold">
-          Results
+          Comparison
         </h2>
         <p className="font-mono-nums text-xs text-muted-foreground">
           {others === 1 ? 'B compared with A' : `Each of B, C and D compared with A`}
@@ -256,6 +292,19 @@ export function ComparisonTable() {
 }
 
 /* ------------------------------------------------------------------------- */
+
+/**
+ * Whether a result carries floor weights at all.
+ *
+ * An old saved run has an empty array. A genuine building cannot weigh zero,
+ * so an empty array is unambiguous: there is nothing to divide, and nothing
+ * should be guessed.
+ */
+function recorded(result: SimulationResult): boolean {
+  // A zero total cannot be a solved building either. Requiring both keeps a
+  // malformed record from printing "0 kN" beside real measurements.
+  return (result.floorWeightsKN?.length ?? 0) > 0 && result.totalWeightKN > 0;
+}
 
 /** Percentage change of `b` from `a`, or null when it cannot be computed. */
 function pct(a: number | null, b: number | null): number | null {

@@ -15,16 +15,17 @@ import { TOUR_BACKDROP_FILTER } from './tourBackdrop';
 /* =========================================================================
    Narrow-screen presentation of the tour
 
-   The same four steps as the spotlight, as a paged modal.
+   The same five steps as the spotlight, as a paged modal.
 
    WHY A DIFFERENT PRESENTATION AT ALL
-   Below the desktop breakpoint the app is tab-based: exactly one of the three
-   panels is on screen at a time, chosen from the bottom tab bar. A spotlight
-   pointing at "the controls panel" would be pointing at something hidden
-   behind the results panel. Forcing the spotlight to work anyway would mean
-   driving the tab bar from inside the tour, and the first thing to break would
-   be a tour pointing at the wrong panel — which reads as broken, not as
-   clever.
+   Below the desktop breakpoint the app opens on the Continue-anyway notice,
+   and choosing to continue mounts the desktop workspace with sideways
+   scrolling. The workspace under the modal is therefore the same three zones
+   the spotlight points at — but a spotlight is built around targets it can
+   outline in place, and narrow screens reach that workspace by scrolling, so
+   the spotlight's geometry (outline, hole, card placement) is measured
+   against a viewport that does not hold most of the workspace. The modal
+   says the same words without pretending the workspace is all in view.
 
    So the content is shared and only the presentation differs. Both read
    `TOUR_STEPS`, so the two cannot say different things.
@@ -69,9 +70,10 @@ export function TourModal({ step, index, total, isLast, onNext, onBack, onSkip }
         }}
       />
 
-      {/* A real modal is correct here and only here. On narrow screens the page
-       behind has nothing worth showing, and Radix handles the focus trap and
-       Escape for us — which is why the spotlight had to write its own. */}
+      {/* A real modal is correct here: the workspace behind is reached by
+       sideways scrolling, so nothing in it is reliably in view to point at,
+       and Radix handles the focus trap and Escape — which is why the spotlight
+       had to write its own. */}
       <Dialog
         open
         onOpenChange={(next) => {

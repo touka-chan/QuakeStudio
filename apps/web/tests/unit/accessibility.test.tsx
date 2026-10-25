@@ -8,6 +8,7 @@ import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { defaultCompareBuilding, useCompareStore } from '@/store/compareStore';
 import { useConfigStore } from '@/store/configStore';
 import { __testing as tourTesting } from '@/store/tourStore';
+import { useUiStore } from '@/store/uiStore';
 import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
@@ -79,6 +80,11 @@ function seedResult(scale = 1): SimulationResult {
     maxDriftRatio: 0.004 * scale,
     periodsS: [0.5 * scale],
     groundAccel: [0, 1],
+    floorWeightsKN: [1000, 1000, 1000, 1000, 1000],
+    floorDeadKN: [800, 800, 800, 800, 800],
+    floorLiveCountedKN: [200, 200, 200, 200, 200],
+    totalWeightKN: 5000,
+    floorMassesKg: [100, 100, 100, 100, 100],
   };
 }
 
@@ -95,6 +101,9 @@ beforeEach(() => {
    */
   localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
   tourTesting.reset();
+  // Cross-panel UI state lives in a store, so a dialog left open by one test
+  // would be open — and modal — at the start of the next one.
+  useUiStore.setState({ assumptionsOpen: false, assumptionsTab: 'about', cutaway: false });
   useConfigStore.setState({ result: seedResult() });
 });
 
@@ -131,7 +140,7 @@ describe('accessibility', () => {
     await user.click(screen.getByRole('button', { name: /assumptions/i }));
     const dialog = await screen.findByRole('dialog');
 
-    for (const tab of [/about/i, /assumptions/i, /glossary/i]) {
+    for (const tab of [/about/i, /assumptions/i, /floor loads/i, /glossary/i]) {
       await user.click(within(dialog).getByRole('tab', { name: tab }));
       const results = await audit(dialog);
       expect(describeViolations(results)).toBe('');
@@ -158,6 +167,10 @@ describe('accessibility', () => {
     await user.click(within(dialog).getByRole('tab', { name: /assumptions/i }));
     expect(within(dialog).getByRole('heading', { name: 'Materials' })).toBeInTheDocument();
     expect(within(dialog).queryByText('What this is')).not.toBeInTheDocument();
+
+    // Floor loads
+    await user.click(within(dialog).getByRole('tab', { name: /floor loads/i }));
+    expect(within(dialog).getByRole('heading', { name: /occupancy presets/i })).toBeInTheDocument();
 
     // Glossary
     await user.click(within(dialog).getByRole('tab', { name: /glossary/i }));

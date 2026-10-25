@@ -7,6 +7,7 @@ import { useCssVar } from '@/lib/useCssVar';
 import { useConfigStore } from '@/store/configStore';
 import { BuildingMesh } from './BuildingMesh';
 import { CameraFrame } from './CameraFrame';
+import { CutawayToggle } from './CutawayToggle';
 import { GroundSlab } from './GroundSlab';
 import { ShakeArrow } from './ShakeArrow';
 
@@ -127,9 +128,13 @@ function ViewportHints() {
   return (
     <>
       {/* Hidden on narrow screens: at 360px the two top chips overlapped, and the
-            orbit hint is a nicety, not information. */}
-      <div className="pointer-events-none absolute top-3 right-3 hidden sm:block">
-        <Chip>Drag to orbit · scroll to zoom</Chip>
+            orbit hint is a nicety, not information. The Solid/Cutaway control
+            stays at every width because it changes what the view means. */}
+      <div className="absolute top-3 right-3 flex flex-col items-end gap-2">
+        <CutawayToggle />
+        <span className="pointer-events-none hidden sm:block">
+          <Chip>Drag to orbit · scroll to zoom</Chip>
+        </span>
       </div>
 
       {/* Top-left stack: which building, and the floor-selection control. */}

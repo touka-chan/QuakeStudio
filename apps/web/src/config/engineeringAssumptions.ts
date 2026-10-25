@@ -44,8 +44,6 @@ export type MaterialId = 'concrete' | 'steel' | 'composite' | 'wood';
 export type MaterialAssumption = {
   /** Human label for the UI. */
   readonly label: string;
-  /** Dead load per unit floor area. PLACEHOLDER – needs engineer review */
-  readonly massPerAreaKgM2: number;
   /** Structural damping ratio (fraction, not percent). PLACEHOLDER – needs engineer review */
   readonly dampingRatio: number;
   /** Ct in the empirical period formula T1 = Ct * H^x. PLACEHOLDER – needs engineer review */
@@ -55,9 +53,13 @@ export type MaterialAssumption = {
 };
 
 /**
- * Mass-per-area values. Concrete's 600 kg/m² is the figure given in the
- * specification; the other three are estimates in the same ballpark and
- * need confirming.
+ * Material properties.
+ *
+ * There is deliberately no mass per unit area here any more. A floor's weight
+ * now comes from its own dead and live loads (see LOAD_ASSUMPTIONS and
+ * `config/floorLoads.ts`), which is what lets one floor be a parking deck and
+ * the next an office. Damping and the period formula are what remain genuinely
+ * material-dependent.
  *
  * Damping ratios sit in the 2–5% range the spec allows for. Steel and
  * composite buildings are typically the least damped, timber the most.
@@ -65,28 +67,24 @@ export type MaterialAssumption = {
 export const MATERIALS: Record<MaterialId, MaterialAssumption> = {
   concrete: {
     label: 'Concrete',
-    massPerAreaKgM2: 600, // PLACEHOLDER – needs engineer review
     dampingRatio: 0.05, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
   },
   steel: {
     label: 'Steel',
-    massPerAreaKgM2: 400, // PLACEHOLDER – needs engineer review
     dampingRatio: 0.02, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
   },
   composite: {
     label: 'Composite',
-    massPerAreaKgM2: 500, // PLACEHOLDER – needs engineer review
     dampingRatio: 0.03, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
   },
   wood: {
     label: 'Wood',
-    massPerAreaKgM2: 250, // PLACEHOLDER – needs engineer review
     dampingRatio: 0.05, // PLACEHOLDER – needs engineer review
     periodCt: 0.072, // PLACEHOLDER – needs engineer review
     periodExponentX: 0.8, // PLACEHOLDER – needs engineer review
@@ -118,6 +116,95 @@ export const FRAME_TYPES: Record<FrameTypeId, FrameAssumption> = {
     label: 'Braced frame',
     stiffnessFactor: 2.0, // PLACEHOLDER – needs engineer review
   },
+};
+
+// ===========================================================================
+// 2b. FLOOR LOADS
+// ===========================================================================
+
+/**
+ * What a floor is used for. The use chooses the live-load preset; the user can
+ * then edit the value, which is what `custom` records.
+ */
+export const OCCUPANCY_IDS = ['office', 'residential', 'parking', 'storage', 'custom'] as const;
+export type Occupancy = (typeof OCCUPANCY_IDS)[number];
+
+export type OccupancyAssumption = {
+  readonly label: string;
+  /** Minimum uniformly distributed live load, in kPa (kN/m²). */
+  readonly liveKPa: number;
+  /** One line for the picker. */
+  readonly description: string;
+};
+
+/**
+ * FLOOR LOADS — the single source of truth for what a floor weighs.
+ *
+ * The model no longer takes mass from the material alone. Each floor carries a
+ * dead load (the structure and finishes) and a live load (what is on it), and
+ * only a fraction of the live load is counted as earthquake weight. That
+ * fraction is `liveLoadParticipation`.
+ *
+ * ⚠️  EVERY NUMBER HERE IS A PLACEHOLDER PENDING ENGINEER REVIEW.
+ * The code basis is named because the adviser asked for it, not because this
+ * file has been checked against the official code.
+ */
+export const LOAD_ASSUMPTIONS = {
+  codeBasis: 'NSCP 2015 (Philippines), which follows ASCE 7 for earthquake provisions', // PLACEHOLDER – needs engineer review
+  /** Standard gravity, used to turn a weight in kN into a mass in kg. */
+  gravityMs2: GRAVITY_MS2,
+  /** Dead load every floor starts from: slab, ceiling, finishes and services. */
+  defaultDeadLoadKPa: 4.8, // PLACEHOLDER – needs engineer review
+  /** Fraction of the live load counted as earthquake weight. */
+  liveLoadParticipation: 0.25, // PLACEHOLDER – needs engineer review
+  minDeadLoadKPa: 0,
+  maxDeadLoadKPa: 20,
+  minLiveLoadKPa: 0,
+  maxLiveLoadKPa: 30,
+  occupancies: {
+    office: {
+      label: 'Office',
+      liveKPa: 2.4, // PLACEHOLDER – needs engineer review
+      description: 'Desks, people and light equipment.',
+    },
+    residential: {
+      label: 'Residential',
+      liveKPa: 1.9, // PLACEHOLDER – needs engineer review
+      description: 'Homes: beds, sofas and household furniture.',
+    },
+    parking: {
+      label: 'Parking',
+      liveKPa: 2.4, // PLACEHOLDER – needs engineer review
+      description: 'Passenger cars parked on the floor.',
+    },
+    storage: {
+      label: 'Storage',
+      liveKPa: 6.0, // PLACEHOLDER – needs engineer review
+      description: 'Light stored goods, crates and shelves.',
+    },
+    custom: {
+      label: 'Custom',
+      liveKPa: 2.4, // PLACEHOLDER – needs engineer review
+      description: 'Type your own live load.',
+    },
+  },
+  /**
+   * Values taken from published summaries of NSCP 2015 Table 205-1. Confirm
+   * against the official code before relying on them.
+   */
+  sourceNote:
+    'Values from published summaries of NSCP 2015 Table 205-1. Confirm against the official code.',
+} as const satisfies {
+  codeBasis: string;
+  gravityMs2: number;
+  defaultDeadLoadKPa: number;
+  liveLoadParticipation: number;
+  minDeadLoadKPa: number;
+  maxDeadLoadKPa: number;
+  minLiveLoadKPa: number;
+  maxLiveLoadKPa: number;
+  occupancies: Record<Occupancy, OccupancyAssumption>;
+  sourceNote: string;
 };
 
 // ===========================================================================

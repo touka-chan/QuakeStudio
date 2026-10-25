@@ -51,10 +51,12 @@ figure and a citation, not your judgement.
 
 | # | Assumption | Our placeholder | Typical range | Source needed |
 |---|---|---|---|---|
-| 1.1 | Floor mass per area — concrete | 600 kg/m² | — | spec, confirm |
-| 1.2 | Floor mass per area — steel | 400 kg/m² | — | **needs a real figure** |
-| 1.3 | Floor mass per area — composite | 500 kg/m² | — | **needs a real figure** |
-| 1.4 | Floor mass per area — wood | 250 kg/m² | — | **needs a real figure** |
+| 1.1 | Floor live load — office | 2.4 kPa | ~2.4 kPa for offices and parking is the standard pick-up | citation (NSCP 2015 Table 205-1 / ASCE 7) |
+| 1.2 | Floor live load — residential | 1.9 kPa | ~1.9–2.0 kPa residential | citation, same table |
+| 1.3 | Floor live load — parking | 2.4 kPa | ~2.4 kPa | citation, same table |
+| 1.4 | Floor live load — storage | 6.0 kPa | ~6.0 kPa for light storage; heavier uses count more | citation, same table |
+| 1.5 | Floor dead load (slab, finishes, services) | 4.8 kPa, editable per floor | a few kPa for ordinary floors, build-up specific | **needs a real figure per floor build-up** |
+| 1.6 | Live-load participation ψ | 0.25 flat for every use | provisions count 0.25 for some uses, more for storage/partitions | decision: flat vs per-use fractions |
 | 2.1–2.4 | Damping ratio, four materials | 5 / 2 / 3 / 5 % | 2–5 % | citation per material |
 | 3.1 | Braced-frame stiffness factor | 2.0× moment frame | ~1.8–2.2× | citation |
 

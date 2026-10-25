@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
+import { normalizeFloorLoads } from '@/config/floorLoads';
 import { MATERIAL_IDS, type BuildingConfig } from '@/types';
 
 /** The material of a building. Taken off the building rather than imported, because
@@ -184,11 +185,17 @@ function spareMaterials(a: BuildingConfig): MaterialId[] {
 export function defaultCompareBuilding(index: number, a = currentBuilding()): BuildingConfig {
   const materials = spareMaterials(a);
   const material = materials[index % materials.length] ?? 'steel';
+  const floors = a.floors <= 8 ? a.floors + 5 : Math.max(3, a.floors - 5);
   return {
     ...a,
     id: `${a.id}-${COMPARE_SIDES[index + 1]?.toLowerCase() ?? index + 1}`,
     name: `${a.name} — ${material}`,
-    floors: a.floors <= 8 ? a.floors + 5 : Math.max(3, a.floors - 5),
+    floors,
+    // The extra building starts from A's load pattern, adapted to its new
+    // floor count. The normalizer copies the nearest floor, so a taller B is
+    // not silently all-Office while its lower floors carry A's parking load.
+    // A fresh array, not A's: two buildings must never share one mutable list.
+    floorLoads: normalizeFloorLoads(floors, a.floorLoads),
     // Alternate the frame against A's, so there is a second thing varying.
     frameType: a.frameType === 'moment' ? 'braced' : 'moment',
     material,

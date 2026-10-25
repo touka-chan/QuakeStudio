@@ -33,8 +33,14 @@ import { expect, test, type Page } from '@playwright/test';
 const WIDTHS = [
   { name: 'desktop', width: 1440, height: 900 },
   { name: 'narrow', width: 1024, height: 900 },
-  { name: 'phone', width: 390, height: 844 },
 ];
+
+/*
+ * Two widths, not three. Below 1024px the app meets the Continue-anyway
+ * notice, and what a 390px window scrolls sideways through is the same
+ * workspace these tests already cover — the badges' geometry does not depend
+ * on how much of the workspace is scrolled into view.
+ */
 
 async function skipFirstRun(page: Page) {
   await page.addInitScript(() => {
@@ -47,46 +53,21 @@ async function skipFirstRun(page: Page) {
   });
 }
 
-/**
- * Pick a tab, if this layout has tabs at all.
- *
- * A phone shows one panel at a time behind Build / Simulate / Results; a
- * desktop shows all three at once and has no tab strip. The first version of
- * this helper assumed the desktop, and every phone test failed on a button that
- * genuinely was not on screen — the compare control lives in the Results panel,
- * so on a phone you have to go and find it first.
- */
-async function goToTab(page: Page, name: RegExp) {
-  const tab = page.getByRole('tab', { name });
-  if ((await tab.count()) > 0) await tab.first().click();
-}
-
 /** Get to a four-building comparison and wait for the scene to settle. */
 async function fourBuildings(page: Page) {
   await page.goto('/');
 
-  // The compare control is in the results panel.
-  await goToTab(page, /results/i);
+  // Everything is always on screen in the three-zone workspace: the compare
+  // control in the results panel, the switcher in the controls panel, the 3D
+  // viewport in the middle.
   await page.getByRole('button', { name: /compare with another building/i }).click();
-
-  /*
-   * Wait on the button turning into "Stop comparing", not on the view toggle.
-   * The toggle lives in the 3D viewport, which on a phone is two tabs away and
-   * genuinely not on screen here — asserting on it at this point fails on a
-   * layout that is working perfectly.
-   */
   await expect(page.getByRole('button', { name: /stop comparing/i })).toBeVisible();
 
-  // "Add a building" is in the controls panel.
   for (let i = 0; i < 2; i += 1) {
-    await goToTab(page, /^build$/i);
     const add = page.getByRole('button', { name: /add a building/i });
     await add.first().scrollIntoViewIfNeeded();
     await add.first().click();
   }
-
-  // The 3D viewport is in the simulate panel, where there is a tab strip.
-  await goToTab(page, /simulate/i);
 
   // Four badges, then let the frame loop position them.
   await expect(page.locator('[data-roof-badge]')).toHaveCount(4);

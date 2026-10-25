@@ -19,8 +19,14 @@ import {
   placeholderCount,
   type AssumptionRow,
 } from '@/config/assumptionCatalogue';
-import { DISCLAIMER_LONG } from '@/config/engineeringAssumptions';
+import {
+  DISCLAIMER_LONG,
+  GRAVITY_MS2,
+  LOAD_ASSUMPTIONS,
+  OCCUPANCY_IDS,
+} from '@/config/engineeringAssumptions';
 import { GLOSSARY } from '@/config/glossary';
+import { useUiStore, type AssumptionsTab } from '@/store/uiStore';
 import { APP_VERSION } from '@/types';
 
 /* =========================================================================
@@ -55,6 +61,8 @@ import { APP_VERSION } from '@/types';
 export function AssumptionsDialog() {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
+  const tab = useUiStore((s) => s.assumptionsTab);
+  const setTab = useUiStore((s) => s.setAssumptionsTab);
 
   const copyForReview = async () => {
     const markdown = assumptionsMarkdown();
@@ -84,10 +92,15 @@ export function AssumptionsDialog() {
         </DialogDescription>
       </DialogHeader>
 
-      <Tabs defaultValue="about" className="flex min-h-0 flex-1 flex-col">
+      <Tabs
+        value={tab}
+        onValueChange={(value) => setTab(value as AssumptionsTab)}
+        className="flex min-h-0 flex-1 flex-col"
+      >
         <TabsList>
           <TabsTrigger value="about">About</TabsTrigger>
           <TabsTrigger value="assumptions">Assumptions</TabsTrigger>
+          <TabsTrigger value="loads">Floor loads</TabsTrigger>
           <TabsTrigger value="glossary">Glossary</TabsTrigger>
         </TabsList>
 
@@ -143,10 +156,12 @@ export function AssumptionsDialog() {
                 <h3 className="font-semibold">How the model works</h3>
                 <p className="text-muted-foreground">
                   The building is treated as a stack of floors that can move sideways, joined by
-                  springs. Mass comes from floor area and material; stiffness is calibrated so the
-                  building reaches a target natural period from a standard formula. The earthquake
-                  shakes the ground, and the floors follow with their own lag. The equations are
-                  integrated forward in time with Newmark-β at a fixed 0.01 s step.
+                  springs. Mass comes from each floor&apos;s dead load plus a counted share of its
+                  live load, times the floor area; stiffness is calibrated from a reference building
+                  so every configuration reaches a target natural period from a standard formula.
+                  Changing a load therefore changes the weight, but not the frame&apos;s stiffness.
+                  The earthquake shakes the ground, and the floors follow with their own lag. The
+                  equations are integrated forward in time with Newmark-β at a fixed 0.01 s step.
                 </p>
               </section>
 
@@ -172,6 +187,10 @@ export function AssumptionsDialog() {
 
         <TabsContent value="assumptions" className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <AssumptionsTab />
+        </TabsContent>
+
+        <TabsContent value="loads" className="flex min-h-0 flex-1 flex-col overflow-hidden">
+          <FloorLoadsTab />
         </TabsContent>
 
         <TabsContent value="glossary" className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -332,6 +351,122 @@ function AssumptionItem({ row }: { row: AssumptionRow }) {
         </span>
       </span>
     </li>
+  );
+}
+
+/* ------------------------------------------------------------------------- */
+
+/**
+ * Floor loads, in one page.
+ *
+ * The left panel is where a student changes a load; this is where they can see
+ * what the change means and where the presets came from. The formula is shown
+ * in the same units and order as the panel, so moving between the two does not
+ * require re-reading the arithmetic.
+ */
+function FloorLoadsTab() {
+  const useIds = OCCUPANCY_IDS.filter((id) => id !== 'custom');
+
+  return (
+    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-3 text-sm">
+      <p className="text-muted-foreground">
+        Each floor carries a dead load — the floor itself, finishes and fixed services — and a live
+        load from the people and movable things on it. Only part of the live load is counted as
+        weight that the earthquake has to move.
+      </p>
+
+      <div className="space-y-1 rounded-app border border-line bg-surface-2 px-3 py-2.5 font-mono text-xs">
+        <p>W_i = (dead + ψ × live) × A</p>
+        <p>m_i = W_i × 1000 / g</p>
+      </div>
+
+      <dl className="grid grid-cols-3 gap-2">
+        <div className="rounded-app border border-line px-3 py-2">
+          <dt className="text-[11px] tracking-wide text-muted-foreground uppercase">
+            Dead load default
+          </dt>
+          <dd className="font-mono-nums mt-0.5 text-base font-semibold">
+            {LOAD_ASSUMPTIONS.defaultDeadLoadKPa}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">kPa</span>
+          </dd>
+        </div>
+        <div className="rounded-app border border-line px-3 py-2">
+          <dt className="text-[11px] tracking-wide text-muted-foreground uppercase">ψ default</dt>
+          <dd className="font-mono-nums mt-0.5 text-base font-semibold">
+            {Math.round(LOAD_ASSUMPTIONS.liveLoadParticipation * 100)}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">% of live</span>
+          </dd>
+        </div>
+        <div className="rounded-app border border-line px-3 py-2">
+          <dt className="text-[11px] tracking-wide text-muted-foreground uppercase">Gravity</dt>
+          <dd className="font-mono-nums mt-0.5 text-base font-semibold">
+            {GRAVITY_MS2}
+            <span className="ml-1 text-xs font-normal text-muted-foreground">m/s²</span>
+          </dd>
+        </div>
+      </dl>
+
+      <section aria-labelledby="occupancy-presets-heading">
+        <h3 id="occupancy-presets-heading" className="mb-1.5 text-sm font-semibold">
+          Occupancy presets
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <caption className="sr-only">
+              Live-load presets for each floor use, in kilopascals
+            </caption>
+            <thead>
+              <tr className="border-b border-line text-left text-muted-foreground">
+                <th scope="col" className="py-1.5 pr-3 font-medium">
+                  Use
+                </th>
+                <th scope="col" className="py-1.5 pr-3 text-right font-medium">
+                  Live load
+                </th>
+                <th scope="col" className="py-1.5 font-medium">
+                  What it covers
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {useIds.map((id) => {
+                const preset = LOAD_ASSUMPTIONS.occupancies[id];
+                return (
+                  <tr key={id} className="border-b border-line last:border-0">
+                    <th scope="row" className="py-2 pr-3 text-left font-normal">
+                      {preset.label}
+                    </th>
+                    <td className="font-mono-nums py-2 pr-3 text-right">
+                      {preset.liveKPa.toFixed(1)} kPa
+                    </td>
+                    <td className="py-2 text-muted-foreground">{preset.description}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          A custom floor has no preset: its live load is whatever value you type in.
+        </p>
+      </section>
+
+      <div className="rounded-app border border-accent-yellow/40 bg-warning-bg px-3 py-2.5 text-xs leading-relaxed text-warning-text">
+        <p className="font-semibold">Changing a load does not make the building stiffer.</p>
+        <p className="mt-1">
+          Stiffness is calibrated from the same all-Office reference building at the default ψ, and
+          is recalculated only when the geometry, material or frame changes. A heavier floor gains
+          mass; its springs stay the same. That separation is deliberate, so you can see what a load
+          change alone does.
+        </p>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        These presets are teaching defaults. They are close to common code values, but they are
+        placeholders until the engineering adviser signs them off — and they are not a substitute
+        for the loads a real building actually carries.
+      </p>
+    </div>
   );
 }
 

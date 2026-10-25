@@ -3,11 +3,14 @@ import { z } from 'zod';
 import {
   GEOMETRY,
   GROUND_MOTION,
+  LOAD_ASSUMPTIONS,
+  OCCUPANCY_IDS,
   SOLVER,
   type FrameTypeId,
   type GroundMotionPresetId,
   type MaterialId,
 } from '@/config/engineeringAssumptions';
+import { normalizeFloorLoads, type FloorLoadValue } from '@/config/floorLoads';
 
 /* =========================================================================
    Shared types & Zod schemas
@@ -36,7 +39,51 @@ export const GROUND_MOTION_PRESET_IDS = [
 
 /* ---------------------------------------------------------------- Building */
 
-export const buildingConfigSchema = z.object({
+export const occupancySchema = z.enum(OCCUPANCY_IDS);
+
+/**
+ * One floor's loads.
+ *
+ * `liveOverridden` records that the user typed a live load instead of taking
+ * the use's preset. The use is then `custom`, which is what the badge shows.
+ */
+export const floorLoadSchema = z.object({
+  floor: z.number().int('Floor numbers must be whole.').min(1),
+  occupancy: occupancySchema,
+  deadLoadKPa: z
+    .number()
+    .min(
+      LOAD_ASSUMPTIONS.minDeadLoadKPa,
+      `Dead load must be at least ${LOAD_ASSUMPTIONS.minDeadLoadKPa} kPa.`,
+    )
+    .max(
+      LOAD_ASSUMPTIONS.maxDeadLoadKPa,
+      `Dead load must be ${LOAD_ASSUMPTIONS.maxDeadLoadKPa} kPa or less.`,
+    ),
+  liveLoadKPa: z
+    .number()
+    .min(
+      LOAD_ASSUMPTIONS.minLiveLoadKPa,
+      `Live load must be at least ${LOAD_ASSUMPTIONS.minLiveLoadKPa} kPa.`,
+    )
+    .max(
+      LOAD_ASSUMPTIONS.maxLiveLoadKPa,
+      `Live load must be ${LOAD_ASSUMPTIONS.maxLiveLoadKPa} kPa or less.`,
+    ),
+  liveOverridden: z.boolean(),
+});
+
+export type FloorLoad = z.infer<typeof floorLoadSchema>;
+
+/**
+ * The shape before normalization.
+ *
+ * `floorLoads` and `liveLoadParticipation` are optional on the way in so that a
+ * saved run or an imported file written before floor loads existed still
+ * parses. The transform below fills them with all-Office defaults. Nothing
+ * downstream has to handle a building without loads.
+ */
+const buildingConfigBaseSchema = z.object({
   id: z.string().min(1),
   name: z.string().min(1).max(80),
   floors: z
@@ -51,7 +98,17 @@ export const buildingConfigSchema = z.object({
   frameType: z.enum(FRAME_TYPE_IDS),
   /** Optional override of the material's damping ratio. */
   dampingRatio: z.number().min(0.001).max(0.2).optional(),
+  /** One entry per floor, lowest first. Normalized to exactly `floors`. */
+  floorLoads: z.array(floorLoadSchema).optional(),
+  /** Fraction of live load counted as earthquake weight, 0..1. */
+  liveLoadParticipation: z.number().min(0).max(1).optional(),
 });
+
+export const buildingConfigSchema = buildingConfigBaseSchema.transform((value) => ({
+  ...value,
+  floorLoads: normalizeFloorLoads(value.floors, value.floorLoads as FloorLoadValue[] | undefined),
+  liveLoadParticipation: value.liveLoadParticipation ?? LOAD_ASSUMPTIONS.liveLoadParticipation,
+}));
 
 export type BuildingConfig = z.infer<typeof buildingConfigSchema>;
 
@@ -94,13 +151,24 @@ export const simulationResultSchema = z.object({
   periodsS: z.array(z.number()),
   /** Ground acceleration input, in m/s². */
   groundAccel: z.array(z.number()),
+  /**
+   * Floor loads turned into weight. Stored with the result because a run is a
+   * record of what was simulated, and because old runs (written before floor
+   * loads existed) legitimately have none — the arrays default to empty rather
+   * than inventing a weight.
+   */
+  floorWeightsKN: z.array(z.number()).default([]),
+  floorDeadKN: z.array(z.number()).default([]),
+  floorLiveCountedKN: z.array(z.number()).default([]),
+  totalWeightKN: z.number().default(0),
+  floorMassesKg: z.array(z.number()).default([]),
 });
 
 export type SimulationResult = z.infer<typeof simulationResultSchema>;
 
 /* -------------------------------------------------------------- Run record */
 
-export const APP_VERSION = '0.1.0';
+export const APP_VERSION = '0.2.0';
 
 export const runRecordSchema = z.object({
   id: z.string().min(1),

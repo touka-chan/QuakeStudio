@@ -14,9 +14,8 @@ import { Capacitor } from '@capacitor/core';
    ----------------------------------------------------------------------------
    1. Close whatever dialog is open — the user asked to dismiss the thing in
       front of them.
-   2. If none is open, go back a step within the app. On a phone the workspace
-      is three tabs, so back returns to Build rather than leaving.
-   3. Only when there is nowhere left to go, let the OS close the app.
+   2. Otherwise let the OS close the app. There is no tab strip to step back
+      through: the workspace is one desktop layout, not a set of screens.
 
    Step 1 is deliberately DOM-driven rather than "let Radix handle it". Radix
    closes its own dialogs on Escape, but nothing routes a native back press
@@ -30,16 +29,6 @@ import { Capacitor } from '@capacitor/core';
    has to work without it, and the entry chunk is currently 175 KB with a
    deliberate budget — this must not become the reason it grows.
    ========================================================================== */
-
-type SidebarTab = 'build' | 'simulate' | 'results';
-
-/**
- * Dispatched when the user asks to go back within the app.
- *
- * Returns true if something handled it. Anything false means "carry on and
- * close the app", which is the contract the native listener relies on.
- */
-export const BACK_REQUESTED = 'quakestudio:back-requested';
 
 /** Is a modal dialog open right now? */
 function dialogOpen(): boolean {
@@ -58,19 +47,8 @@ function dialogOpen(): boolean {
   );
 }
 
-/** The mobile tab currently shown, or null on desktop. */
-function activeTab(): SidebarTab | null {
-  if (typeof document === 'undefined') return null;
-  const selected = document.querySelector('[role="tab"][aria-selected="true"]');
-  const label = selected?.textContent?.trim().toLowerCase() ?? '';
-  if (label.includes('build')) return 'build';
-  if (label.includes('simulate')) return 'simulate';
-  if (label.includes('results')) return 'results';
-  return null;
-}
-
 async function handleBack(): Promise<boolean> {
-  // 1. A dialog is the top-most thing; the user means to dismiss it.
+  // A dialog is the top-most thing; the user means to dismiss it.
   if (dialogOpen()) {
     /*
      * Dispatching Escape rather than reaching into Radix: it is the same path
@@ -82,16 +60,7 @@ async function handleBack(): Promise<boolean> {
     return true;
   }
 
-  // 2. Return to Build from another tab.
-  const tab = activeTab();
-  if (tab && tab !== 'build') {
-    document.dispatchEvent(
-      new CustomEvent(BACK_REQUESTED, { detail: { tab: 'build' }, bubbles: true }),
-    );
-    return true;
-  }
-
-  // 3. Nothing left to go back to. Let the OS close the app.
+  // Nothing left to go back to. Let the OS close the app.
   return false;
 }
 
@@ -121,4 +90,4 @@ export async function registerBackButton(): Promise<void> {
 }
 
 /** Exposed for tests: the decision, without any Capacitor involvement. */
-export const __testing = { handleBack, dialogOpen, activeTab };
+export const __testing = { handleBack, dialogOpen };

@@ -18,17 +18,22 @@ import { fileURLToPath } from 'node:url';
 
 import { SOLVER } from '@/config/engineeringAssumptions';
 import { simulate } from '@/engine/solver';
-import type { BuildingConfig, GroundMotionConfig } from '@/types';
+import { buildingConfigSchema, type BuildingConfig, type GroundMotionConfig } from '@/types';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const casesPath = resolve(here, 'cases.json');
 const outputPath = resolve(here, 'ts-results.json');
 
+type CaseBuilding = Omit<BuildingConfig, 'id' | 'name' | 'floorLoads' | 'liveLoadParticipation'> & {
+  floorLoads?: BuildingConfig['floorLoads'];
+  liveLoadParticipation?: number;
+};
+
 type CaseFile = {
   cases: Array<{
     id: string;
     why: string;
-    building: Omit<BuildingConfig, 'id' | 'name'>;
+    building: CaseBuilding;
     motion: Omit<GroundMotionConfig, 'dt' | 'seed'>;
   }>;
 };
@@ -49,11 +54,14 @@ function trim(values: number[]): number[] {
 const file = JSON.parse(readFileSync(casesPath, 'utf8')) as CaseFile;
 
 const results = file.cases.map((testCase) => {
-  const building: BuildingConfig = {
+  // Parsed, not cast: this is the same schema the app uses on an imported run,
+  // so a case without explicit floor loads receives the all-Office defaults
+  // and the two sides are guaranteed to start from the same building.
+  const building: BuildingConfig = buildingConfigSchema.parse({
     id: testCase.id,
     name: testCase.id,
     ...testCase.building,
-  };
+  });
 
   const motion: GroundMotionConfig = {
     ...testCase.motion,
@@ -87,6 +95,8 @@ const results = file.cases.map((testCase) => {
     driftRatio: trim(result.driftRatio),
     maxDisp: result.maxDisp,
     maxDriftRatio: result.maxDriftRatio,
+    floorWeightsKN: trim(result.floorWeightsKN),
+    totalWeightKN: result.totalWeightKN,
 
     /**
      * Full histories, so the comparison can measure error over time rather
@@ -101,7 +111,7 @@ const results = file.cases.map((testCase) => {
 
 writeFileSync(
   outputPath,
-  `${JSON.stringify({ schemaVersion: 1, cases: results }, null, 2)}\n`,
+  `${JSON.stringify({ schemaVersion: 2, cases: results }, null, 2)}\n`,
   'utf8',
 );
 

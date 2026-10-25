@@ -74,6 +74,20 @@ async function asPlainUser(page: Page) {
   });
 }
 
+/*
+ * The narrow-screen gate.
+ *
+ * Below 1024px the app opens on a notice instead of the workspace, and the
+ * choice to continue is deliberately never remembered — so a reload at the
+ * same size shows it again. Every test that wants the workspace under
+ * 1024px has to click through, and these tests are how the "Continue anyway"
+ * path stays covered rather than rotting as dead code.
+ */
+async function continueAnyway(page: Page) {
+  if ((page.viewportSize()?.width ?? 0) >= 1024) return;
+  await page.getByRole('button', { name: /continue anyway/i }).click();
+}
+
 function card(page: Page): Locator {
   return page.getByRole('dialog');
 }
@@ -448,8 +462,8 @@ test.describe('the background behind the tour', () => {
     await expect(card(page)).toBeVisible();
     await page.waitForTimeout(700);
 
-    // Below the breakpoint there is no canvas, and the backdrop layer is the
-    // only thing that blurs.
+    // The canvas gets its own filter from the stylesheet rule, so the reader
+    // switches that off alongside the layers where a canvas is present.
     const alsoCanvas = (await page.locator('canvas').count()) > 0;
     await setBlur(page, false, alsoCanvas);
     const looks = await measureLooks(page, candidates);
@@ -486,6 +500,7 @@ test.describe('the background behind the tour', () => {
       await page.setViewportSize({ width: size.w, height: size.h });
       await asPlainUser(page);
       await page.goto('/');
+      await continueAnyway(page);
       await page.waitForTimeout(700);
       await page.getByRole('button', { name: /how to use/i }).click();
       await expect(card(page)).toBeVisible();
@@ -563,18 +578,18 @@ test.describe('the background behind the tour', () => {
    * The same measurement, at the width where the tour is a modal and there is
    * no spotlight at all.
    *
-   * There is no 3D viewport to measure here — the narrow layout is tab-based,
-   * and the tab open on arrival is Build, so the canvas is not even mounted. So
-   * the search area is the whole window and "busiest patch" lands on the
-   * controls panel: all text and sliders, which is the thing a blur shows up on
-   * most clearly of anything in this app.
-   *
-   * `false` for the last argument because there is no canvas here to switch off.
+   * Below the desktop breakpoint the app opens on the Continue-anyway notice,
+   * and continuing mounts the same three-zone workspace with sideways
+   * scrolling. So there IS a 3D viewport behind the modal now, and `true` for
+   * the last argument: the reader switches the canvas's own filter off along
+   * with the layers, which is what "sharp" means when the canvas is in the
+   * search area.
    */
   test('loses its detail and its colour in the narrow layout too', async ({ page }) => {
     await page.setViewportSize({ width: 860, height: 1100 });
     await asPlainUser(page);
     await page.goto('/');
+    await continueAnyway(page);
     await page.waitForTimeout(900);
 
     const region = await pickBackgroundRegion(page, { x: 0, y: 0, width: 860, height: 1100 });
@@ -582,7 +597,7 @@ test.describe('the background behind the tour', () => {
     // Left open by the picker, for the same reason as above.
     await expect(card(page)).toBeVisible();
 
-    const { sharp, blurred, sharpAgain } = await readWithAndWithoutBlur(page, region, false);
+    const { sharp, blurred, sharpAgain } = await readWithAndWithoutBlur(page, region, true);
 
     expect(
       sharp.edges,
@@ -621,6 +636,7 @@ test.describe('the background behind the tour', () => {
       await page.setViewportSize({ width: size.w, height: size.h });
       await asPlainUser(page);
       await page.goto('/');
+      await continueAnyway(page);
       await page.waitForTimeout(600);
 
       const flagged = () =>
@@ -641,11 +657,10 @@ test.describe('the background behind the tour', () => {
   /*
    * The canvas itself, and only where there IS a 3D view.
    *
-   * Below the breakpoint the layout is tab-based and the tab open on arrival is
-   * Build, so no canvas is mounted at all. Asserting a filter on an element that
-   * is not there is a check that passes on nothing — and it did: the first
-   * version of this ran at both widths and failed on `no canvas` being compared
-   * against `none`, which is what sent it looking for a bug that was not there.
+   * The workspace is the same three zones at every size the tour can appear
+   * in, so wherever the tour runs the canvas is mounted and every backdrop
+   * reads as desktop. This one reads the canvas directly, which is the layer
+   * the modal path cannot reach.
    */
   test('blurs the 3D canvas itself, and takes it off again', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -702,7 +717,7 @@ test.describe('the background behind the tour', () => {
     await page.goto('/');
     await expect(card(page)).toBeVisible();
 
-    for (let step = 1; step <= 4; step += 1) {
+    for (let step = 1; step <= 5; step += 1) {
       const inside = await page.evaluate(() => {
         const target = document.querySelector<HTMLElement>('[data-tour-active]');
         if (!target) return 'no target on this step';
@@ -731,7 +746,7 @@ test.describe('the background behind the tour', () => {
    * control sharp — it made the entire page stop being blurred, and the
    * untouched page showing through the "hole" read as the hole working.
    *
-   * Measured on the controls panel at step 3, where the target is the results
+   * Measured on the controls panel at step 4, where the target is the results
    * panel on the far side: 7.2% of edges left with the clip, 2.7% without it,
    * 7.1% with the tour closed. An SVG mask behaves the same way.
    *
@@ -786,20 +801,20 @@ test.describe('the background behind the tour', () => {
     await page.waitForSelector('canvas', { timeout: 20_000 });
     await page.waitForTimeout(700);
 
-    // Step 3 targets the results panel on the right, so the left is background.
+    // Step 4 targets the results panel on the right, so the left is background.
     const farSide = { x: 20, y: 180, width: 260, height: 160 };
     const before = await measureLook(page, farSide);
 
     await page.getByRole('button', { name: /how to use/i }).click();
     await expect(card(page)).toBeVisible();
     await page.waitForTimeout(700);
-    for (let i = 0; i < 2; i += 1) {
+    for (let i = 0; i < 3; i += 1) {
       await card(page)
         .getByRole('button', { name: /^next$/i })
         .click();
       await page.waitForTimeout(900);
     }
-    await expect(card(page).getByText(/step 3 of 4/i)).toBeVisible();
+    await expect(card(page).getByText(/step 4 of \d+/i)).toBeVisible();
     await page.waitForTimeout(700);
 
     const during = await measureLook(page, farSide);
@@ -821,7 +836,7 @@ test.describe('the background behind the tour', () => {
     await page.goto('/');
     await expect(card(page)).toBeVisible();
 
-    for (let step = 1; step <= 4; step += 1) {
+    for (let step = 1; step <= 5; step += 1) {
       await expect
         .poll(() =>
           page.evaluate(() => {
@@ -834,10 +849,10 @@ test.describe('the background behind the tour', () => {
 
       // And it is genuinely above the layer, not merely numbered higher.
       //
-      // Polled, because step 4 scrolls its target into view and the reading
+      // Polled, because step 5 scrolls its target into view and the reading
       // taken the instant the step changed lands mid-scroll, on the scrolling
-      // panel rather than on the control. Read once it failed on step 4 and
-      // passed on steps 1 to 3, which is a test timing rather than a bug.
+      // panel rather than on the control. Read once it failed on step 5 and
+      // passed on steps 1 to 4, which is a test timing rather than a bug.
       await expect
         .poll(
           () =>
@@ -876,7 +891,7 @@ test.describe('the background behind the tour', () => {
       await page.goto('/');
       await expect(card(page)).toBeVisible();
 
-      for (let step = 1; step <= 4; step += 1) {
+      for (let step = 1; step <= 5; step += 1) {
         await expect
           .poll(
             async () => {
@@ -948,7 +963,7 @@ test.describe('guided tour', () => {
 
   test('runs before anything else, and every step stays on screen', async ({ page }) => {
     const steps = await card(page).locator('ol li').count();
-    expect(steps).toBe(4);
+    expect(steps).toBe(5);
 
     for (let i = 0; i < steps; i += 1) {
       const box = await settledBox(card(page));
@@ -969,7 +984,7 @@ test.describe('guided tour', () => {
    * the user would be reading an explanation of a panel they cannot see.
    */
   test('the card never covers the element it is describing', async ({ page }) => {
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       await expect
         .poll(() => cardCoversTarget(page.locator('[data-tour-outline]'), card(page)), {
           timeout: 6000,
@@ -984,7 +999,7 @@ test.describe('guided tour', () => {
   });
 
   test('highlights a real element on every step', async ({ page }) => {
-    for (let i = 0; i < 4; i += 1) {
+    for (let i = 0; i < 5; i += 1) {
       const outlined = page.locator('[data-tour-outline]');
       await expect(outlined).toHaveCount(1);
       const box = await settledBox(outlined);
@@ -995,7 +1010,7 @@ test.describe('guided tour', () => {
        * And the thing being pointed at has to be somewhere the user can
        * actually see.
        *
-       * Step 4 points at the compare button, which sits below the fold of the
+       * Step 5 points at the compare button, which sits below the fold of the
        * results panel. Without the tour scrolling its target into view the
        * outline was drawn around a control off the bottom of the screen — the
        * card got placed for something the reader had never been shown.
@@ -1022,7 +1037,9 @@ test.describe('guided tour', () => {
   });
 
   test('can be completed with the keyboard alone', async ({ page }) => {
-    for (let i = 0; i < 3; i += 1) {
+    // Four Enters on Next walk to step 5 of 5; the card's primary button is
+    // Finish only there.
+    for (let i = 0; i < 4; i += 1) {
       await card(page)
         .getByRole('button', { name: /^next$/i })
         .press('Enter');
@@ -1045,7 +1062,7 @@ test.describe('guided tour', () => {
     for (const visit of [1, 2, 3]) {
       await page.reload();
       await expect(card(page), `visit ${visit}`).toBeVisible();
-      await expect(card(page).getByText(/step 1 of 4/i), `visit ${visit}`).toBeVisible();
+      await expect(card(page).getByText(/step 1 of \d+/i), `visit ${visit}`).toBeVisible();
       await card(page)
         .getByRole('button', { name: /skip tour/i })
         .click();
@@ -1073,7 +1090,7 @@ test.describe('guided tour', () => {
 
     await page.getByRole('button', { name: /how to use/i }).click();
     await expect(card(page)).toBeVisible();
-    await expect(card(page).getByText(/step 1 of 4/i)).toBeVisible();
+    await expect(card(page).getByText(/step 1 of \d+/i)).toBeVisible();
   });
 });
 
@@ -1177,7 +1194,7 @@ test.describe('the highlighted control is live', () => {
     await page.waitForTimeout(200);
 
     // Still showing step 1, still pointing at the same thing, still on screen.
-    await expect(card(page).getByText(/step 1 of 4/i)).toBeVisible();
+    await expect(card(page).getByText(/step 1 of \d+/i)).toBeVisible();
     const outline = await settledBox(page.locator('[data-tour-outline]'));
     const size = page.viewportSize()!;
     expect(outline!.x).toBeGreaterThanOrEqual(-10);
@@ -1197,6 +1214,7 @@ test.describe('the floating How to use button', () => {
   async function openApp(page: Page) {
     await asPlainUser(page);
     await page.goto('/');
+    await continueAnyway(page);
     await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
     // The 3D viewport mounts late and resizes the panels when it does, so an
     // early reading catches a layout that was never shown to anyone.
@@ -1258,22 +1276,13 @@ test.describe('the floating How to use button', () => {
    * behaves. Both scrolling panels reserve bottom padding so nothing is left
    * trapped underneath at the end of their scroll.
    *
-   * What is NOT acceptable is covering the chrome that does not move: the tab
-   * bar, the transport controls. Those are the ones a user cannot scroll away
-   * from, so they are what is checked.
+   * What is NOT acceptable is covering chrome that does not move: at 1024px
+   * and up the playback bar sits fixed at the bottom of the centre zone while
+   * the panels scroll, so that is what is checked. (On the Continue-anyway
+   * workspace below 1024px the same transport scrolls sideways with the rest
+   * of the workspace — the same accepted case as any scrolled content.)
    */
   test('covers nothing that cannot be scrolled away from', async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 720 });
-    await openApp(page);
-
-    // The playback bar: transport, speed, exaggeration. It lives at the bottom
-    // of the Simulate tab and does not move.
-    await page.getByRole('tab', { name: /simulate/i }).click();
-    await page.waitForTimeout(400);
-    expect(await controlsUnderneath(page), 'it is covering the playback bar').toEqual([]);
-  });
-
-  test('covers nothing fixed on a desktop layout', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 });
     await openApp(page);
 
@@ -1310,6 +1319,7 @@ test.describe('the floating button is draggable and green', () => {
   async function open(page: Page) {
     await asPlainUser(page);
     await page.goto('/');
+    await continueAnyway(page);
     await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
     await page.waitForTimeout(800);
   }
@@ -1398,6 +1408,11 @@ test.describe('the floating button is draggable and green', () => {
   /*
    * A spot chosen on a wide screen is off the edge of a phone. Resizing has to
    * pull it back rather than leave it somewhere the user cannot reach it.
+   *
+   * The resize meets the narrow gate on the way down — below 1024px the notice
+   * replaces the workspace, and continuing remounts it (never persisted, so
+   * this really is what a resizing user meets). The button's clamping runs
+   * against the new size, so the assertion is on the state after the remount.
    */
   test('is pulled back on screen when the window shrinks a lot', async ({ page }) => {
     await page.setViewportSize({ width: 1600, height: 900 });
@@ -1405,6 +1420,8 @@ test.describe('the floating button is draggable and green', () => {
     await dragTo(page, { x: 1560, y: 860 }, { x: 1592, y: 892 });
 
     await page.setViewportSize({ width: 360, height: 720 });
+    await continueAnyway(page);
+    await expect(page.getByRole('button', { name: /how to use/i })).toBeVisible();
     await page.waitForTimeout(500);
     const box = (await fab(page).boundingBox())!;
     expect(box.x, 'it is off the left').toBeGreaterThanOrEqual(0);
@@ -1416,7 +1433,7 @@ test.describe('the floating button is draggable and green', () => {
     await open(page);
     await fab(page).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await expect(page.getByRole('dialog').getByText(/step 1 of 4/i)).toBeVisible();
+    await expect(page.getByRole('dialog').getByText(/step 1 of \d+/i)).toBeVisible();
   });
 });
 
@@ -1430,6 +1447,7 @@ test.describe('guided tour on a phone', () => {
   test('shows as a modal that fits the screen', async ({ page }) => {
     await asFirstTimer(page);
     await page.goto('/');
+    await continueAnyway(page);
 
     await expect(card(page)).toBeVisible();
 
@@ -1448,6 +1466,7 @@ test.describe('guided tour on a phone', () => {
   test('never stacks on the disclaimer gate', async ({ page }) => {
     await asCompleteFirstTimer(page);
     await page.goto('/');
+    await continueAnyway(page);
 
     await expect(card(page)).toBeVisible();
     await expect(page.getByRole('button', { name: /start exploring/i })).toHaveCount(0);
@@ -1458,7 +1477,7 @@ test.describe('guided tour on a phone', () => {
       .click();
 
     await expect(page.getByRole('button', { name: /start exploring/i })).toBeVisible();
-    await expect(card(page).getByText(/step 1 of 4/i)).toHaveCount(0);
+    await expect(card(page).getByText(/step 1 of \d+/i)).toHaveCount(0);
   });
 
   /*
@@ -1475,18 +1494,20 @@ test.describe('guided tour on a phone', () => {
   }) => {
     await asCompleteFirstTimer(page);
     await page.goto('/');
+    await continueAnyway(page);
 
     await expect(card(page)).toBeVisible();
     await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toHaveCount(0);
 
     // Walk to the last step the way a user does, rather than reaching in.
-    for (let i = 0; i < 3; i += 1) {
+    // TOUR_STEPS is five deep; four Nexts land on "Step 5 of 5".
+    for (let i = 0; i < 4; i += 1) {
       await card(page)
         .getByRole('button', { name: /^next$/i })
         .click();
       await page.waitForTimeout(500);
     }
-    await expect(card(page).getByText(/step 4 of 4/i)).toBeVisible();
+    await expect(card(page).getByText(/step 5 of 5/i)).toBeVisible();
     await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toHaveCount(0);
 
     await card(page)
@@ -1497,7 +1518,7 @@ test.describe('guided tour on a phone', () => {
     // dialog too. It would have taken one for the tour still being up, which is
     // the opposite of what just happened. The step text is on the tour card and
     // nowhere else, so that is what says the tour has gone.
-    await expect(page.getByText(/step \d of 4/i)).toHaveCount(0);
+    await expect(page.getByText(/step \d of \d+/i)).toHaveCount(0);
     await expect(page.getByRole('heading', { name: /welcome to quakestudio/i })).toBeVisible();
     // Still a real gate and not a notice: Start stays disabled until the
     // disclaimer is acknowledged again for this visit.
@@ -1507,6 +1528,7 @@ test.describe('guided tour on a phone', () => {
   test('the How to use button is still reachable at 360px', async ({ page }) => {
     await asFirstTimer(page);
     await page.goto('/');
+    await continueAnyway(page);
 
     await card(page)
       .getByRole('button', { name: /skip tour/i })

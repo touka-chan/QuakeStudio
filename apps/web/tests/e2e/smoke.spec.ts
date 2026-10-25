@@ -34,6 +34,17 @@ test.beforeEach(async ({ page }) => {
   await skipFirstRun(page);
 });
 
+/*
+ * The narrow-screen gate. Below 1024px the app opens on a notice instead of
+ * the workspace, and the choice is never remembered, so a test that wants the
+ * workspace under 1024px has to click through. This keeps the "Continue
+ * anyway" path exercised rather than silently orphaned.
+ */
+async function continueAnyway(page: Page) {
+  if ((page.viewportSize()?.width ?? 0) >= 1024) return;
+  await page.getByRole('button', { name: /continue anyway/i }).click();
+}
+
 test.describe('QuakeStudio — Phase 1 shell', () => {
   test('shows all three zones on a desktop viewport', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -80,7 +91,15 @@ test.describe('QuakeStudio — Phase 1 shell', () => {
     page.on('pageerror', (e) => errors.push(e.message));
 
     await page.goto('/');
-    await page.getByRole('heading', { name: /displacement over time/i }).waitFor();
+    // Waited for a worked result, not for a heading: the charts moved behind
+    // the results panel's Response tab, so a heading would read an empty
+    // mount. A real number means the worker ran and produced output.
+    await expect
+      .poll(
+        async () => Number.parseFloat(await page.getByTestId('metric-peak-disp-value').innerText()),
+        { timeout: 10_000 },
+      )
+      .toBeGreaterThan(0);
     expect(errors).toEqual([]);
   });
 });
@@ -129,6 +148,9 @@ test.describe('building a model', () => {
   });
 
   test('every earthquake control is keyboard reachable', async ({ page }) => {
+    // The earthquake controls live on the Earthquake tab, which is not the
+    // one open on arrival.
+    await page.getByRole('tab', { name: /earthquake/i }).click();
     const strength = page.getByRole('slider', { name: /strength/i });
     await strength.focus();
     const before = await strength.getAttribute('aria-valuetext');
@@ -138,25 +160,45 @@ test.describe('building a model', () => {
 });
 
 test.describe('responsive layout', () => {
-  test('stacks into tabs on a phone-sized viewport', async ({ page }) => {
+  test('a phone-sized viewport meets a notice, not a squeezed workspace', async ({ page }) => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
 
-    const tabs = page.getByRole('tablist', { name: /sections/i });
-    await expect(tabs).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: /built for a laptop or desktop/i }),
+    ).toBeVisible();
+    const continueAnyway = page.getByRole('button', { name: /continue anyway/i });
+    await expect(continueAnyway).toBeVisible();
 
-    // Only one zone at a time.
-    await expect(page.getByRole('complementary', { name: /controls/i })).toBeVisible();
+    // Nothing of the workspace is on screen yet — one honest screen rather
+    // than three overlays stacked on a layout that cannot fit.
+    await expect(page.getByRole('complementary', { name: /controls/i })).toHaveCount(0);
     await expect(page.getByRole('main', { name: /simulation viewport/i })).toHaveCount(0);
-
-    await page.getByRole('tab', { name: /simulate/i }).click();
-    await expect(page.getByRole('main', { name: /simulation viewport/i })).toBeVisible();
-
-    await page.getByRole('tab', { name: /results/i }).click();
-    await expect(page.getByRole('complementary', { name: /simulation results/i })).toBeVisible();
   });
 
-  test('holds together at 360px without sideways scrolling', async ({ page }) => {
+  test('continuing anyway mounts the real workspace, which scrolls sideways at 360px', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 360, height: 800 });
+    await page.goto('/');
+    await continueAnyway(page);
+
+    // The same three zones as desktop, at real proportions. The document
+    // itself does not overflow — the inner container scrolls — which is the
+    // point: the workspace keeps its real width and is reached by sideways
+    // scrolling rather than being compressed into slivers.
+    await expect(page.getByRole('complementary', { name: /controls/i })).toBeVisible();
+    await expect(page.getByRole('main', { name: /simulation viewport/i })).toBeVisible();
+    const results = page.getByRole('complementary', { name: /simulation results/i });
+    await expect(results).toBeAttached();
+    const box = await results.boundingBox();
+    expect(
+      box!.x,
+      'the right panel keeps its real width and is reached by scrolling, not squeezed',
+    ).toBeGreaterThanOrEqual(360);
+  });
+
+  test('the notice itself never scrolls sideways at 360px', async ({ page }) => {
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto('/');
 
@@ -166,13 +208,13 @@ test.describe('responsive layout', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
-  test('no metric card clips its own label at 360px', async ({ page }) => {
+  test('no metric card clips its own label on the continued workspace', async ({ page }) => {
     /*
-     * The page-wide overflow check above cannot see this bug.
+     * The page-wide overflow check cannot see this bug.
      *
      * A card whose label is wider than the card overflows INSIDE its own
      * border and is clipped by the rounded corner. The document does not grow,
-     * so scrollWidth still matches clientWidth and the previous test passes.
+     * so scrollWidth still matches clientWidth and a scrollbar test passes.
      * A user sees "DISPLACEMEN" with no T.
      *
      * `scrollWidth > clientWidth` on an element is what catches it, and only a
@@ -180,7 +222,7 @@ test.describe('responsive layout', () => {
      */
     await page.setViewportSize({ width: 360, height: 800 });
     await page.goto('/');
-    await page.getByRole('tab', { name: /results/i }).click();
+    await continueAnyway(page);
 
     const clipped = await page.evaluate(() => {
       const cards = [
@@ -197,19 +239,22 @@ test.describe('responsive layout', () => {
 
   test('no option button loses its label to a percentage column width', async ({ page }) => {
     /*
-     * The Material and Frame type groups used to be laid out with
-     * `basis-[calc(50%-2px)] sm:basis-[calc(25%-3px)]`, which picks a column
-     * count from the viewport. On the desktop layout they sit in a fixed 287px
-     * sidebar, so a 640px+ viewport forced four columns of 67px into 287px.
-     * "Composite" needs 66px of text plus 16px of padding, so it overflowed,
-     * and the group's `overflow-hidden` cut the last label at the edge.
+     * The Material and Frame type radio groups live in the controls sidebar,
+     * which is a fixed 288px (320 from 1280px up) at every viewport width.
+     * The old per-viewport basis classes are gone, but the property they were
+     * introduced for is still worth having: no label overflows the button it
+     * sits in, at the narrowest thing the gate lets through or at the widest
+     * desk the app is built for.
      *
-     * 320px is included because that is where the sidebar is narrowest relative
-     * to the labels, and 1440 because that is where the fixed sidebar applies.
+     * 320 is the narrowest "Continue anyway" workspace; 1024 the desktop gate;
+     * 1440 a common laptop. At 320 the sidebar keeps its width and the
+     * document scrolls, so the sidebar itself is the same box at every size —
+     * which is exactly why the narrow case is still worth running.
      */
     for (const width of [320, 1024, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       await page.goto('/');
+      await continueAnyway(page);
       await page.getByRole('radio', { name: 'Composite' }).waitFor();
 
       const damaged = await page.evaluate(() => {
@@ -258,7 +303,7 @@ test.describe('responsive layout', () => {
     }
   });
 
-  test('metric cards stack on a phone and sit side by side when there is room', async ({
+  test('metric cards stack on a narrow screen and sit side by side when there is room', async ({
     page,
   }) => {
     /*
@@ -271,7 +316,9 @@ test.describe('responsive layout', () => {
      * ResultsPanel, which are the real fix for the clipped label.
      *
      * Rows are counted by distinct `top` edges. Three distinct tops means
-     * stacked; one means side by side.
+     * stacked; one means side by side. The cards are laid out even when the
+     * continued workspace leaves them sideways of the window, so the count
+     * works without scrolling to them.
      */
     const rowCount = async () => {
       await page.waitForSelector('[data-testid="metric-peak-disp"]');
@@ -287,11 +334,11 @@ test.describe('responsive layout', () => {
 
     await page.setViewportSize({ width: 360, height: 900 });
     await page.goto('/');
-    await page.getByRole('tab', { name: /results/i }).click();
+    await continueAnyway(page);
     expect(await rowCount(), 'at 360px the cards should each be their own row').toBe(3);
 
-    await page.setViewportSize({ width: 768, height: 900 });
-    expect(await rowCount(), 'at 768px the cards should sit side by side').toBe(1);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    expect(await rowCount(), 'from the sm breakpoint up the cards sit side by side').toBe(1);
   });
 
   test('does not scroll sideways at 1920px', async ({ page }) => {
@@ -601,6 +648,11 @@ test.describe('honesty about results', () => {
   test('the Phase 7 site controls are visible but unavailable', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
-    await expect(page.getByText(/soil, foundation and fault distance/i)).toBeVisible();
+    // The site section lives at the bottom of the Earthquake tab.
+    await page.getByRole('tab', { name: /earthquake/i }).click();
+    await expect(page.getByText(/soil, foundation and fault distance are planned/i)).toBeVisible();
+    // "Unavailable" is a section with nothing to operate: no input of any kind.
+    const section = page.locator('section', { has: page.getByRole('heading', { name: /site/i }) });
+    await expect(section.locator('input, button, [role="slider"], select')).toHaveCount(0);
   });
 });

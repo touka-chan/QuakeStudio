@@ -1,12 +1,10 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { TooltipProvider } from '@/components/ui/tooltip';
-import { cn } from '@/lib/utils';
 import { useIsDesktop } from '@/lib/useMediaQuery';
-import { BACK_REQUESTED } from '@/pwa/backButton';
 import { ControlsPanel } from './ControlsPanel';
+import { DesktopNotice } from './DesktopNotice';
 import { WelcomeGate } from './WelcomeGate';
-import { MobileTabBar, type MobileTab } from './MobileTabBar';
 import { PlaybackBar } from './PlaybackBar';
 import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
@@ -15,99 +13,86 @@ import { LazyViewport } from '@/components/viewport/LazyViewport';
 import { Tour } from '@/components/tutorial/Tour';
 import { TourButton } from '@/components/tutorial/TourButton';
 import { useTourStore } from '@/store/tourStore';
+import { useUiStore } from '@/store/uiStore';
 
 /* =========================================================================
    App shell — the three-zone workspace.
    -------------------------------------------------------------------------
-   Desktop (>=1024px):  [ controls | viewport + playback | results ]
-   Below that:          one zone at a time, chosen by the bottom tab bar.
+   Desktop (>=1024px): [ controls | viewport + playback | results ]
 
-   The viewport is never unmounted when switching tabs on mobile — only
-   hidden. Remounting a WebGL context on every tab change is slow and janky,
-   and losing the user's orbit camera would be worse.
+   Below 1024px the app shows a straight notice instead of inventing a
+   column layout for a screen it was not designed for. "Continue anyway"
+   renders the same three zones with sideways scrolling. There is no tab bar
+   and no separate mobile layout: the desktop workspace is the product.
 
    `forceDesktopLayout` exists for component tests: jsdom reports every
-   media query as "no match", so without it a test would exercise the mobile
-   layout and never see the three-zone workspace.
+   media query as "no match", so without it a test would only ever see the
+   notice.
    ========================================================================= */
 
 export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean } = {}) {
-  const [tab, setTab] = useState<MobileTab>('build');
-
-  /*
-   * Android's back button, when there is no dialog to dismiss.
-   *
-   * The listener lives in pwa/backButton.ts; this only reacts to its event.
-   * Returning to Build rather than closing the app matches what the button
-   * means everywhere else on Android.
-   */
-  useEffect(() => {
-    function onBack(event: Event) {
-      setTab((event as CustomEvent<{ tab: MobileTab }>).detail.tab);
-    }
-    document.addEventListener(BACK_REQUESTED, onBack);
-    return () => document.removeEventListener(BACK_REQUESTED, onBack);
-  }, []);
-  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
+  const [continuedAnyway, setContinuedAnyway] = useState(false);
+  const assumptionsOpen = useUiStore((s) => s.assumptionsOpen);
+  const setAssumptionsOpen = useUiStore((s) => s.setAssumptionsOpen);
   const isDesktop = useIsDesktop(forceDesktopLayout);
   /* True once the tour is out of the way — see Tour.tsx. */
   const tourSettled = useTourStore((s) => s.settled);
+
+  /*
+   * The notice comes before the tour and the welcome gate, so a phone user
+   * gets one honest screen rather than three overlays stacked on a layout
+   * that cannot fit. Choosing to continue mounts the real workspace and the
+   * usual first-run sequence behind it.
+   */
+  if (!isDesktop && !continuedAnyway) {
+    return <DesktopNotice onContinue={() => setContinuedAnyway(true)} />;
+  }
 
   return (
     <TooltipProvider delayDuration={200}>
       <div className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
         <TopBar assumptionsOpen={assumptionsOpen} onAssumptionsOpenChange={setAssumptionsOpen} />
 
-        {/* Desktop: three zones side by side.
-            Mobile: stacked, with exactly ONE zone visible at a time. They
-            must not share a row on a phone — that squeezed the controls and
-            the playback bar into unreadable columns side by side. */}
-        <div className={cn('min-h-0 flex-1', isDesktop ? 'flex flex-row' : 'flex flex-col')}>
-          {/* ---- Left: controls ---- */}
-          {(isDesktop || tab === 'build') && (
+        {/*
+          The three zones, always side by side.
+
+          `min-w-[960px]` + `overflow-x-auto` is the "Continue anyway" path:
+          the workspace keeps its real proportions and a narrow screen scrolls
+          sideways, rather than compressing three panels into slivers. At
+          >=960px, which includes every real desktop, the minimum does nothing.
+        */}
+        <div className="min-h-0 flex-1 overflow-x-auto">
+          <div className="flex h-full min-w-[960px] flex-row">
+            {/* ---- Left: controls ---- */}
             <aside
-              className={
-                isDesktop
-                  ? 'flex min-h-0 w-80 shrink-0 flex-col border-r border-line bg-surface'
-                  : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
-              }
+              className="flex min-h-0 w-72 shrink-0 flex-col border-r border-line bg-surface xl:w-80"
               aria-label="Building and earthquake controls"
               data-tour="controls"
             >
               <ControlsPanel />
             </aside>
-          )}
 
-          {/* ---- Centre: viewport + playback ---- */}
-          {(isDesktop || tab === 'simulate') && (
+            {/* ---- Centre: viewport + playback ---- */}
             <main className="flex min-h-0 min-w-0 flex-1 flex-col" aria-label="Simulation viewport">
               <div className="min-h-0 flex-1">
                 <LazyViewport />
               </div>
               <PlaybackBar />
             </main>
-          )}
 
-          {/* ---- Right: results ---- */}
-          {(isDesktop || tab === 'results') && (
+            {/* ---- Right: results ---- */}
             <aside
-              className={
-                isDesktop
-                  ? 'flex min-h-0 w-96 shrink-0 flex-col border-l border-line bg-surface'
-                  : 'flex min-h-0 min-w-0 flex-1 flex-col bg-surface'
-              }
+              className="flex min-h-0 w-80 shrink-0 flex-col border-l border-line bg-surface xl:w-96"
               aria-label="Simulation results"
               data-tour="results"
             >
               <ResultsPanel />
             </aside>
-          )}
+          </div>
         </div>
 
-        {!isDesktop ? <MobileTabBar value={tab} onChange={setTab} /> : null}
-
         {/* The single playback clock. Mounted once, above everything that
-            reads time, so it keeps ticking whichever tab is visible. */}
+            reads time, so it keeps ticking whichever zone is in view. */}
         <PlaybackClock />
 
         {/* The guided tour. Mounted above the gate on purpose: the tour is

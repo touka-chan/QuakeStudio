@@ -309,7 +309,7 @@ export function TourButton() {
         </Button>
       </TooltipTrigger>
       <TooltipContent className="max-w-xs text-xs">
-        Walk through the four things you can do here. Drag it anywhere.
+        Walk through the five things you can do here. Drag it anywhere.
       </TooltipContent>
     </Tooltip>
   );

@@ -2,7 +2,6 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import App from '@/App';
 import { AppShell } from '@/components/layout/AppShell';
 import { TOUR_STEPS } from '@/components/tutorial/tourSteps';
 import { placeCard } from '@/components/tutorial/placeCard';
@@ -10,6 +9,8 @@ import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { useConfigStore } from '@/store/configStore';
 import { __testing as tourTesting, useTourStore } from '@/store/tourStore';
+import { useUiStore } from '@/store/uiStore';
+import type { SimulationResult } from '@/types';
 
 /* ==========================================================================
    Guided tour
@@ -34,8 +35,32 @@ vi.mock('@/components/viewport/Viewport', () => ({
   Viewport: () => <div data-testid="viewport-stub">3D viewport</div>,
 }));
 
+/** jsdom has no Worker, but the tour's last step points at a results control. */
+function seededResult(): SimulationResult {
+  const weights = [1000, 1000, 1000, 1000, 1000];
+  return {
+    time: [0, 0.1],
+    floorDisp: Array.from({ length: 5 }, () => [0, 0.01]),
+    peakDisp: [0.01, 0.02, 0.03, 0.04, 0.05],
+    maxDisp: 0.05,
+    driftRatio: [0.004, 0.004, 0.004, 0.004, 0.004],
+    maxDriftRatio: 0.004,
+    periodsS: [0.5, 0.2],
+    groundAccel: [0, 1],
+    floorWeightsKN: weights,
+    floorDeadKN: [800, 800, 800, 800, 800],
+    floorLiveCountedKN: [200, 200, 200, 200, 200],
+    totalWeightKN: 5000,
+    floorMassesKg: [100, 100, 100, 100, 100],
+  };
+}
+
 beforeEach(() => {
   localStorage.clear();
+  // The assumptions dialog and the cutaway toggle now live outside React's
+  // component tree, so unmounting a test no longer resets them.
+  useUiStore.setState({ assumptionsOpen: false, assumptionsTab: 'about', cutaway: false });
+  useConfigStore.setState({ status: 'idle', result: seededResult() });
   useTourStore.getState().start();
   useTourStore.getState().skip(); // settles; individual tests opt back in
   tourTesting.reset();
@@ -62,8 +87,8 @@ function asFirstTimer() {
 describe('guided tour — first run', () => {
   it('appears on a first visit', async () => {
     asFirstTimer();
-    render(<App />);
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    render(<AppShell forceDesktopLayout />);
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
   });
 
   /*
@@ -74,17 +99,17 @@ describe('guided tour — first run', () => {
   it('stays away when it has been suppressed', async () => {
     localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     tourTesting.reset();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     await waitFor(() => {
-      expect(screen.queryByText(/step 1 of 4/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/step 1 of 5/i)).not.toBeInTheDocument();
     });
   });
 
   it('still appears to a user who already acknowledged the disclaimer', async () => {
     localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     asFirstTimer();
-    render(<App />);
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    render(<AppShell forceDesktopLayout />);
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
   });
 
   /*
@@ -97,7 +122,7 @@ describe('guided tour — first run', () => {
    */
   it('writes nothing to storage when it ends', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
     expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
@@ -107,16 +132,16 @@ describe('guided tour — first run', () => {
 describe('guided tour — and the disclaimer gate', () => {
   it('holds the gate closed while it is on screen', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
     // The gate's own copy must not be reachable yet.
     expect(screen.queryByRole('button', { name: /start exploring/i })).not.toBeInTheDocument();
   });
 
   it('releases the gate once the tour is skipped', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
@@ -129,7 +154,7 @@ describe('guided tour — and the disclaimer gate', () => {
    */
   it('does NOT let skipping the tour bypass the disclaimer gate', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
@@ -140,7 +165,7 @@ describe('guided tour — and the disclaimer gate', () => {
 
   it('does NOT record the disclaimer when the tour is skipped', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     await userEvent.click(await screen.findByRole('button', { name: /skip tour/i }));
 
@@ -150,7 +175,7 @@ describe('guided tour — and the disclaimer gate', () => {
 
   it('releases the gate after the tour is completed, not just skipped', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     for (let i = 0; i < TOUR_STEPS.length; i += 1) {
       const button = await screen.findByRole('button', {
@@ -169,11 +194,11 @@ describe('guided tour — re-entry', () => {
     localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     localStorage.setItem(STORAGE_KEYS.tourSuppressed, 'true');
     tourTesting.reset();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     await userEvent.click(screen.getByRole('button', { name: /how to use/i }));
 
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
   });
 
   /*
@@ -190,9 +215,9 @@ describe('guided tour — re-entry', () => {
   it('takes its own button out of reach while the tour is showing', async () => {
     localStorage.setItem(STORAGE_KEYS.disclaimerSuppressed, 'true');
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
 
     /*
      * Out of reach, but still mounted.
@@ -215,7 +240,7 @@ describe('guided tour — re-entry', () => {
 describe('guided tour — navigation', () => {
   it('walks forwards and backwards through every step', async () => {
     asFirstTimer();
-    render(<App />);
+    render(<AppShell forceDesktopLayout />);
 
     expect(await screen.findByText(TOUR_STEPS[0]!.title)).toBeInTheDocument();
 
@@ -224,31 +249,33 @@ describe('guided tour — navigation', () => {
       expect(await screen.findByText(TOUR_STEPS[i]!.title)).toBeInTheDocument();
     }
 
-    await userEvent.click(screen.getByRole('button', { name: /back/i }));
+    // "Usability feedback" also contains "back"; anchor the name to the tour's
+    // own button rather than matching a substring.
+    await userEvent.click(screen.getByRole('button', { name: /^back$/i }));
     expect(await screen.findByText(TOUR_STEPS[TOUR_STEPS.length - 2]!.title)).toBeInTheDocument();
   });
 
   it('cannot go back from the first step', async () => {
     asFirstTimer();
-    render(<App />);
-    expect(await screen.findByRole('button', { name: /back/i })).toBeDisabled();
+    render(<AppShell forceDesktopLayout />);
+    expect(await screen.findByRole('button', { name: /^back$/i })).toBeDisabled();
   });
 
   it('shows the position in text, not only as dots', async () => {
     asFirstTimer();
-    render(<App />);
-    expect(await screen.findByText(/step 1 of 4/i)).toBeInTheDocument();
+    render(<AppShell forceDesktopLayout />);
+    expect(await screen.findByText(/step 1 of 5/i)).toBeInTheDocument();
   });
 
   it('closes on Escape', async () => {
     asFirstTimer();
-    render(<App />);
-    await screen.findByText(/step 1 of 4/i);
+    render(<AppShell forceDesktopLayout />);
+    await screen.findByText(/step 1 of 5/i);
 
     await userEvent.keyboard('{Escape}');
 
     await waitFor(() => {
-      expect(screen.queryByText(/step 1 of 4/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/step 1 of 5/i)).not.toBeInTheDocument();
     });
     expect(localStorage.getItem(STORAGE_KEYS.tourSuppressed)).toBeNull();
   });
@@ -351,7 +378,7 @@ describe('guided tour — the model behind stays put', () => {
     const user = userEvent.setup();
     asFirstTimer();
     render(<AppShell forceDesktopLayout />);
-    await screen.findByText(/step 1 of 4/i);
+    await screen.findByText(/step 1 of 5/i);
 
     const slider = floorsSlider();
     slider.focus();
@@ -368,7 +395,7 @@ describe('guided tour — the model behind stays put', () => {
     const user = userEvent.setup();
     asFirstTimer();
     render(<AppShell forceDesktopLayout />);
-    await screen.findByText(/step 1 of 4/i);
+    await screen.findByText(/step 1 of 5/i);
 
     const slider = floorsSlider();
     slider.focus();
@@ -580,7 +607,7 @@ describe('guided tour — content', () => {
     // These are the labels ResultsPanel actually renders. If they change, this
     // fails, which is the point: the tour must not describe numbers that the
     // app does not show.
-    const body = TOUR_STEPS[2]!.body;
+    const body = TOUR_STEPS.find((step) => step.target === 'results')!.body;
     expect(body).toMatch(/Peak displacement/);
     expect(body).toMatch(/max story drift/i);
     expect(body).toMatch(/natural period/i);
@@ -593,13 +620,17 @@ describe('guided tour — content', () => {
   });
 
   it('states that the exaggerated motion does not change the numbers', () => {
-    expect(TOUR_STEPS[1]!.body).toMatch(/only changes the drawing/i);
+    const body = TOUR_STEPS.find((step) => step.target === 'play')!.body;
+    expect(body).toMatch(/only changes the drawing/i);
   });
 
   it('points every step at an element that exists in the app', () => {
     const { container } = render(<AppShell forceDesktopLayout />);
     for (const step of TOUR_STEPS) {
-      expect(container.querySelector(`[data-tour="${step.target}"]`)).not.toBeNull();
+      expect(
+        container.querySelector(`[data-tour="${step.target}"]`),
+        `no element for tour target "${step.target}"`,
+      ).not.toBeNull();
     }
   });
 });

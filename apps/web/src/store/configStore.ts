@@ -6,6 +6,8 @@ import {
   DEFAULT_MOTION_CONFIG,
   type BuildingTemplate,
 } from '@/config/templates';
+import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { allOfficeFloorLoads, normalizeFloorLoads } from '@/config/floorLoads';
 import { SolverClient } from '@/engine/client';
 import { useCompareStore } from '@/store/compareStore';
 import { useTourStore } from '@/store/tourStore';
@@ -50,6 +52,11 @@ const EMPTY_RESULT: SimulationResult = {
   maxDriftRatio: 0,
   periodsS: [],
   groundAccel: [],
+  floorWeightsKN: [],
+  floorDeadKN: [],
+  floorLiveCountedKN: [],
+  totalWeightKN: 0,
+  floorMassesKg: [],
 };
 
 const solver = new SolverClient(
@@ -150,6 +157,15 @@ type ConfigState = {
   setCompareBuildings: (buildings: BuildingConfig[]) => void;
   setMotion: (patch: Partial<GroundMotionConfig>) => void;
   applyTemplate: (templateId: string) => void;
+  /**
+   * Show a saved run as it was recorded.
+   *
+   * Deliberately does NOT solve: an old run has no floor weights, and
+   * recomputing it from the migrated all-Office loads would replace a record
+   * of what was simulated with a new, invented one. The results panel says
+   * "weights not recorded" and offers a re-run.
+   */
+  loadRun: (building: BuildingConfig, motion: GroundMotionConfig, result: SimulationResult) => void;
   setActiveFloor: (floor: number | null) => void;
 };
 
@@ -178,6 +194,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
     // Patches stack on the display copy, so a tour that is reopened mid-edit
     // keeps what the user already did.
     const next = { ...get().displayBuilding, ...patch };
+    // Changing the floor count must leave one load per floor, otherwise the UI
+    // shows a list that does not match the building until the next solve
+    // normalizes it silently.
+    if ('floors' in patch || 'floorLoads' in patch) {
+      next.floorLoads = normalizeFloorLoads(next.floors, next.floorLoads);
+    }
     if (tourOpen()) {
       set({ displayBuilding: next, templateId: 'custom' });
       return;
@@ -189,8 +211,12 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
   setCompareBuilding: (index, patch) => {
     const current = get().displayCompareBuildings;
     const base = current[index] ?? get().displayBuilding;
-    const next = current.map((b, i) => (i === index ? { ...base, ...patch } : b));
-    if (next.length === index) next.push({ ...base, ...patch });
+    const merged = { ...base, ...patch };
+    if ('floors' in patch || 'floorLoads' in patch) {
+      merged.floorLoads = normalizeFloorLoads(merged.floors, merged.floorLoads);
+    }
+    const next = current.map((b, i) => (i === index ? merged : b));
+    if (next.length === index) next.push(merged);
     if (tourOpen()) {
       set({ displayCompareBuildings: next });
       return;
@@ -229,6 +255,10 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       name: found.label,
       ...found.building,
       dampingRatio: undefined,
+      // A template picks geometry, material and frame only. Every floor starts
+      // as Office at the default loads — one place for that default to live.
+      floorLoads: allOfficeFloorLoads(found.building.floors),
+      liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
     };
 
     if (tourOpen()) {
@@ -260,6 +290,26 @@ export const useConfigStore = create<ConfigState>((set, get) => ({
       motion: displayMotion,
     });
     resolve(displayBuilding, get().extras(), displayMotion);
+  },
+
+  loadRun: (building, motion, result) => {
+    // A solve queued for the session's previous configuration would otherwise
+    // land after this and overwrite the record we were asked to restore.
+    solver.cancelPending();
+    set({
+      building,
+      displayBuilding: building,
+      compareBuildings: [],
+      displayCompareBuildings: [],
+      motion,
+      displayMotion: motion,
+      result,
+      results: [],
+      status: 'idle',
+      error: null,
+      activeFloor: null,
+      templateId: 'custom',
+    });
   },
 
   setActiveFloor: (activeFloor) => set({ activeFloor }),

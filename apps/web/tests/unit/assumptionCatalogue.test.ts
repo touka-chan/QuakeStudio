@@ -7,7 +7,14 @@ import {
   assumptionsMarkdown,
   placeholderCount,
 } from '@/config/assumptionCatalogue';
-import { FRAME_TYPES, GEOMETRY, MATERIALS, SOLVER } from '@/config/engineeringAssumptions';
+import {
+  FRAME_TYPES,
+  GEOMETRY,
+  LOAD_ASSUMPTIONS,
+  MATERIALS,
+  OCCUPANCY_IDS,
+  SOLVER,
+} from '@/config/engineeringAssumptions';
 
 /* ==========================================================================
    The assumption catalogue behind the "Assumptions" page.
@@ -22,10 +29,6 @@ import { FRAME_TYPES, GEOMETRY, MATERIALS, SOLVER } from '@/config/engineeringAs
 describe('assumption catalogue', () => {
   it('lists every material and every coefficient that feeds the solver', () => {
     for (const id of Object.keys(MATERIALS)) {
-      expect(
-        ASSUMPTIONS.some((row) => row.id === `material-${id}-massPerAreaKgM2`),
-        `${id} mass is missing from the catalogue`,
-      ).toBe(true);
       expect(
         ASSUMPTIONS.some((row) => row.id === `material-${id}-dampingRatio`),
         `${id} damping is missing from the catalogue`,
@@ -42,8 +45,22 @@ describe('assumption catalogue', () => {
 
     // …and the value shown is the value in the config, not a copy that can go
     // stale.
-    const concreteMass = ASSUMPTIONS.find((row) => row.id === 'material-concrete-massPerAreaKgM2');
-    expect(concreteMass?.raw).toBe(MATERIALS.concrete.massPerAreaKgM2);
+    const concreteDamping = ASSUMPTIONS.find((row) => row.id === 'material-concrete-dampingRatio');
+    expect(concreteDamping?.raw).toBe(MATERIALS.concrete.dampingRatio);
+  });
+
+  it('lists the floor-load model the engine actually multiplies', () => {
+    const byId = new Map(ASSUMPTIONS.map((row) => [row.id, row]));
+
+    expect(byId.get('load-default-dead')?.raw).toBe(LOAD_ASSUMPTIONS.defaultDeadLoadKPa);
+    expect(byId.get('load-live-participation')?.raw).toBe(LOAD_ASSUMPTIONS.liveLoadParticipation);
+
+    for (const occupancy of OCCUPANCY_IDS) {
+      if (occupancy === 'custom') continue;
+      const row = byId.get(`load-live-${occupancy}`);
+      expect(row, `${occupancy} live load is missing from the catalogue`).toBeDefined();
+      expect(row?.raw).toBe(LOAD_ASSUMPTIONS.occupancies[occupancy].liveKPa);
+    }
   });
 
   it('lists every frame type at the configured stiffness', () => {
@@ -90,7 +107,7 @@ describe('assumption catalogue', () => {
      * too — which is the point.
      */
     const materialCount = Object.keys(MATERIALS).length;
-    const fieldCount = 4; // mass, damping, Ct, exponent
+    const fieldCount = 3; // damping, Ct, exponent
 
     expect(ASSUMPTIONS.filter((row) => row.group === 'Materials')).toHaveLength(
       materialCount * fieldCount,
@@ -100,15 +117,17 @@ describe('assumption catalogue', () => {
       Object.keys(FRAME_TYPES).length,
     );
 
+    // Two shared load values (dead load and participation) plus one live-load
+    // row per preset use. Custom has no preset of its own.
+    const presetOccupancies = OCCUPANCY_IDS.filter((id) => id !== 'custom').length;
+    expect(ASSUMPTIONS.filter((row) => row.group === 'Floor loads')).toHaveLength(
+      2 + presetOccupancies,
+    );
+
     // Every numeric material coefficient must be represented by some row, so a
     // newly added material field cannot slip through unnoticed.
     for (const material of Object.values(MATERIALS)) {
-      for (const value of [
-        material.massPerAreaKgM2,
-        material.dampingRatio,
-        material.periodCt,
-        material.periodExponentX,
-      ]) {
+      for (const value of [material.dampingRatio, material.periodCt, material.periodExponentX]) {
         expect(
           ASSUMPTIONS.some((row) => row.raw === value),
           `no row carries the coefficient ${value}`,
@@ -141,7 +160,7 @@ describe('assumption catalogue', () => {
     // Nothing has been signed off yet, so the page must not imply otherwise.
     expect(placeholderCount()).toBeGreaterThan(0);
 
-    for (const id of ['material', 'frame', 'geometry', 'solver', 'motion']) {
+    for (const id of ['material', 'frame', 'load', 'geometry', 'solver', 'motion']) {
       expect(ASSUMPTIONS.some((row) => row.id.startsWith(id))).toBe(true);
     }
 

@@ -20,10 +20,13 @@ there and the app follows.
 
 | # | Assumption | Current value | Decision | Source / rationale |
 |---|---|---|---|---|
-| 1.1 | Floor mass per area — concrete | 600 kg/m² | ☐ | Given in the spec; confirm |
-| 1.2 | Floor mass per area — steel | 400 kg/m² | ☐ | Estimate — **needs a real figure** |
-| 1.3 | Floor mass per area — composite | 500 kg/m² | ☐ | Estimate — **needs a real figure** |
-| 1.4 | Floor mass per area — wood | 250 kg/m² | ☐ | Estimate — **needs a real figure** |
+| 1.1 | Floor live load — office | 2.4 kPa | ☐ | Published summary of NSCP 2015 Table 205-1; confirm against the code |
+| 1.2 | Floor live load — residential | 1.9 kPa | ☐ | Same table; confirm |
+| 1.3 | Floor live load — parking | 2.4 kPa | ☐ | Same table; confirm |
+| 1.4 | Floor live load — storage | 6.0 kPa | ☐ | Same table; confirm |
+| 1.5 | Floor live load — custom | user-entered, preset 2.4 kPa | ☐ | The picker allows any value; interface, not an assumption |
+| 1.6 | Floor dead load (slab, finishes, services) | 4.8 kPa default, editable per floor | ☐ | **Needs a real figure** — estimate |
+| 1.7 | Live-load participation `ψ` | 0.25 for every use | ☐ | **Needs review** — real use has subcategories (eg. 0.5 where partitions apply); a single flat value is deliberate for now, see §5a |
 | 2.1 | Damping ratio — concrete | 5% | ☐ | Within the spec's 2–5% range |
 | 2.2 | Damping ratio — steel | 2% | ☐ | Typically the least damped |
 | 2.3 | Damping ratio — composite | 3% | ☐ | |
@@ -45,7 +48,22 @@ there and the app follows.
 
 A regular multistory **linear-elastic shear building** with lumped mass per
 floor, story stiffness between floors, and viscous damping. One horizontal
-direction.
+direction. Mass is no longer taken from the material: each floor weighs what
+its use says it weighs.
+
+A floor's **counted earthquake weight** is its dead load plus the counted share
+of its live load:
+
+```
+W_i = ( DL_i + ψ · LL_i ) × A      (kN, with A = plan area in m²)
+m_i = W_i · 1000 / g               (kg, g = 9.80665 m/s²)
+```
+
+`DL` starts at 4.8 kPa and is editable per floor; `LL` comes from the floor's
+use (office 2.4, residential 1.9, parking 2.4, storage 6.0 kPa, or a custom
+value); `ψ` (live-load participation) is 0.25 and editable per floor in the
+UI's counts. The counted figure is what appears in the floor list and in the
+Weight-summary table, and there is a §5a below on what `ψ` hides.
 
 ```
 M·ü + C·u̇ + K·u = −M·1·a_g(t)
@@ -136,6 +154,20 @@ for all four materials is a convenience, not a finding — real empirical
 coefficients depend on the lateral system (moment vs braced) more than on the
 deck material. **This is the single assumption most likely to be wrong**, and
 it is the one to fix first.
+
+## 5a. What a single `ψ` hides
+
+The counting rule `DL + ψ·LL` uses one participation value, 0.25, for every
+use. Real provisions count the live load differently by occupancy class —
+storage and partitioned floors, in particular, count a much larger share — so
+the flat value is a simplification, and storage floors (6.0 kPa) are the one
+where the difference bites hardest.
+
+The package it ships in: `ψ` is editable per floor, so an instructor can turn
+it up on a storage row without the code pretending to enforce a rule. What the
+adviser should confirm is whether per-use participation (from the provisions
+themselves, the same review pass as the live loads) should replace the flat
+default, or whether a single adjustable value is the honest teaching version.
 
 ---
 

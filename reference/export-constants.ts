@@ -24,6 +24,7 @@ import {
   FRAME_TYPES,
   GEOMETRY,
   GROUND_MOTION,
+  LOAD_ASSUMPTIONS,
   MATERIALS,
   SOLVER,
   VIEWPORT,
@@ -44,13 +45,14 @@ const outputPath = resolve(here, 'constants.json');
  */
 const constants = {
   /** Bumped when the shape below changes, so a stale constants.json is obvious. */
-  schemaVersion: 1,
+  schemaVersion: 2,
   exportedFrom: 'apps/web/src/config/engineeringAssumptions.ts',
 
   gravityMs2: GRAVITY_MS2,
 
   materials: MATERIALS,
   frameTypes: FRAME_TYPES,
+  loadAssumptions: LOAD_ASSUMPTIONS,
 
   solver: {
     dtS: SOLVER.dtS,
@@ -88,8 +90,9 @@ writeFileSync(outputPath, `${JSON.stringify(constants, null, 2)}\n`, 'utf8');
 
 const materialCount = Object.keys(MATERIALS).length;
 const frameCount = Object.keys(FRAME_TYPES).length;
+const occupancyCount = Object.keys(LOAD_ASSUMPTIONS.occupancies).length;
 console.log(
   `Wrote ${outputPath}\n` +
-    `  ${materialCount} materials, ${frameCount} frame types, ` +
+    `  ${materialCount} materials, ${frameCount} frame types, ${occupancyCount} occupancies, ` +
     `dt = ${SOLVER.dtS} s, Newmark β=${SOLVER.newmarkBeta} γ=${SOLVER.newmarkGamma}`,
 );

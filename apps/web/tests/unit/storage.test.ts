@@ -2,10 +2,18 @@ import { beforeEach, describe, expect, it } from 'vitest';
 
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { simulate } from '@/engine/solver';
-import { EXPORT_FORMAT, isPartialImport, parseRunJson, RunImportError } from '@/lib/runJson';
+import {
+  EXPORT_FORMAT,
+  EXPORT_VERSION,
+  exportRunJson,
+  isPartialImport,
+  parseRunJson,
+  RunImportError,
+} from '@/lib/runJson';
+import { useConfigStore } from '@/store/configStore';
 import { LocalRunStorage, thinRecord } from '@/storage/localRunStorage';
 import { createRunRecord, toSummary } from '@/storage/types';
-import { APP_VERSION, type RunRecord } from '@/types';
+import { APP_VERSION, type RunRecord, type SimulationResult } from '@/types';
 
 /* ==========================================================================
    Phase 4 — persistence and run transfer.
@@ -99,6 +107,83 @@ describe('export / import round trip', () => {
       runs,
     });
     expect(parseRunJson(json)).toHaveLength(3);
+  });
+
+  it('writes version 2 with the current app version', () => {
+    const bundle = JSON.parse(exportRunJson([makeRecord()])) as {
+      version: number;
+      appVersion: string;
+      runs: RunRecord[];
+    };
+    expect(EXPORT_VERSION).toBe(2);
+    expect(bundle.version).toBe(2);
+    expect(bundle.appVersion).toBe(APP_VERSION);
+    // The loads travel with the building; the weights travel with the result.
+    expect(bundle.runs[0]!.building.floorLoads).toHaveLength(bundle.runs[0]!.building.floors);
+    expect(bundle.runs[0]!.result.totalWeightKN).toBeGreaterThan(0);
+  });
+
+  it('migrates a v1 run to all-Office loads and leaves its weights empty', () => {
+    const record = makeRecord();
+
+    // Strip the floor-loads and weight fields that v1 did not have, then
+    // re-import. The schemas fill the loads from defaults and leave weights
+    // empty, which the UI reads as "not recorded".
+    const oldBuilding = { ...record.building };
+    delete oldBuilding.floorLoads;
+    delete oldBuilding.liveLoadParticipation;
+    const oldResult = { ...record.result };
+    delete oldResult.floorWeightsKN;
+    delete oldResult.floorDeadKN;
+    delete oldResult.floorLiveCountedKN;
+    delete oldResult.totalWeightKN;
+    delete oldResult.floorMassesKg;
+
+    const json = JSON.stringify({
+      format: EXPORT_FORMAT,
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      appVersion: '0.1.0',
+      runs: [{ ...record, building: oldBuilding, result: oldResult }],
+    });
+
+    const [restored] = parseRunJson(json);
+    expect(restored!.building.floorLoads).toHaveLength(record.building.floors);
+    expect(
+      restored!.building.floorLoads.every(
+        (load) => load.occupancy === 'office' && load.deadLoadKPa === 4.8,
+      ),
+    ).toBe(true);
+    expect(restored!.building.liveLoadParticipation).toBe(0.25);
+    expect(restored!.result.floorWeightsKN).toEqual([]);
+    expect(restored!.result.floorDeadKN).toEqual([]);
+    expect(restored!.result.totalWeightKN).toBe(0);
+  });
+});
+
+describe('loading a saved run', () => {
+  it('shows the recorded result instead of solving it again', () => {
+    const record = makeRecord();
+    // A v1 result: parsed defaults give it empty weights, which is exactly
+    // what an old saved run has.
+    const oldResult: SimulationResult = {
+      ...record.result,
+      floorWeightsKN: [],
+      floorDeadKN: [],
+      floorLiveCountedKN: [],
+      totalWeightKN: 0,
+      floorMassesKg: [],
+    };
+
+    useConfigStore.getState().loadRun(record.building, record.motion, oldResult);
+    const state = useConfigStore.getState();
+
+    expect(state.result).toBe(oldResult);
+    expect(state.building).toBe(record.building);
+    expect(state.motion).toBe(record.motion);
+    expect(state.status).toBe('idle');
+    expect(state.compareBuildings).toEqual([]);
+    expect(state.results).toEqual([]);
   });
 });
 

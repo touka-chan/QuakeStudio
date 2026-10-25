@@ -1,6 +1,6 @@
 import { SOLVER } from '@/config/engineeringAssumptions';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
-import { effectiveStiffness, buildModel } from './buildingModel';
+import { effectiveStiffness, buildModel, type StructuralModel } from './buildingModel';
 import { generateGroundMotion } from './groundMotion';
 import { matVec, solveCholesky, type CholeskyFactor } from './matrix';
 
@@ -108,7 +108,7 @@ export function simulate(building: BuildingConfig, motion: GroundMotionConfig): 
 
   const floorDisp = transposeToFloorMajor(byTime, n);
 
-  return summarise(time, floorDisp, model.floors, building, model.periodsS, ground.accel);
+  return summarise(time, floorDisp, model, building, ground.accel);
 }
 
 /** [step][floor] -> [floor][step], as plain arrays for the result type. */
@@ -132,11 +132,11 @@ function transposeToFloorMajor(byTime: Float64Array[], floors: number): number[]
 function summarise(
   time: number[],
   floorDisp: number[][],
-  floors: number,
+  model: StructuralModel,
   building: BuildingConfig,
-  periodsS: number[],
   groundAccel: number[],
 ): SimulationResult {
+  const floors = model.floors;
   const peakDisp = new Array<number>(floors).fill(0);
 
   for (let floor = 0; floor < floors; floor++) {
@@ -174,8 +174,15 @@ function summarise(
     maxDisp,
     driftRatio,
     maxDriftRatio,
-    periodsS: periodsS.slice(0, SOLVER.reportedModes),
+    periodsS: model.periodsS.slice(0, SOLVER.reportedModes),
     groundAccel,
+    // The loads the run was made with. Copied, so editing the building after a
+    // run cannot retroactively change what the saved result says it weighed.
+    floorWeightsKN: [...model.floorWeightsKN],
+    floorDeadKN: [...model.floorDeadKN],
+    floorLiveCountedKN: [...model.floorLiveCountedKN],
+    totalWeightKN: model.totalWeightKN,
+    floorMassesKg: Array.from(model.floorMassKg),
   };
 }
 

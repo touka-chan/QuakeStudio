@@ -5,7 +5,7 @@ Four groups, plus the shadcn/ui primitives they are built from.
 | Folder | Holds | Phase |
 |---|---|---|
 | `ui/` | shadcn/ui primitives (Button, Slider, Dialog, Tooltip, Tabs, Select…). Installed via the shadcn CLI, committed to the repo. | 0–1 |
-| `layout/` | Top bar, left controls panel, right results panel, mobile tab bar, first-run dialog. | 1 |
+| `layout/` | Top bar, left controls panel, right results panel, first-run dialog. | 1 |
 | `controls/` | Building and earthquake controls bound to the config store. Every control gets a plain-language tooltip. | 1 |
 | `viewport/` | Three.js scene: building, ground slab, grid, playback bar, hover/select, and the comparison scene. | 1, 3, 4 |
 | `charts/` | Displacement-vs-time, per-floor peak bars, CSV export, A/B overlay and the A/B comparison table. | 3, 4 |

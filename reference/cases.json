@@ -53,7 +53,7 @@
     },
     {
       "id": "floors-15-wood-moment-harmonic",
-      "why": "Lightest material — the largest acceleration response.",
+      "why": "A 15-storey wood tower: the tallest flexible case, and a material-damping check.",
       "building": {
         "floors": 15,
         "floorHeightM": 3.2,
@@ -184,7 +184,7 @@
     },
     {
       "id": "floors-7-wood-moment-impulse",
-      "why": "Light and flexible — the combination with the largest drift ratios.",
+      "why": "Tall and flexible under a sharp impulse — drift accumulates over many stories.",
       "building": {
         "floors": 7,
         "floorHeightM": 2.8,
@@ -220,6 +220,484 @@
         "frameType": "moment"
       },
       "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 10 }
+    },
+    {
+      "id": "loads-uniform-office",
+      "why": "FLOOR LOADS: every floor Office at the default dead load, psi 0.25. This is the reference building, so T1 must equal the empirical period.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-uniform-heavy-storage",
+      "why": "FLOOR LOADS: every floor Storage at 6.0 kPa and a 9 kPa dead load. Same stiffness as the office case, so the periods must be longer and the drift smaller.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "storage",
+            "deadLoadKPa": 9,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "storage",
+            "deadLoadKPa": 9,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "storage",
+            "deadLoadKPa": 9,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "storage",
+            "deadLoadKPa": 9,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "storage",
+            "deadLoadKPa": 9,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-top-heavy",
+      "why": "FLOOR LOADS: the top three of eight floors are Storage and the rest Office. Non-uniform M must produce a different T1 from the equal-weight bottom-heavy case.",
+      "building": {
+        "floors": 8,
+        "floorHeightM": 3,
+        "widthM": 16,
+        "depthM": 12,
+        "material": "steel",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 7,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 8,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-bottom-heavy",
+      "why": "FLOOR LOADS: three Storage floors at the bottom of eight and five Office above; equal total weight to loads-top-heavy. Checks that the mass distribution, not only the total, reaches the eigenproblem.",
+      "building": {
+        "floors": 8,
+        "floorHeightM": 3,
+        "widthM": 16,
+        "depthM": 12,
+        "material": "steel",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 7,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 8,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-mixed-worked-example",
+      "why": "FLOOR LOADS: the five-floor Parking/Storage/Office/Office/Residential example from the build prompt. Total weight must be 3888.5 kN at area 140 m2 and psi 0.25.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 10,
+        "depthM": 14,
+        "material": "composite",
+        "frameType": "moment",
+        "liveLoadParticipation": 0.25,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "parking",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "storage",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 6,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "residential",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 1.9,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-participation-zero",
+      "why": "FLOOR LOADS: psi = 0, so only dead load counts. The lightest and fastest of the six-floor pair; checks the participation factor reaches the mass matrix.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "liveLoadParticipation": 0,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-participation-one",
+      "why": "FLOOR LOADS: psi = 1, so the full live load counts. Same geometry as participation-zero; every period must be longer by the mass ratio.",
+      "building": {
+        "floors": 6,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment",
+        "liveLoadParticipation": 1,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 2,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 3,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 4,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 5,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          },
+          {
+            "floor": 6,
+            "occupancy": "office",
+            "deadLoadKPa": 4.8,
+            "liveLoadKPa": 2.4,
+            "liveOverridden": false
+          }
+        ]
+      },
+      "motion": { "preset": "harmonic", "pgaG": 0.3, "frequencyHz": 1.4, "durationS": 20 }
+    },
+    {
+      "id": "loads-custom-values",
+      "why": "FLOOR LOADS: every floor Custom at 6.5 kPa dead and 4.2 kPa live, psi 0.35. Checks that typed values and a non-default participation survive the whole pipeline.",
+      "building": {
+        "floors": 7,
+        "floorHeightM": 3.2,
+        "widthM": 13,
+        "depthM": 11,
+        "material": "wood",
+        "frameType": "braced",
+        "liveLoadParticipation": 0.35,
+        "floorLoads": [
+          {
+            "floor": 1,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 2,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 3,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 4,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 5,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 6,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          },
+          {
+            "floor": 7,
+            "occupancy": "custom",
+            "deadLoadKPa": 6.5,
+            "liveLoadKPa": 4.2,
+            "liveOverridden": true
+          }
+        ]
+      },
+      "motion": { "preset": "impulse", "pgaG": 0.35, "durationS": 20 }
     }
   ]
 }

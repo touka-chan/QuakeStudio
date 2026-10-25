@@ -7,7 +7,9 @@ import {
   FRAME_TYPES,
   GEOMETRY,
   GROUND_MOTION,
+  LOAD_ASSUMPTIONS,
   MATERIALS,
+  OCCUPANCY_IDS,
   PLACEHOLDER_MARKER,
   SOLVER,
   type MaterialId,
@@ -65,8 +67,6 @@ describe('engineeringAssumptions', () => {
     for (const id of ids) {
       const m = MATERIALS[id];
       expect(m.label, `${id} needs a UI label`).toBeTruthy();
-      expect(m.massPerAreaKgM2, `${id} mass per area`).toBeGreaterThan(0);
-      expect(m.massPerAreaKgM2, `${id} mass per area upper bound`).toBeLessThanOrEqual(1000);
       expect(m.dampingRatio, `${id} damping ratio`).toBeGreaterThan(0);
       expect(m.dampingRatio, `${id} damping must stay within 2-5%`).toBeLessThanOrEqual(0.05);
       expect(m.periodCt, `${id} Ct`).toBeGreaterThan(0);
@@ -74,8 +74,51 @@ describe('engineeringAssumptions', () => {
     }
   });
 
-  it('keeps wood lighter than concrete, as a sanity check', () => {
-    expect(MATERIALS.wood.massPerAreaKgM2).toBeLessThan(MATERIALS.concrete.massPerAreaKgM2);
+  it('does not carry a mass per area on the material any more', () => {
+    // Weight moved to the per-floor loads. A leftover material mass would be a
+    // second, silently ignored source of truth — exactly the kind of thing the
+    // assumptions page exists to prevent.
+    for (const material of Object.values(MATERIALS)) {
+      expect('massPerAreaKgM2' in material).toBe(false);
+    }
+  });
+
+  it('defines a plausible load model', () => {
+    expect(LOAD_ASSUMPTIONS.defaultDeadLoadKPa).toBeGreaterThan(0);
+    expect(LOAD_ASSUMPTIONS.liveLoadParticipation).toBeGreaterThanOrEqual(0);
+    expect(LOAD_ASSUMPTIONS.liveLoadParticipation).toBeLessThanOrEqual(1);
+    expect(LOAD_ASSUMPTIONS.gravityMs2).toBeGreaterThan(9);
+
+    for (const occupancy of OCCUPANCY_IDS) {
+      const m = LOAD_ASSUMPTIONS.occupancies[occupancy];
+      expect(m.label, `${occupancy} needs a UI label`).toBeTruthy();
+      expect(m.liveKPa, `${occupancy} live load`).toBeGreaterThan(0);
+      expect(m.liveKPa, `${occupancy} live load upper bound`).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it('marks the dead load and participation values for review', () => {
+    const source = readFileSync(SOURCE_PATH, 'utf8');
+    const block = readBlock(source, 'LOAD_ASSUMPTIONS');
+
+    for (const field of ['defaultDeadLoadKPa', 'liveLoadParticipation']) {
+      const line = block
+        .split('\n')
+        .map((entry) => entry.trim())
+        .find((entry) => entry.startsWith(`${field}:`));
+      expect(line, `${field} should be in LOAD_ASSUMPTIONS`).toBeDefined();
+      expect(line, `${field} needs the placeholder marker`).toContain('PLACEHOLDER');
+    }
+
+    // Every preset live load is an engineering value too.
+    const liveLines = block
+      .split('\n')
+      .map((entry) => entry.trim())
+      .filter((entry) => entry.startsWith('liveKPa:'));
+    expect(liveLines.length).toBe(OCCUPANCY_IDS.length);
+    for (const line of liveLines) {
+      expect(line, `${line} needs the placeholder marker`).toContain('PLACEHOLDER');
+    }
   });
 
   it('defines both frame types, with braced stiffer than moment', () => {

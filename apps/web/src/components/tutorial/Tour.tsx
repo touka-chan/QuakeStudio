@@ -1,7 +1,6 @@
 import { useCallback, useEffect } from 'react';
 
 import { useIsDesktop } from '@/lib/useMediaQuery';
-import { BACK_REQUESTED } from '@/pwa/backButton';
 import { useConfigStore } from '@/store/configStore';
 import { useTourStore } from '@/store/tourStore';
 import { SpotlightTour } from './SpotlightTour';
@@ -114,24 +113,6 @@ export function Tour({ forceDesktopLayout }: Props = {}) {
     }
     document.addEventListener('keydown', onEscape);
     return () => document.removeEventListener('keydown', onEscape);
-  }, [open, handleSkip]);
-
-  /*
-   * Android's back button.
-   *
-   * The narrow-screen tour is a Radix dialog and `backButton.ts` already
-   * closes it, which routes here through `onSkip`. The spotlight is a custom
-   * overlay, so nothing closes it and the press would fall through to the tab
-   * bar behind. Handle it explicitly so a back press always means "leave the
-   * tour" while it is on screen.
-   */
-  useEffect(() => {
-    if (!open) return;
-    function onBack() {
-      handleSkip();
-    }
-    document.addEventListener(BACK_REQUESTED, onBack);
-    return () => document.removeEventListener(BACK_REQUESTED, onBack);
   }, [open, handleSkip]);
 
   // Clamped rather than trusted: the store is module-level and a bad index

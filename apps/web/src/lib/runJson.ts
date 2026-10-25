@@ -1,4 +1,4 @@
-import { runRecordSchema, type RunRecord } from '@/types';
+import { APP_VERSION, runRecordSchema, type RunRecord } from '@/types';
 
 /* =========================================================================
    Run import / export
@@ -13,7 +13,14 @@ import { runRecordSchema, type RunRecord } from '@/types';
    ========================================================================= */
 
 export const EXPORT_FORMAT = 'quakestudio-runs';
-export const EXPORT_VERSION = 1;
+/**
+ * Version 2 adds floor loads to the building and weights to the result.
+ *
+ * Version 1 files still import: the schemas fill absent loads from the
+ * all-office defaults and leave old weights empty, which the UI reads as
+ * "not recorded" rather than as a zero-weight building.
+ */
+export const EXPORT_VERSION = 2;
 
 export type RunBundle = {
   format: typeof EXPORT_FORMAT;
@@ -25,7 +32,7 @@ export type RunBundle = {
 };
 
 /** Serialise runs into the portable bundle format. */
-export function exportRunJson(runs: RunRecord[], appVersion = '0.1.0'): string {
+export function exportRunJson(runs: RunRecord[], appVersion = APP_VERSION): string {
   const bundle: RunBundle = {
     format: EXPORT_FORMAT,
     version: EXPORT_VERSION,
@@ -81,6 +88,10 @@ export function parseRunJson(json: string): RunRecord[] {
 
   if (typeof bundle.version !== 'number') {
     throw new RunImportError('That file does not say which QuakeStudio version wrote it.');
+  }
+
+  if (bundle.version < 1) {
+    throw new RunImportError('That file does not contain a usable QuakeStudio export.');
   }
 
   if (bundle.version > EXPORT_VERSION) {

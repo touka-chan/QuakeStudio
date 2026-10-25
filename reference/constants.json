@@ -1,32 +1,28 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "exportedFrom": "apps/web/src/config/engineeringAssumptions.ts",
   "gravityMs2": 9.80665,
   "materials": {
     "concrete": {
       "label": "Concrete",
-      "massPerAreaKgM2": 600,
       "dampingRatio": 0.05,
       "periodCt": 0.072,
       "periodExponentX": 0.8
     },
     "steel": {
       "label": "Steel",
-      "massPerAreaKgM2": 400,
       "dampingRatio": 0.02,
       "periodCt": 0.072,
       "periodExponentX": 0.8
     },
     "composite": {
       "label": "Composite",
-      "massPerAreaKgM2": 500,
       "dampingRatio": 0.03,
       "periodCt": 0.072,
       "periodExponentX": 0.8
     },
     "wood": {
       "label": "Wood",
-      "massPerAreaKgM2": 250,
       "dampingRatio": 0.05,
       "periodCt": 0.072,
       "periodExponentX": 0.8
@@ -41,6 +37,44 @@
       "label": "Braced frame",
       "stiffnessFactor": 2
     }
+  },
+  "loadAssumptions": {
+    "codeBasis": "NSCP 2015 (Philippines), which follows ASCE 7 for earthquake provisions",
+    "gravityMs2": 9.80665,
+    "defaultDeadLoadKPa": 4.8,
+    "liveLoadParticipation": 0.25,
+    "minDeadLoadKPa": 0,
+    "maxDeadLoadKPa": 20,
+    "minLiveLoadKPa": 0,
+    "maxLiveLoadKPa": 30,
+    "occupancies": {
+      "office": {
+        "label": "Office",
+        "liveKPa": 2.4,
+        "description": "Desks, people and light equipment."
+      },
+      "residential": {
+        "label": "Residential",
+        "liveKPa": 1.9,
+        "description": "Homes: beds, sofas and household furniture."
+      },
+      "parking": {
+        "label": "Parking",
+        "liveKPa": 2.4,
+        "description": "Passenger cars parked on the floor."
+      },
+      "storage": {
+        "label": "Storage",
+        "liveKPa": 6,
+        "description": "Light stored goods, crates and shelves."
+      },
+      "custom": {
+        "label": "Custom",
+        "liveKPa": 2.4,
+        "description": "Type your own live load."
+      }
+    },
+    "sourceNote": "Values from published summaries of NSCP 2015 Table 205-1. Confirm against the official code."
   },
   "solver": {
     "dtS": 0.01,

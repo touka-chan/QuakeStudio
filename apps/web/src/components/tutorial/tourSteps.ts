@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react';
-import { ArrowLeftRight, Building2, Play, Waves } from 'lucide-react';
+import { ArrowLeftRight, Building2, Layers, Play, Waves } from 'lucide-react';
 
 import { VIEWPORT } from '@/config/engineeringAssumptions';
 
@@ -40,6 +40,12 @@ export const TOUR_STEPS: readonly TourStep[] = [
     title: 'Set up your building',
     body: 'Pick a template, then set how many floors it has, how big each one is, what it is made of, and whether the frame is braced. Every one of those changes how the building answers a shake.',
     icon: Building2,
+  },
+  {
+    target: 'loads',
+    title: 'Give each floor a use',
+    body: 'Choose what each floor is for — office, home, parking or storage — or type your own dead and live loads. The use sets how much live load is counted, which changes the building’s weight and how it sways. These are teaching defaults, not a design check.',
+    icon: Layers,
   },
   {
     /*

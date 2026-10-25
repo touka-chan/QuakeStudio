@@ -83,10 +83,10 @@ def load_constants(path: Path = CONSTANTS_PATH) -> dict[str, Any]:
     with path.open(encoding="utf-8") as handle:
         data = json.load(handle)
 
-    if data.get("schemaVersion") != 1:
+    if data.get("schemaVersion") != 2:
         raise ValueError(
             f"constants.json has schemaVersion {data.get('schemaVersion')!r}, "
-            "expected 1. Re-run `npm run validate:constants`."
+            "expected 2. Re-run `npm run validate:constants`."
         )
     return data
 
@@ -107,6 +107,8 @@ class Building:
     material: str
     frame_type: str
     damping_ratio: float | None = None
+    floor_loads: tuple[dict[str, Any], ...] = ()
+    live_load_participation: float | None = None
 
 
 def fundamental_period_s(building: Building, material: dict[str, Any]) -> float:
@@ -129,6 +131,11 @@ def story_stiffness_nm(
     so
 
         k = m·ω1² / ( 4·sin²( π / (2(2N+1)) ) )
+
+    `floor_mass_kg` is the REFERENCE floor mass (all Office, default loads), not
+    the user's actual floor mass. Passing the actual mass would change the
+    stiffness whenever a load changed, which is exactly what the floor-loads
+    feature must not do.
     """
     if target_period_s <= 0:
         raise ValueError("Target period must be positive")
@@ -194,27 +201,150 @@ def damping_matrix(mass: np.ndarray, stiffness: np.ndarray, a0: float, a1: float
     return a0 * mass + a1 * stiffness
 
 
+# ============================================================================
+# Floor loads
+# ============================================================================
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return min(high, max(low, value))
+
+
+def _default_floor_load(floor: int, loads: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "floor": floor,
+        "occupancy": "office",
+        "deadLoadKPa": loads["defaultDeadLoadKPa"],
+        "liveLoadKPa": loads["occupancies"]["office"]["liveKPa"],
+        "liveOverridden": False,
+    }
+
+
+def normalise_floor_loads(
+    building: Building, constants: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """
+    One entry per floor, exactly `building.floors` long.
+
+    Mirrors `config/floorLoads.ts::normalizeFloorLoads`:
+      • no loads          → all Office at the defaults (old runs migrate here)
+      • too few           → new floors copy the nearest existing floor
+      • too many          → extra floors are dropped from the top
+      • out of range      → clamped; the Zod schema reports the error in the UI
+    """
+    loads = constants["loadAssumptions"]
+    count = max(0, int(building.floors))
+    source = list(building.floor_loads or ())
+    out: list[dict[str, Any]] = []
+
+    for index in range(count):
+        fallback = out[-1] if out else _default_floor_load(index + 1, loads)
+        candidate = source[index] if index < len(source) else None
+
+        if not isinstance(candidate, dict):
+            out.append({**fallback, "floor": index + 1})
+            continue
+
+        occupancy = candidate.get("occupancy")
+        if occupancy not in loads["occupancies"]:
+            occupancy = "office"
+        live_fallback = loads["occupancies"][occupancy]["liveKPa"]
+
+        dead = candidate.get("deadLoadKPa")
+        dead = (
+            float(dead)
+            if isinstance(dead, (int, float)) and math.isfinite(dead)
+            else loads["defaultDeadLoadKPa"]
+        )
+        live = candidate.get("liveLoadKPa")
+        live = (
+            float(live)
+            if isinstance(live, (int, float)) and math.isfinite(live)
+            else live_fallback
+        )
+
+        out.append(
+            {
+                "floor": index + 1,
+                "occupancy": occupancy,
+                "deadLoadKPa": _clamp(
+                    dead, loads["minDeadLoadKPa"], loads["maxDeadLoadKPa"]
+                ),
+                "liveLoadKPa": _clamp(
+                    live, loads["minLiveLoadKPa"], loads["maxLiveLoadKPa"]
+                ),
+                "liveOverridden": candidate.get("liveOverridden") is True,
+            }
+        )
+    return out
+
+
+def participation_for(building: Building, constants: dict[str, Any]) -> float:
+    """ψ, falling back to the documented default."""
+    loads = constants["loadAssumptions"]
+    value = building.live_load_participation
+    if value is None:
+        return float(loads["liveLoadParticipation"])
+    return _clamp(float(value), 0.0, 1.0)
+
+
+def floor_area_m2(building: Building) -> float:
+    return max(0.0, building.width_m) * max(0.0, building.depth_m)
+
+
+def reference_floor_mass_kg(area_m2: float, constants: dict[str, Any]) -> float:
+    """
+    Floor mass of the reference building: all Office, DEFAULT loads and
+    DEFAULT participation. Stiffness is calibrated from this, never from the
+    user's loads — see the header note in `engine/buildingModel.ts`.
+    """
+    loads = constants["loadAssumptions"]
+    reference_weight_kn = (
+        loads["defaultDeadLoadKPa"]
+        + loads["liveLoadParticipation"] * loads["occupancies"]["office"]["liveKPa"]
+    ) * area_m2
+    return reference_weight_kn * 1000.0 / loads["gravityMs2"]
+
+
 def build_model(building: Building, constants: dict[str, Any]) -> dict[str, Any]:
     """Assemble M, K, C, and the natural frequencies, for the given building."""
     n = building.floors
     material = constants["materials"][building.material]
     frame = constants["frameTypes"][building.frame_type]
+    load_constants = constants["loadAssumptions"]
+    gravity = float(load_constants["gravityMs2"])
 
-    floor_area_m2 = building.width_m * building.depth_m
-    floor_mass_kg = floor_area_m2 * material["massPerAreaKgM2"]
+    area_m2 = floor_area_m2(building)
+    loads = normalise_floor_loads(building, constants)
+    participation = participation_for(building, constants)
 
-    mass = np.eye(n) * floor_mass_kg
+    # ---- Mass, from the floor loads ---------------------------------------
+    floor_dead_kn = [load["deadLoadKPa"] * area_m2 for load in loads]
+    floor_live_counted_kn = [
+        participation * load["liveLoadKPa"] * area_m2 for load in loads
+    ]
+    floor_weights_kn = [
+        dead + live for dead, live in zip(floor_dead_kn, floor_live_counted_kn)
+    ]
+    floor_masses_kg = [weight * 1000.0 / gravity for weight in floor_weights_kn]
+    mass = np.diag(floor_masses_kg)
 
+    # ---- Stiffness, from the reference mass -------------------------------
+    reference_mass_kg = reference_floor_mass_kg(area_m2, constants)
     target_period = fundamental_period_s(building, material)
     # The frame factor is applied AFTER the period is targeted, so a braced
     # frame ends up stiffer — and therefore with a shorter period — than the
     # empirical formula predicts. Flagged in docs/assumptions.md §5.
-    story_stiffness = story_stiffness_nm(floor_mass_kg, n, target_period) * frame["stiffnessFactor"]
+    story_stiffness = (
+        story_stiffness_nm(reference_mass_kg, n, target_period)
+        * frame["stiffnessFactor"]
+    )
 
     stiffness = stiffness_matrix(n, story_stiffness)
 
     # Generalised symmetric eigenproblem K·φ = ω²·M·φ, solved directly by
-    # LAPACK. TypeScript instead forms M⁻¹K and runs its own Jacobi rotation.
+    # LAPACK. This handles a different mass on every floor; the TypeScript
+    # reduces to M^{-1/2}·K·M^{-1/2} first.
     eigenvalues = eigh(stiffness, mass, eigvals_only=True)
 
     omega = np.sqrt(np.clip(eigenvalues, 0.0, None))
@@ -233,7 +363,13 @@ def build_model(building: Building, constants: dict[str, Any]) -> dict[str, Any]
 
     return {
         "floors": n,
-        "floor_mass_kg": floor_mass_kg,
+        "floor_mass_kg": floor_masses_kg,
+        "floor_weights_kn": floor_weights_kn,
+        "floor_dead_kn": floor_dead_kn,
+        "floor_live_counted_kn": floor_live_counted_kn,
+        "total_weight_kn": float(sum(floor_weights_kn)),
+        "participation": participation,
+        "reference_mass_kg": reference_mass_kg,
         "story_stiffness_nm": story_stiffness,
         "mass": mass,
         "stiffness": stiffness,
@@ -422,11 +558,16 @@ def simulate(building: Building, motion: dict[str, Any], constants: dict[str, An
         "ground_accel": ground_accel,
         "story_stiffness_nm": model["story_stiffness_nm"],
         "damping_ratio": model["damping_ratio"],
-        **summarise(floor_disp, building, constants),
+        **summarise(floor_disp, building, constants, model),
     }
 
 
-def summarise(floor_disp: np.ndarray, building: Building, constants: dict[str, Any]) -> dict[str, Any]:
+def summarise(
+    floor_disp: np.ndarray,
+    building: Building,
+    constants: dict[str, Any],
+    model: dict[str, Any],
+) -> dict[str, Any]:
     """
     Turn raw displacement histories into the outputs the app reports.
 
@@ -454,12 +595,18 @@ def summarise(floor_disp: np.ndarray, building: Building, constants: dict[str, A
         "max_disp": max_disp,
         "drift_ratio": drift_ratio,
         "max_drift_ratio": float(np.max(drift_ratio)),
+        "floor_weights_kn": model["floor_weights_kn"],
+        "floor_dead_kn": model["floor_dead_kn"],
+        "floor_live_counted_kn": model["floor_live_counted_kn"],
+        "total_weight_kn": model["total_weight_kn"],
+        "floor_masses_kg": model["floor_mass_kg"],
     }
 
 
 def building_from_case(case: dict[str, Any]) -> Building:
     """Build a `Building` from one entry of `cases.json`."""
     raw = case["building"]
+    raw_loads = raw.get("floorLoads")
     return Building(
         floors=int(raw["floors"]),
         floor_height_m=float(raw["floorHeightM"]),
@@ -469,5 +616,15 @@ def building_from_case(case: dict[str, Any]) -> Building:
         frame_type=str(raw["frameType"]),
         damping_ratio=(
             None if raw.get("dampingRatio") is None else float(raw["dampingRatio"])
+        ),
+        floor_loads=(
+            tuple(dict(item) for item in raw_loads)
+            if isinstance(raw_loads, list)
+            else ()
+        ),
+        live_load_participation=(
+            None
+            if raw.get("liveLoadParticipation") is None
+            else float(raw["liveLoadParticipation"])
         ),
     )

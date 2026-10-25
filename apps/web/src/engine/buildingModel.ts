@@ -1,4 +1,11 @@
 import { MATERIALS, FRAME_TYPES, SOLVER } from '@/config/engineeringAssumptions';
+import {
+  floorAreaM2,
+  massKgFromWeightKN,
+  normalizeFloorLoads,
+  participationFor,
+  referenceFloorMassKg,
+} from '@/config/floorLoads';
 import type { BuildingConfig } from '@/types';
 import {
   cholesky,
@@ -18,9 +25,25 @@ import {
 
        M·ü + C·u̇ + K·u = −M·1·a_g(t)
 
+   MASS COMES FROM FLOOR LOADS, NOT FROM THE MATERIAL.
+
+   Each floor's earthquake weight is
+
+       W_i = (DL_i + ψ·LL_i) × A          (kN)
+       m_i = W_i × 1000 / g               (kg)
+
+   and the floors may all be different, so M is a general diagonal matrix.
+
+   STIFFNESS IS CALIBRATED FROM A REFERENCE BUILDING whose floors are all
+   Office at the default loads. That is what makes adding load change the
+   response without making the building stronger: K is fixed for a given
+   geometry, material and frame, and the loads only change M. Recalibrating on
+   the user's actual masses would silently cancel the effect the feature
+   exists to demonstrate.
+
    Nothing here is hard-coded: every value comes from
-   `config/engineeringAssumptions.ts`, which is the single source of truth for
-   the engineering numbers and the document the adviser reviews.
+   `config/engineeringAssumptions.ts` and `config/floorLoads.ts`, which are the
+   documents the adviser reviews.
 
    ⚠️ Every coefficient below traces back to a PLACEHOLDER pending review.
    ========================================================================= */
@@ -30,8 +53,19 @@ export type StructuralModel = {
   readonly floors: number;
   /** Lumped floor masses in kg, one per floor. */
   readonly floorMassKg: Float64Array;
+  /** Earthquake weight per floor, in kN. */
+  readonly floorWeightsKN: number[];
+  /** Dead-load part of each floor's weight, in kN. */
+  readonly floorDeadKN: number[];
+  /** Counted live-load part of each floor's weight, in kN. */
+  readonly floorLiveCountedKN: number[];
+  readonly totalWeightKN: number;
+  /** Fraction of live load counted as earthquake weight, 0..1. */
+  readonly participation: number;
   /** Story stiffness in N/m. Uniform in the MVP. */
   readonly storyStiffnessNm: number;
+  /** The mass used to calibrate stiffness, in kg. See the header note. */
+  readonly referenceMassKg: number;
   readonly mass: Square;
   readonly stiffness: Square;
   readonly damping: Square;
@@ -59,6 +93,11 @@ export type StructuralModel = {
  *
  *     k = m·ω₁² / ( 4·sin²( π / (2(2N+1)) ) )
  *
+ * `m` here is the REFERENCE floor mass (all Office, default loads), not the
+ * user's actual floor mass. Passing the actual mass would make a heavier
+ * building stiffer and cancel the response change the floor-loads feature is
+ * meant to show. See buildModel().
+ *
  * The derivation is reproduced in docs/assumptions.md so the reviewer can check
  * the algebra rather than trust it.
  */
@@ -69,6 +108,7 @@ export function storyStiffnessForPeriod(
 ): number {
   if (targetPeriodS <= 0) throw new Error('Target period must be positive');
   if (floors < 1) throw new Error('Need at least one floor');
+  if (!(floorMassKg > 0)) throw new Error('Reference floor mass must be positive');
 
   const omega1 = (2 * Math.PI) / targetPeriodS;
   const sinTerm = Math.sin(Math.PI / (2 * (2 * floors + 1)));
@@ -96,20 +136,45 @@ export function buildModel(building: BuildingConfig): StructuralModel {
   const material = MATERIALS[building.material];
   const frame = FRAME_TYPES[building.frameType];
 
-  const floorAreaM2 = building.widthM * building.depthM;
-  const floorMassKg = floorAreaM2 * material.massPerAreaKgM2;
+  const areaM2 = floorAreaM2(building.widthM, building.depthM);
+  const loads = normalizeFloorLoads(n, building.floorLoads);
+  const participation = participationFor(building);
 
-  const massValues = new Float64Array(n).fill(floorMassKg);
+  // ---- Mass, from the floor loads ----------------------------------------
+  const floorDeadKN = loads.map((load) => load.deadLoadKPa * areaM2);
+  const floorLiveCountedKN = loads.map((load) => participation * load.liveLoadKPa * areaM2);
+  const floorWeightsKN = floorDeadKN.map((dead, index) => dead + floorLiveCountedKN[index]!);
+  const totalWeightKN = floorWeightsKN.reduce((sum, weight) => sum + weight, 0);
+  /*
+   * A floor with no weight has no mass, and the eigenproblem divides by its
+   * square root. Zero loads are reachable (dead load 0, live load 0 or ψ 0), so
+   * this is reported as a model error rather than allowed to become NaN in
+   * every chart. Dead load includes the floor itself, so a real floor is never
+   * weightless.
+   */
+  const weightless = floorWeightsKN.findIndex((weight) => !(weight > 0));
+  if (weightless >= 0) {
+    throw new Error(
+      `Floor ${weightless + 1} has no weight. Set a dead load or count some live load on every floor.`,
+    );
+  }
+  const massValues = Float64Array.from(floorWeightsKN.map(massKgFromWeightKN));
 
+  // ---- Stiffness, from the REFERENCE mass --------------------------------
+  // Not from `massValues`. See the header note and §3.2 of the build prompt:
+  // load changes mass only, never stiffness.
+  const referenceMassKg = referenceFloorMassKg(areaM2);
   const targetPeriod = fundamentalPeriodS(building);
   const storyStiffness =
-    storyStiffnessForPeriod(floorMassKg, n, targetPeriod) * frame.stiffnessFactor;
+    storyStiffnessForPeriod(referenceMassKg, n, targetPeriod) * frame.stiffnessFactor;
 
   const stiffness = buildStiffnessMatrix(n, storyStiffness);
 
   // ---- Natural frequencies ------------------------------------------------
-  // Generalised eigenproblem K·φ = ω²·M·φ. M is diagonal with equal entries,
-  // so this reduces to the symmetric problem (M⁻¹K)φ = ω²φ.
+  // Generalised eigenproblem K·φ = ω²·M·φ with a NON-UNIFORM diagonal M.
+  // Forming M⁻¹K is only symmetric when every floor mass is equal, so the
+  // symmetric reduction is D = M^{-1/2}·K·M^{-1/2}. Its eigenvalues are the
+  // same as the generalised problem's, which is all this needs.
   const { reduced } = reduceByMass(stiffness, massValues, n);
   const eigen = symmetricEigen(reduced);
 
@@ -130,7 +195,13 @@ export function buildModel(building: BuildingConfig): StructuralModel {
   return {
     floors: n,
     floorMassKg: massValues,
+    floorWeightsKN,
+    floorDeadKN,
+    floorLiveCountedKN,
+    totalWeightKN,
+    participation,
     storyStiffnessNm: storyStiffness,
+    referenceMassKg,
     mass: diagonal(massValues),
     stiffness,
     damping,
@@ -214,12 +285,32 @@ export function buildRayleighDamping(
   return { n, a };
 }
 
-/** M⁻¹K, used to turn the generalised eigenproblem into a symmetric one. */
+/**
+ * Symmetric reduction of the generalised eigenproblem K·φ = ω²·M·φ.
+ *
+ *     D = M^{-1/2} · K · M^{-1/2}        D_ij = K_ij / √(m_i · m_j)
+ *
+ * Do NOT form M⁻¹K. That is symmetric only when every floor has the same mass,
+ * and the Jacobi eigensolver below requires symmetry. Before floor loads the
+ * masses were uniform, so M⁻¹K happened to work; with a different load on each
+ * floor it would produce wrong periods — including a wrong T₁, which the whole
+ * app reports.
+ *
+ * D has the same eigenvalues as the generalised problem, and the natural
+ * frequencies are the square roots of those eigenvalues. The eigenvectors are
+ * not needed here (the solver integrates the equations directly), so the
+ * back-transformation φ = M^{-1/2}·v is deliberately omitted.
+ */
 function reduceByMass(stiffness: Square, massValues: Float64Array, n: number) {
   const reduced = square(n);
+  const invSqrtMass = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    const mass = massValues[i]!;
+    invSqrtMass[i] = mass > 0 ? 1 / Math.sqrt(mass) : 0;
+  }
   for (let i = 0; i < n; i++) {
     for (let j = 0; j < n; j++) {
-      reduced.a[i * n + j] = stiffness.a[i * n + j]! / massValues[i]!;
+      reduced.a[i * n + j] = stiffness.a[i * n + j]! * invSqrtMass[i]! * invSqrtMass[j]!;
     }
   }
   return { reduced };

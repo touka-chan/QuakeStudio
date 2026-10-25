@@ -91,6 +91,26 @@ export class SolverClient {
     this.worker = null;
   }
 
+  /**
+   * Drop whatever is waiting to be solved, and ignore anything already in
+   * flight.
+   *
+   * Used when a saved run is loaded: its stored result is what the user asked
+   * to see, and a solve queued for the previous configuration must not arrive
+   * afterwards and replace it. Moving `latestSentId` past every issued id is
+   * what makes the in-flight response stale; `nextId` keeps increasing, so the
+   * next real request still gets a fresh id.
+   */
+  cancelPending(): void {
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.buildings = [];
+    this.motion = null;
+    this.latestSentId = -1;
+  }
+
   /* --------------------------------------------------------------- requests */
 
   /**

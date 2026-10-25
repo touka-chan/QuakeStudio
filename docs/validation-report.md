@@ -1,6 +1,6 @@
 # Validation report
 
-Generated 2026-10-16 by `python/reference/python/compare.py`. Every number below is measured, not typed in by hand — re-running the comparison regenerates this file.
+Generated 2026-10-25 by `python/reference/python/compare.py`. Every number below is measured, not typed in by hand — re-running the comparison regenerates this file.
 
 > ⚠️ **This validates the software, not the engineering.** Read
 > [What this does and does not prove](#what-this-does-and-does-not-prove)
@@ -8,19 +8,19 @@ Generated 2026-10-16 by `python/reference/python/compare.py`. Every number below
 
 ## Verdict: PASS
 
-The TypeScript engine and the independent Python reference agree to **6.3e-11%** at worst across 16 cases — tolerance was 1.0e-06%.
+The TypeScript engine and the independent Python reference agree to **6.4e-11%** at worst across 24 cases — tolerance was 1.0e-06%.
 
 | Quantity | Worst disagreement |
 |---|---|
-| Natural periods (3 modes) | 2.8e-14 % |
+| Natural periods (3 modes) | 4.7e-14 % |
 | Peak displacement (every floor) | 1.3e-11 % |
-| Story drift ratio (every story) | 6.3e-11 % |
+| Story drift ratio (every story) | 6.4e-11 % |
 | Max drift ratio | 7.3e-12 % |
 | Roof displacement history | 2.2e-11 % (NRMSE) |
 | Ground acceleration history | 1.8e-11 % (NRMSE) |
 | Phase lag between histories | 0.00e+00 s |
 
-The agreement is 15,846× tighter than the threshold, which is the expected result: two correct implementations of the same arithmetic disagree only by floating-point rounding.
+The agreement is 15,732× tighter than the threshold, which is the expected result: two correct implementations of the same arithmetic disagree only by floating-point rounding.
 
 ## What this does and does not prove
 
@@ -80,22 +80,30 @@ Comparisons are relative and symmetric — `|a − b| / max(|a|, |b|)` — so a 
 
 | Case | Floors | Material / frame | Motion | T₁ TS | T₁ Py | Period err | Peak err | Drift err | History NRMSE |
 |---|---|---|---|---|---|---|---|---|---|
-| `default-5-concrete-moment-harmonic` | 5 | concrete / moment | harmonic | 0.6284 s | 0.6284 s | 4.4e-15 % | 2.1e-14 % | 5.2e-14 % | 3.7e-14 % |
-| `floors-3-composite-moment-harmonic` | 3 | composite / moment | harmonic | 0.4176 s | 0.4176 s | 3.8e-15 % | 2.6e-14 % | 3.5e-14 % | 3.6e-14 % |
-| `floors-10-steel-braced-harmonic` | 10 | steel / braced | harmonic | 0.7736 s | 0.7736 s | 1.1e-14 % | 4.0e-13 % | 9.9e-13 % | 8.3e-13 % |
-| `floors-15-wood-moment-harmonic` | 15 | wood / moment | harmonic | 1.5934 s | 1.5934 s | 2.8e-14 % | 5.0e-13 % | 2.1e-12 % | 1.1e-12 % |
-| `floors-20-concrete-moment-harmonic` | 20 | concrete / moment | harmonic | 2.1548 s | 2.1548 s | 6.6e-15 % | 4.0e-13 % | 1.4e-12 % | 2.9e-13 % |
-| `floors-1-concrete-moment-harmonic` | 1 | concrete / moment | harmonic | 0.1734 s | 0.1734 s | 9.6e-16 % | 3.3e-15 % | 2.9e-15 % | 9.1e-15 % |
-| `floors-2-concrete-moment-harmonic` | 2 | concrete / moment | harmonic | 0.3019 s | 0.3019 s | 1.1e-15 % | 1.6e-14 % | 3.2e-14 % | 1.7e-14 % |
-| `floors-8-concrete-damping-override` | 8 | concrete / moment | harmonic | 0.9152 s | 0.9152 s | 4.9e-15 % | 5.2e-14 % | 2.6e-13 % | 1.3e-13 % |
-| `floors-6-concrete-moment-random` | 6 | concrete / moment | random | 0.7270 s | 0.7270 s | 4.0e-15 % | 5.8e-13 % | 2.0e-12 % | 2.2e-11 % |
-| `floors-6-concrete-moment-impulse` | 6 | concrete / moment | impulse | 0.7270 s | 0.7270 s | 4.0e-15 % | 9.7e-15 % | 3.6e-14 % | 9.1e-14 % |
-| `floors-10-concrete-moment-near-resonance` | 10 | concrete / moment | harmonic | 1.0940 s | 1.0940 s | 2.0e-15 % | 2.6e-14 % | 1.9e-13 % | 4.2e-13 % |
-| `floors-4-steel-braced-impulse` | 4 | steel / braced | impulse | 0.3717 s | 0.3717 s | 1.8e-15 % | 1.3e-14 % | 1.6e-14 % | 1.6e-13 % |
-| `floors-12-composite-braced-random` | 12 | composite / braced | random | 0.9189 s | 0.9189 s | 9.1e-15 % | 7.3e-12 % | 6.3e-11 % | 2.0e-11 % |
-| `floors-7-wood-moment-impulse` | 7 | wood / moment | impulse | 0.7783 s | 0.7783 s | 1.4e-15 % | 2.2e-14 % | 6.6e-14 % | 2.9e-13 % |
-| `floors-5-composite-moment-random` | 5 | composite / moment | random | 0.6945 s | 0.6945 s | 8.0e-16 % | 1.3e-11 % | 4.4e-11 % | 2.2e-11 % |
-| `floors-9-steel-moment-harmonic-short` | 9 | steel / moment | harmonic | 1.0056 s | 1.0056 s | 3.3e-16 % | 2.1e-14 % | 5.9e-14 % | 9.8e-14 % |
+| `default-5-concrete-moment-harmonic` | 5 | concrete / moment | harmonic | 0.6284 s | 0.6284 s | 1.8e-15 % | 8.6e-15 % | 1.8e-14 % | 2.8e-14 % |
+| `floors-3-composite-moment-harmonic` | 3 | composite / moment | harmonic | 0.4176 s | 0.4176 s | 3.6e-15 % | 2.8e-14 % | 4.9e-14 % | 6.0e-14 % |
+| `floors-10-steel-braced-harmonic` | 10 | steel / braced | harmonic | 0.7736 s | 0.7736 s | 2.3e-15 % | 3.8e-14 % | 5.9e-14 % | 1.8e-13 % |
+| `floors-15-wood-moment-harmonic` | 15 | wood / moment | harmonic | 1.5934 s | 1.5934 s | 1.5e-15 % | 1.4e-13 % | 6.0e-13 % | 2.7e-13 % |
+| `floors-20-concrete-moment-harmonic` | 20 | concrete / moment | harmonic | 2.1548 s | 2.1548 s | 4.7e-14 % | 1.4e-13 % | 1.0e-12 % | 1.7e-13 % |
+| `floors-1-concrete-moment-harmonic` | 1 | concrete / moment | harmonic | 0.1734 s | 0.1734 s | 9.6e-16 % | 2.7e-15 % | 4.8e-15 % | 7.7e-15 % |
+| `floors-2-concrete-moment-harmonic` | 2 | concrete / moment | harmonic | 0.3019 s | 0.3019 s | 1.1e-15 % | 4.6e-15 % | 7.4e-15 % | 1.6e-14 % |
+| `floors-8-concrete-damping-override` | 8 | concrete / moment | harmonic | 0.9152 s | 0.9152 s | 1.6e-15 % | 5.0e-14 % | 4.9e-14 % | 2.9e-13 % |
+| `floors-6-concrete-moment-random` | 6 | concrete / moment | random | 0.7270 s | 0.7270 s | 3.6e-15 % | 5.4e-13 % | 2.0e-12 % | 2.2e-11 % |
+| `floors-6-concrete-moment-impulse` | 6 | concrete / moment | impulse | 0.7270 s | 0.7270 s | 3.6e-15 % | 1.1e-14 % | 2.6e-14 % | 4.2e-14 % |
+| `floors-10-concrete-moment-near-resonance` | 10 | concrete / moment | harmonic | 1.0940 s | 1.0940 s | 5.7e-15 % | 8.7e-15 % | 8.4e-14 % | 4.4e-14 % |
+| `floors-4-steel-braced-impulse` | 4 | steel / braced | impulse | 0.3717 s | 0.3717 s | 1.0e-15 % | 1.0e-14 % | 1.1e-14 % | 1.3e-13 % |
+| `floors-12-composite-braced-random` | 12 | composite / braced | random | 0.9189 s | 0.9189 s | 2.2e-15 % | 7.3e-12 % | 6.4e-11 % | 2.0e-11 % |
+| `floors-7-wood-moment-impulse` | 7 | wood / moment | impulse | 0.7783 s | 0.7783 s | 1.9e-15 % | 3.1e-14 % | 2.6e-13 % | 3.3e-13 % |
+| `floors-5-composite-moment-random` | 5 | composite / moment | random | 0.6945 s | 0.6945 s | 2.9e-15 % | 1.3e-11 % | 4.4e-11 % | 2.2e-11 % |
+| `floors-9-steel-moment-harmonic-short` | 9 | steel / moment | harmonic | 1.0056 s | 1.0056 s | 1.1e-14 % | 2.0e-14 % | 1.8e-13 % | 1.5e-13 % |
+| `loads-uniform-office` | 5 | concrete / moment | harmonic | 0.6284 s | 0.6284 s | 1.8e-15 % | 8.6e-15 % | 1.8e-14 % | 2.8e-14 % |
+| `loads-uniform-heavy-storage` | 5 | concrete / moment | harmonic | 0.8762 s | 0.8762 s | 3.2e-15 % | 5.5e-14 % | 1.2e-13 % | 9.7e-14 % |
+| `loads-top-heavy` | 8 | steel / moment | harmonic | 0.9630 s | 0.9630 s | 5.3e-15 % | 3.0e-14 % | 4.1e-14 % | 1.7e-13 % |
+| `loads-bottom-heavy` | 8 | steel / moment | harmonic | 0.9232 s | 0.9232 s | 7.0e-15 % | 1.1e-13 % | 2.3e-13 % | 6.7e-13 % |
+| `loads-mixed-worked-example` | 5 | composite / moment | harmonic | 0.6314 s | 0.6314 s | 1.6e-15 % | 6.1e-14 % | 6.5e-14 % | 8.2e-14 % |
+| `loads-participation-zero` | 6 | concrete / moment | harmonic | 0.6854 s | 0.6854 s | 2.3e-15 % | 3.7e-14 % | 5.4e-14 % | 7.4e-14 % |
+| `loads-participation-one` | 6 | concrete / moment | harmonic | 0.8395 s | 0.8395 s | 2.3e-15 % | 6.5e-14 % | 1.3e-13 % | 6.6e-14 % |
+| `loads-custom-values` | 7 | wood / braced | impulse | 0.7440 s | 0.7440 s | 2.0e-15 % | 1.5e-14 % | 4.2e-14 % | 3.1e-13 % |
 
 Errors are percentages; `0` means the two agree to within floating-point noise.
 
@@ -106,7 +114,7 @@ Agreeing on the default model proves very little. The matrix is built around the
 - **`default-5-concrete-moment-harmonic`** — The default model. If this disagrees, everything else is suspect.
 - **`floors-3-composite-moment-harmonic`** — Shortest building in the main sweep.
 - **`floors-10-steel-braced-harmonic`** — Braced frame: the stiffness multiplier must apply after period calibration.
-- **`floors-15-wood-moment-harmonic`** — Lightest material — the largest acceleration response.
+- **`floors-15-wood-moment-harmonic`** — A 15-storey wood tower: the tallest flexible case, and a material-damping check.
 - **`floors-20-concrete-moment-harmonic`** — The tallest building the UI allows. Longest solve, densest eigenproblem.
 - **`floors-1-concrete-moment-harmonic`** — EDGE: a single floor has one mode, so Rayleigh damping cannot be calibrated to modes 1 and 2. The mass-proportional fallback must match.
 - **`floors-2-concrete-moment-harmonic`** — EDGE: the smallest case with two modes, so the Rayleigh branch switches exactly here.
@@ -116,13 +124,21 @@ Agreeing on the default model proves very little. The matrix is built around the
 - **`floors-10-concrete-moment-near-resonance`** — EDGE: shaking close to the building's own frequency. Largest displacements, so the largest absolute error — the hardest case to agree on.
 - **`floors-4-steel-braced-impulse`** — Stiff frame under an impulse: short period, so the timestep is most likely to be too coarse.
 - **`floors-12-composite-braced-random`** — Mid-height braced composite under band-limited random motion.
-- **`floors-7-wood-moment-impulse`** — Light and flexible — the combination with the largest drift ratios.
+- **`floors-7-wood-moment-impulse`** — Tall and flexible under a sharp impulse — drift accumulates over many stories.
 - **`floors-5-composite-moment-random`** — Another random-motion case, different geometry, to catch anything seed- or shape-specific.
 - **`floors-9-steel-moment-harmonic-short`** — Short record (10 s). Checks the taper at the end of the record is handled the same way.
+- **`loads-uniform-office`** — FLOOR LOADS: every floor Office at the default dead load, psi 0.25. This is the reference building, so T1 must equal the empirical period.
+- **`loads-uniform-heavy-storage`** — FLOOR LOADS: every floor Storage at 6.0 kPa and a 9 kPa dead load. Same stiffness as the office case, so the periods must be longer and the drift smaller.
+- **`loads-top-heavy`** — FLOOR LOADS: the top three of eight floors are Storage and the rest Office. Non-uniform M must produce a different T1 from the equal-weight bottom-heavy case.
+- **`loads-bottom-heavy`** — FLOOR LOADS: three Storage floors at the bottom of eight and five Office above; equal total weight to loads-top-heavy. Checks that the mass distribution, not only the total, reaches the eigenproblem.
+- **`loads-mixed-worked-example`** — FLOOR LOADS: the five-floor Parking/Storage/Office/Office/Residential example from the build prompt. Total weight must be 3888.5 kN at area 140 m2 and psi 0.25.
+- **`loads-participation-zero`** — FLOOR LOADS: psi = 0, so only dead load counts. The lightest and fastest of the six-floor pair; checks the participation factor reaches the mass matrix.
+- **`loads-participation-one`** — FLOOR LOADS: psi = 1, so the full live load counts. Same geometry as participation-zero; every period must be longer by the mass ratio.
+- **`loads-custom-values`** — FLOOR LOADS: every floor Custom at 6.5 kPa dead and 4.2 kPa live, psi 0.35. Checks that typed values and a non-default participation survive the whole pipeline.
 
 ## Engine performance
 
-All 16 cases solve in well under a second combined (worst single case under 10 ms). Fast enough to re-run on every parameter change, which is what makes this usable for exploration rather than a one-off check.
+All 24 cases solve in well under a second combined (worst single case under 10 ms). Fast enough to re-run on every parameter change, which is what makes this usable for exploration rather than a one-off check.
 
 ## What would make this stronger
 

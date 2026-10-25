@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { MATERIALS, GEOMETRY } from '@/config/engineeringAssumptions';
+import { MATERIALS, GEOMETRY, LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { allOfficeFloorLoads } from '@/config/floorLoads';
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import {
   buildModel,
@@ -104,25 +105,69 @@ describe('storyStiffnessForPeriod', () => {
 });
 
 describe('buildModel', () => {
-  it('computes floor mass from area and material density', () => {
+  it('computes floor mass from the floor loads, not the material', () => {
     const building: BuildingConfig = {
       ...BASE,
       floors: 4,
       widthM: 20,
       depthM: 10,
       material: 'concrete',
+      floorLoads: allOfficeFloorLoads(4),
+      liveLoadParticipation: LOAD_ASSUMPTIONS.liveLoadParticipation,
     };
     const model = buildModel(building);
 
-    const expected = 20 * 10 * MATERIALS.concrete.massPerAreaKgM2;
-    expect(model.floorMassKg[0]).toBeCloseTo(expected, 6);
+    const area = 20 * 10;
+    const expectedWeight =
+      (LOAD_ASSUMPTIONS.defaultDeadLoadKPa +
+        LOAD_ASSUMPTIONS.liveLoadParticipation * LOAD_ASSUMPTIONS.occupancies.office.liveKPa) *
+      area;
+
+    expect(model.floorWeightsKN[0]).toBeCloseTo(expectedWeight, 10);
+    expect(model.floorMassKg[0]).toBeCloseTo(
+      (expectedWeight * 1000) / LOAD_ASSUMPTIONS.gravityMs2,
+      6,
+    );
     expect(model.floorMassKg.length).toBe(4);
+    expect(model.totalWeightKN).toBeCloseTo(expectedWeight * 4, 10);
   });
 
-  it('gives heavier materials more floor mass', () => {
+  it('rejects a floor with no weight instead of producing NaN', () => {
+    const building: BuildingConfig = {
+      ...BASE,
+      floors: 2,
+      liveLoadParticipation: 0,
+      floorLoads: [
+        {
+          floor: 1,
+          occupancy: 'custom',
+          deadLoadKPa: 0,
+          liveLoadKPa: 2.4,
+          liveOverridden: true,
+        },
+        {
+          floor: 2,
+          occupancy: 'office',
+          deadLoadKPa: 4.8,
+          liveLoadKPa: 2.4,
+          liveOverridden: false,
+        },
+      ],
+    };
+    expect(() => buildModel(building)).toThrow(/floor 1 has no weight/i);
+  });
+
+  it('gives the same floor mass under different materials', () => {
+    // Mass now comes from the loads, so material no longer contributes weight.
+    // It still supplies the damping ratio, which is what actually differed
+    // between materials in the old model too: the period formula uses the same
+    // Ct and x for all four, and stiffness was (and is) calibrated to it.
     const concrete = buildModel({ ...BASE, material: 'concrete' });
-    const wood = buildModel({ ...BASE, material: 'wood' });
-    expect(concrete.floorMassKg[0]!).toBeGreaterThan(wood.floorMassKg[0]!);
+    const steel = buildModel({ ...BASE, material: 'steel' });
+
+    expect(concrete.floorMassKg[0]!).toBeCloseTo(steel.floorMassKg[0]!, 6);
+    expect(concrete.periodsS[0]!).toBeCloseTo(steel.periodsS[0]!, 10);
+    expect(concrete.dampingRatio).not.toBe(steel.dampingRatio);
   });
 
   it('scales stiffness with the frame type', () => {

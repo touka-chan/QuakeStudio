@@ -4,7 +4,7 @@ import { useCallback, useSyncExternalStore } from 'react';
    Media query hook
    -------------------------------------------------------------------------
    The OS settings QuakeStudio must respect: reduced motion (start paused, lower
-   default speed) and the desktop breakpoint (three zones vs bottom tabs).
+   default speed) and the desktop breakpoint (the workspace vs the notice).
 
    Read through useSyncExternalStore rather than an effect + state, so a
    component never renders once with a stale answer and again with the real one.

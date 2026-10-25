@@ -1,5 +1,7 @@
 import { Capacitor } from '@capacitor/core';
 
+import { LOAD_ASSUMPTIONS } from '@/config/engineeringAssumptions';
+import { normalizeFloorLoads, participationFor } from '@/config/floorLoads';
 import { APP_VERSION } from '@/types';
 import { formatMm, formatPct } from '@/lib/utils';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
@@ -47,6 +49,39 @@ export function buildCsv(
   lines.push(`# Material,${building.material}`);
   lines.push(`# Frame type,${building.frameType}`);
   lines.push('#');
+  lines.push('# --- Floor loads ---');
+  const participation = participationFor(building);
+  lines.push(`# Live-load participation (psi),${participation}`);
+
+  const weightsRecorded = (result.floorWeightsKN?.length ?? 0) > 0;
+  if (!weightsRecorded) {
+    // The loads below are the all-Office defaults a v1 record is migrated to.
+    // Saying so keeps them from reading as loads that run actually used.
+    lines.push('# Migrated from a version before floor loads; the loads below are defaults.');
+  }
+  lines.push(
+    '# Floor,Use,Dead load (kPa),Live load (kPa),Counted live (kPa)' +
+      // Weight is a property of the run, not of the current configuration. An
+      // old run gets the load columns it did record, and no invented weight.
+      (weightsRecorded ? ',Weight (kN),Mass (kg)' : ''),
+  );
+
+  const loads = normalizeFloorLoads(building.floors, building.floorLoads);
+  for (const load of loads) {
+    const use = LOAD_ASSUMPTIONS.occupancies[load.occupancy].label;
+    const counted = load.liveLoadKPa * participation;
+    const index = load.floor - 1;
+    const weight = result.floorWeightsKN?.[index];
+    const mass = result.floorMassesKg?.[index];
+    lines.push(
+      `# ${load.floor},${use},${load.deadLoadKPa},${load.liveLoadKPa},${counted.toFixed(4)}` +
+        (weightsRecorded && weight !== undefined
+          ? `,${weight.toFixed(4)},${(mass ?? 0).toFixed(4)}`
+          : ''),
+    );
+  }
+  if (!weightsRecorded) lines.push('# Floor weights not recorded in this run.');
+  lines.push('#');
   lines.push('# --- Earthquake ---');
   lines.push(`# Preset,${motion.preset}`);
   lines.push(`# Peak ground acceleration (g),${motion.pgaG}`);
@@ -69,6 +104,15 @@ export function buildCsv(
   );
   lines.push(`# Max interstory drift ratio (%),${(result.maxDriftRatio * 100).toFixed(4)}`);
   lines.push(`# Natural periods (s),${result.periodsS.map((p) => p.toFixed(4)).join(' ')}`);
+  if (weightsRecorded) {
+    const live = (result.floorLiveCountedKN ?? []).reduce((sum, value) => sum + value, 0);
+    lines.push(`# Total weight (kN),${result.totalWeightKN.toFixed(4)}`);
+    lines.push(
+      `# Counted live share of weight (%),${
+        result.totalWeightKN > 0 ? ((live / result.totalWeightKN) * 100).toFixed(4) : '0.0000'
+      }`,
+    );
+  }
   lines.push('#');
   lines.push('# Displacement columns are in MILLIMETRES, relative to the ground.');
   lines.push('# Drift columns are PERCENT of floor height.');
@@ -93,8 +137,12 @@ export function buildCsv(
     for (let floor = 0; floor < building.floors; floor++) {
       row.push(((floorDisp[floor]?.[step] ?? 0) * 1000).toFixed(6));
     }
-    for (const drift of result.driftRatio) {
-      row.push((drift * 100).toFixed(6));
+    // Index by the building's floors rather than iterating the result: a
+    // result still in flight during an edit can be a different length, and the
+    // header is built from the building. Missing values are zero, not a
+    // truncated row.
+    for (let floor = 0; floor < building.floors; floor++) {
+      row.push(((result.driftRatio[floor] ?? 0) * 100).toFixed(6));
     }
     row.push((groundAccel[step] ?? 0).toFixed(6));
     lines.push(row.join(','));
