@@ -22,6 +22,7 @@ import { CameraFrame } from './CameraFrame';
 import { CutawayToggle } from './CutawayToggle';
 import { FloorObjects } from './FloorObjects';
 import { CarGroup } from './CarGroup';
+import { HybridContent } from './HybridContent';
 import { GroundSlab } from './GroundSlab';
 import { ShakeArrow } from './ShakeArrow';
 
@@ -961,9 +962,8 @@ function SwayingBuilding({
                   opacity={ghost ? 0.5 : 1}
                 />
               ) : (
-                <FloorObjects
+                <HybridContent
                   items={floorContents(load.occupancy, building.widthM, building.depthM)}
-                  geometry={geometry.unit}
                   color={palette['--content'] ?? '#64748b'}
                   opacity={ghost ? 0.5 : 1}
                 />

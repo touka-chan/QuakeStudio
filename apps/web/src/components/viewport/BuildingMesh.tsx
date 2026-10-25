@@ -14,6 +14,7 @@ import { usePlaybackStore } from '@/store/playbackStore';
 import { useUiStore } from '@/store/uiStore';
 import { FloorObjects } from './FloorObjects';
 import { CarGroup } from './CarGroup';
+import { HybridContent } from './HybridContent';
 
 /* =========================================================================
    Building mesh — a stack of floors that sway.
@@ -196,10 +197,10 @@ export function BuildingMesh() {
                   color={palette['--load-parking'] ?? '#3b82f6'}
                 />
               ) : (
-                <FloorObjects
+                <HybridContent
                   items={floorContents(load.occupancy, widthM, depthM)}
-                  geometry={geometries.unit}
                   color={palette['--content'] ?? '#64748b'}
+                  opacity={1}
                 />
               )
             ) : null}
