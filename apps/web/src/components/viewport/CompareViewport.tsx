@@ -194,12 +194,16 @@ export function CompareViewport() {
           peakMm: (hoveredSubject.result.peakDisp[hovered.floor - 1] ?? 0) * 1000,
           driftPct: (hoveredSubject.result.driftRatio[hovered.floor - 1] ?? 0) * 100,
           useLabel:
-            LOAD_ASSUMPTIONS.occupancies[
-              normalizeFloorLoads(
-                hoveredSubject.building.floors,
-                hoveredSubject.building.floorLoads,
-              )[hovered.floor - 1]?.occupancy ?? 'office'
-            ].label,
+            hoveredSubject.building.loadsEnabled === false
+              ? // Nothing was counted on this building, so the callout does not
+                // name a use — a bare floor is not secretly an office.
+                'Bare structure (loads off)'
+              : LOAD_ASSUMPTIONS.occupancies[
+                  normalizeFloorLoads(
+                    hoveredSubject.building.floors,
+                    hoveredSubject.building.floorLoads,
+                  )[hovered.floor - 1]?.occupancy ?? 'office'
+                ].label,
         }
       : null;
 
@@ -789,6 +793,7 @@ function SwayingBuilding({
    * it in Ghost overlay.
    */
   const palette = useCssVars([
+    '--undeformed',
     '--drift-1',
     '--drift-2',
     '--drift-3',
@@ -821,13 +826,21 @@ function SwayingBuilding({
    * of the outline: two floors with the same outline have the same drift. But
    * the floor's use is now a second thing the picture must carry, and a solid
    * drift wash swallowed it. The badge above each roof still carries identity.
+   *
+   * A building with its loads switched off counts no use, so it gets no use
+   * colour either: its slabs take the undeformed colour, the same bare look
+   * the single view gives, and no floor objects are drawn — the picture and
+   * the weights table then agree on what was simulated.
    */
+  const loadsOn = building.loadsEnabled !== false;
   const slabColors = useMemo(
     () =>
-      loads.map(
-        (load) => palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe',
+      loads.map((load) =>
+        loadsOn
+          ? (palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe')
+          : (palette['--undeformed'] ?? '#dbeafe'),
       ),
-    [loads, palette],
+    [loadsOn, loads, palette],
   );
 
   const driftColors = useMemo(
@@ -939,23 +952,22 @@ function SwayingBuilding({
               />
             </lineSegments>
 
-            {cutaway && !ghost && load ? (
-              <>
-                <FloorObjects
-                  items={floorContents(load.occupancy, building.widthM, building.depthM)}
-                  geometry={geometry.unit}
-                  color={palette['--content'] ?? '#64748b'}
-                  opacity={ghost ? 0.5 : 1}
-                />
-                {index > 0 ? (
-                  <FloorObjects
-                    items={storyColumns(building.widthM, building.depthM, floorHeightM)}
-                    geometry={geometry.unit}
-                    color={palette['--content'] ?? '#64748b'}
-                    opacity={0.55}
-                  />
-                ) : null}
-              </>
+            {cutaway && !ghost && load && loadsOn ? (
+              <FloorObjects
+                items={floorContents(load.occupancy, building.widthM, building.depthM)}
+                geometry={geometry.unit}
+                color={palette['--content'] ?? '#64748b'}
+                opacity={ghost ? 0.5 : 1}
+              />
+            ) : null}
+            {/* Columns are structure: they stay in cutaway while loads are off. */}
+            {cutaway && !ghost && index > 0 ? (
+              <FloorObjects
+                items={storyColumns(building.widthM, building.depthM, floorHeightM)}
+                geometry={geometry.unit}
+                color={palette['--content'] ?? '#64748b'}
+                opacity={0.55}
+              />
             ) : null}
           </group>
         );

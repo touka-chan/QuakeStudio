@@ -65,6 +65,10 @@ export function BuildingMesh() {
   const [hovered, setHovered] = useState<number | null>(null);
 
   const { widthM, depthM, floorHeightM, floors } = building;
+  // The switch decides what the picture shows as well as what the engine
+  // counts: with loads off there is no use to draw, and the slab stops
+  // wearing the use tint, so the 3D says "bare structure" automatically.
+  const loadsOn = building.loadsEnabled !== false;
   const loads = useMemo(
     () => normalizeFloorLoads(floors, building.floorLoads),
     [floors, building.floorLoads],
@@ -92,13 +96,17 @@ export function BuildingMesh() {
     };
   }, [geometries]);
 
-  // Occupancy tint per floor. Recomputed only when a load or the theme changes.
+  // Occupancy tint per floor — while the loads are counted. With the switch
+  // off, no use is counted, so no slab wears a use colour: the bare structure
+  // takes the undeformed colour, the one that already means "at rest".
   const slabColors = useMemo(
     () =>
-      loads.map(
-        (load) => palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe',
+      loads.map((load) =>
+        loadsOn
+          ? (palette[`--load-${load.occupancy}`] ?? palette['--load-office'] ?? '#dbeafe')
+          : (palette['--undeformed'] ?? '#dbeafe'),
       ),
-    [loads, palette],
+    [loadsOn, loads, palette],
   );
 
   // Drift on the outline, so it survives alongside the occupancy tint.
@@ -140,7 +148,10 @@ export function BuildingMesh() {
         const isActive = activeFloor === floor;
         const isHovered = hovered === floor;
         const load = loads[index];
-        const occupancyLabel = load ? LOAD_ASSUMPTIONS.occupancies[load.occupancy].label : 'Office';
+        const occupancyLabel =
+          load && loadsOn
+            ? LOAD_ASSUMPTIONS.occupancies[load.occupancy].label
+            : 'Bare structure (loads off)';
 
         return (
           <group
@@ -177,22 +188,25 @@ export function BuildingMesh() {
               <lineBasicMaterial color={isActive ? palette['--selection'] : driftColors[index]} />
             </lineSegments>
 
-            {cutaway && load ? (
-              <>
-                <FloorObjects
-                  items={floorContents(load.occupancy, widthM, depthM)}
-                  geometry={geometries.unit}
-                  color={palette['--content'] ?? '#64748b'}
-                />
-                {index > 0 ? (
-                  <FloorObjects
-                    items={storyColumns(widthM, depthM, floorHeightM)}
-                    geometry={geometries.unit}
-                    color={palette['--content'] ?? '#64748b'}
-                    opacity={0.55}
-                  />
-                ) : null}
-              </>
+            {cutaway && load && loadsOn ? (
+              <FloorObjects
+                items={floorContents(load.occupancy, widthM, depthM)}
+                geometry={geometries.unit}
+                color={palette['--content'] ?? '#64748b'}
+              />
+            ) : null}
+            {/*
+             * The columns are structure, not loads: they keep drawing in
+             * cutaway even while the loads are off, which is exactly what a
+             * bare building is — slabs and columns, no use inside.
+             */}
+            {cutaway && index > 0 ? (
+              <FloorObjects
+                items={storyColumns(widthM, depthM, floorHeightM)}
+                geometry={geometries.unit}
+                color={palette['--content'] ?? '#64748b'}
+                opacity={0.55}
+              />
             ) : null}
 
             {/* Hover readout. Rendered as 3D text so it follows the cursor. */}
