@@ -265,3 +265,6 @@
     z-index: 60;
   }
 }
+
+/* Keep the scrollbar gutter stable so admin navigation does not shift when page length changes. */
+html { scrollbar-gutter: stable; }

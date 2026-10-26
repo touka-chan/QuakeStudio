@@ -1,3 +1,5 @@
+import { z } from 'zod';
+
 import {
   DEFAULT_BUILDING,
   DEFAULT_GROUND_MOTION,
@@ -5,6 +7,8 @@ import {
   type FrameTypeId,
   type MaterialId,
 } from './engineeringAssumptions';
+import { templateContentSchema } from '@/content/schema';
+import { readStoredContent } from '@/content/storage';
 import { allOfficeFloorLoads } from './floorLoads';
 import type { BuildingConfig, GroundMotionConfig } from '@/types';
 
@@ -15,12 +19,15 @@ import type { BuildingConfig, GroundMotionConfig } from '@/types';
    it is the label shown once any field is edited by hand.
 
    Templates set the BUILDING only. The earthquake is chosen separately and is
-   shared by both sides in comparison mode (Phase 4).
+   shared by both sides in comparison mode.
 
    A template deliberately does not carry floor loads. Floors start as Office
    at the default loads, and `DEFAULT_BUILDING_CONFIG` fills them in — a
    template that listed seven identical floor loads would be seven places for
    the defaults to drift.
+
+   The list is seeded from the values below, then replaced by the admin-managed
+   document on load. `custom` is mandatory and cannot be deleted.
    ========================================================================= */
 
 /** The fields a template chooses. Loads are added from the defaults. */
@@ -45,7 +52,7 @@ const template = (
   building: TemplateBuilding,
 ): BuildingTemplate => ({ id, label, description, building });
 
-export const BUILDING_TEMPLATES: readonly BuildingTemplate[] = [
+const BASELINE_TEMPLATES: readonly BuildingTemplate[] = [
   template(
     'custom',
     'Custom',
@@ -130,13 +137,48 @@ export const BUILDING_TEMPLATES: readonly BuildingTemplate[] = [
       frameType: 'moment',
     },
   ),
-] as const;
+];
+
+const stored = readStoredContent();
+const templateArraySchema = z.array(templateContentSchema).min(1).max(30);
+const parsedTemplates = templateArraySchema.safeParse(stored?.templates);
+
+const savedTemplates: readonly BuildingTemplate[] =
+  parsedTemplates.success && parsedTemplates.data.some((item) => item.id === 'custom')
+    ? parsedTemplates.data.map((item) => ({
+        id: item.id,
+        label: item.label,
+        description: item.description,
+        building: {
+          floors: item.building.floors,
+          floorHeightM: item.building.floorHeightM,
+          widthM: item.building.widthM,
+          depthM: item.building.depthM,
+          material: item.building.material,
+          frameType: item.building.frameType,
+        },
+      }))
+    : BASELINE_TEMPLATES;
+
+export const BUILDING_TEMPLATES: readonly BuildingTemplate[] = savedTemplates;
+
+const storedDefaultId =
+  typeof stored?.defaultTemplateId === 'string' ? stored.defaultTemplateId : null;
+const fallbackTemplate =
+  BUILDING_TEMPLATES.find((item) => item.id === 'tpl-5-concrete') ??
+  BUILDING_TEMPLATES.find((item) => item.id !== 'custom') ??
+  BUILDING_TEMPLATES[0]!;
 
 /** Id of the template the app opens with. */
-export const DEFAULT_TEMPLATE_ID = 'tpl-5-concrete';
+export const DEFAULT_TEMPLATE_ID: string =
+  storedDefaultId &&
+  storedDefaultId !== 'custom' &&
+  BUILDING_TEMPLATES.some((item) => item.id === storedDefaultId)
+    ? storedDefaultId
+    : fallbackTemplate.id;
 
 const defaultTemplate = (): BuildingTemplate => {
-  const found = BUILDING_TEMPLATES.find((t) => t.id === DEFAULT_TEMPLATE_ID);
+  const found = BUILDING_TEMPLATES.find((item) => item.id === DEFAULT_TEMPLATE_ID);
   if (!found) {
     throw new Error(`Default template "${DEFAULT_TEMPLATE_ID}" is missing from BUILDING_TEMPLATES`);
   }

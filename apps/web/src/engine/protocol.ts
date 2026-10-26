@@ -1,3 +1,4 @@
+import type { EngineeringContent } from '@/content/types';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
 
 /* =========================================================================
@@ -22,6 +23,14 @@ export type SolveRequest = {
   readonly buildings: readonly BuildingConfig[];
   /** Shared by every building in the batch, so comparisons are like-for-like. */
   readonly motion: GroundMotionConfig;
+  /**
+   * The engineering assumptions the UI is currently using.
+   *
+   * The solver runs in a worker, and a worker cannot read localStorage. Sending
+   * the snapshot with the request is what keeps admin-edited coefficients,
+   * occupancy loads and ground-motion settings in the numbers the student sees.
+   */
+  readonly engineering: EngineeringContent;
 };
 
 export type SolveResponse =

@@ -1,3 +1,6 @@
+import { buildDefaultEngineeringContent } from '@/content/engineeringDefaults';
+import { readStoredContent } from '@/content/storage';
+import type { EngineeringContent } from '@/content/types';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
 import type { SolveRequest, SolveResponse } from './protocol';
 
@@ -31,6 +34,7 @@ export class SolverClient {
 
   private buildings: readonly BuildingConfig[] = [];
   private motion: GroundMotionConfig | null = null;
+  private engineering: EngineeringContent | null = null;
 
   // Declared as fields rather than constructor parameter properties: the
   // project compiles with `erasableSyntaxOnly`, which forbids them.
@@ -145,10 +149,15 @@ export class SolverClient {
     const worker = this.ensureWorker();
     if (!worker) return;
 
+    // Read once per client. Admin edits are applied by a page reload, which
+    // recreates both this client and its worker with the same snapshot.
+    this.engineering ??= readStoredContent()?.engineering ?? buildDefaultEngineeringContent();
+
     const request: SolveRequest = {
       id: this.nextId++,
       buildings: this.buildings,
       motion: this.motion,
+      engineering: this.engineering,
     };
     this.latestSentId = request.id;
     worker.postMessage(request);

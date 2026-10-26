@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 
-import { PLAYBACK_SPEEDS, VIEWPORT, type PlaybackSpeed } from '@/config/engineeringAssumptions';
+import {
+  PLAYBACK_DEFAULTS,
+  PLAYBACK_SPEEDS,
+  VIEWPORT,
+  type PlaybackSpeed,
+} from '@/config/engineeringAssumptions';
 
 /* =========================================================================
    Playback store
@@ -36,8 +41,8 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
   // Starts paused: it respects prefers-reduced-motion and is honest about the
   // fact that nothing is being simulated yet.
   playing: false,
-  speed: 1,
-  loop: true,
+  speed: PLAYBACK_DEFAULTS.defaultSpeed,
+  loop: PLAYBACK_DEFAULTS.defaultLoop,
   exaggeration: VIEWPORT.defaultExaggeration,
 
   setTime: (time) => set({ time: Math.max(0, time) }),
@@ -49,7 +54,12 @@ export const usePlaybackStore = create<PlaybackState>((set, get) => ({
     set({
       exaggeration: Math.min(
         VIEWPORT.maxExaggeration,
-        Math.max(VIEWPORT.minExaggeration, Math.round(exaggeration)),
+        Math.max(
+          VIEWPORT.minExaggeration,
+          VIEWPORT.minExaggeration +
+            Math.round((exaggeration - VIEWPORT.minExaggeration) / VIEWPORT.exaggerationStep) *
+              VIEWPORT.exaggerationStep,
+        ),
       ),
     }),
   reset: (durationS) => set({ time: Math.min(get().time, durationS), playing: false }),

@@ -9,6 +9,7 @@ import {
   type FrameTypeId,
   type MaterialId,
 } from '@/config/engineeringAssumptions';
+import { readStoredContent } from '@/content/storage';
 
 /* =========================================================================
    Assumption catalogue
@@ -346,7 +347,7 @@ function motionRows(): AssumptionRow[] {
 /* ------------------------------------------------------------------- export */
 
 /** Every assumption the model uses, grouped and ready to render. */
-export const ASSUMPTIONS: readonly AssumptionRow[] = [
+export const BASE_ASSUMPTIONS: readonly AssumptionRow[] = [
   ...materialRows(),
   ...frameRows(),
   ...floorLoadRows(),
@@ -363,6 +364,15 @@ export const ASSUMPTION_GROUPS = [
   'Solver',
   'Ground motion',
 ] as const;
+
+const storedAssumptionReview = readStoredContent()?.assumptionReview;
+
+/** The catalogue the UI renders, with any admin review overrides applied. */
+export const ASSUMPTIONS: readonly AssumptionRow[] = BASE_ASSUMPTIONS.map((row) => ({
+  ...row,
+  placeholder: storedAssumptionReview?.placeholder[row.id] ?? row.placeholder,
+  note: storedAssumptionReview?.notes[row.id] ?? row.note,
+}));
 
 /** How many values are still waiting on an engineer. */
 export function placeholderCount(): number {

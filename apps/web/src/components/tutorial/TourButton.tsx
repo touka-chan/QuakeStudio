@@ -3,6 +3,7 @@ import { CircleHelp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { TOUR_UI } from '@/content/branding';
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { cn } from '@/lib/utils';
 import { useTourStore } from '@/store/tourStore';
@@ -271,6 +272,8 @@ export function TourButton() {
     start();
   }
 
+  if (!TOUR_UI.enabled) return null;
+
   return (
     <Tooltip>
       <TooltipTrigger asChild>
@@ -286,7 +289,7 @@ export function TourButton() {
            * the other controls in the corner — which is exactly what happened to
            * the feedback button here once already.
            */
-          aria-label="How to use"
+          aria-label={TOUR_UI.buttonLabel}
           aria-hidden={tourOpen || undefined}
           tabIndex={tourOpen ? -1 : undefined}
           className={cn(
@@ -308,9 +311,7 @@ export function TourButton() {
           <CircleHelp aria-hidden="true" className="size-6" />
         </Button>
       </TooltipTrigger>
-      <TooltipContent className="max-w-xs text-xs">
-        Walk through the five things you can do here. Drag it anywhere.
-      </TooltipContent>
+      <TooltipContent className="max-w-xs text-xs">{TOUR_UI.buttonTooltip}</TooltipContent>
     </Tooltip>
   );
 }

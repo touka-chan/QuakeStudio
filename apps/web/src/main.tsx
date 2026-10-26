@@ -25,6 +25,8 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
+import './config/hydrateEngineering';
+
 import App from './App';
 import { registerBackButton } from './pwa/backButton';
 import { registerServiceWorker } from './pwa/registerServiceWorker';

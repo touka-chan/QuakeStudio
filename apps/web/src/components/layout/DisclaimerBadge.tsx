@@ -1,6 +1,6 @@
 import { Building2 } from 'lucide-react';
 
-import { DISCLAIMER_SHORT } from '@/config/engineeringAssumptions';
+import { BRANDING } from '@/content/branding';
 
 /* =========================================================================
    Disclaimer badge — persistent, top bar, never dismissible.
@@ -17,7 +17,7 @@ export function DisclaimerBadge() {
       className="flex items-start gap-2 rounded-full bg-warning-bg px-3 py-1.5 text-xs text-warning-text sm:px-4"
     >
       <Building2 aria-hidden="true" className="mt-px size-3.5 shrink-0" />
-      <span className="leading-snug">{DISCLAIMER_SHORT}</span>
+      <span className="leading-snug">{BRANDING.disclaimerShort}</span>
     </p>
   );
 }

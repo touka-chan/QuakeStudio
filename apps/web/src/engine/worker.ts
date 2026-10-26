@@ -1,6 +1,6 @@
 /// <reference lib="webworker" />
 
-import { buildModel } from './buildingModel';
+import { applyEngineeringContent } from '@/config/engineeringAssumptions';
 import type { SolveRequest, SolveResponse } from './protocol';
 import { simulate } from './solver';
 
@@ -22,6 +22,7 @@ ctx.addEventListener('message', (event: MessageEvent<SolveRequest>) => {
   const started = performance.now();
 
   try {
+    applyEngineeringContent(request.engineering);
     const results = request.buildings.map((building) => simulate(building, request.motion));
     const response: SolveResponse = {
       id: request.id,
@@ -40,4 +41,4 @@ ctx.addEventListener('message', (event: MessageEvent<SolveRequest>) => {
   }
 });
 
-export { buildModel };
+export {}

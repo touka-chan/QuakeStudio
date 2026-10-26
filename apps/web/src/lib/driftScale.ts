@@ -1,3 +1,7 @@
+import { driftBandsSchema } from '@/content/schema';
+import { readStoredContent } from '@/content/storage';
+import type { DriftBandContent } from '@/content/types';
+
 /* =========================================================================
    Drift scale — the shared mapping from drift ratio to colour band.
    -------------------------------------------------------------------------
@@ -11,10 +15,12 @@
    Very high and never use the words safe or unsafe.
 
    The band boundaries are placeholder values pending engineering review —
-   see docs/assumptions.md.
+   see docs/assumptions.md. They are editable in the admin and are restored
+   after a reload so the chart, legend and 3D scene stay in step.
    ========================================================================= */
 
 export type DriftBand = {
+  readonly id: string;
   /** Upper bound of this band, as a fraction. Infinity for the last band. */
   readonly max: number;
   readonly label: string;
@@ -22,25 +28,69 @@ export type DriftBand = {
   readonly token: string;
   /** Short plain-language description, used in legends and tooltips. */
   readonly note: string;
+  readonly colorLight: string;
+  readonly colorDark: string;
 };
 
-export const DRIFT_BANDS: readonly DriftBand[] = [
-  { max: 0.001, label: 'Very small', token: '--drift-1', note: 'The floors stay close together.' },
-  { max: 0.002, label: 'Small', token: '--drift-2', note: 'A small gap opens between floors.' },
-  { max: 0.0035, label: 'Moderate', token: '--drift-3', note: 'The gap is easy to see.' },
+export const BASELINE_DRIFT_BANDS: readonly DriftBandContent[] = [
   {
+    id: 'drift-very-small',
+    max: 0.001,
+    label: 'Very small',
+    note: 'The floors stay close together.',
+    colorLight: '#bfdbfe',
+    colorDark: '#bfdbfe',
+  },
+  {
+    id: 'drift-small',
+    max: 0.002,
+    label: 'Small',
+    note: 'A small gap opens between floors.',
+    colorLight: '#86efac',
+    colorDark: '#86efac',
+  },
+  {
+    id: 'drift-moderate',
+    max: 0.0035,
+    label: 'Moderate',
+    note: 'The gap is easy to see.',
+    colorLight: '#fde047',
+    colorDark: '#fde047',
+  },
+  {
+    id: 'drift-large',
     max: 0.005,
     label: 'Large',
-    token: '--drift-4',
     note: 'Neighbouring floors move noticeably apart.',
+    colorLight: '#fb923c',
+    colorDark: '#fb923c',
   },
   {
-    max: Infinity,
+    id: 'drift-very-large',
+    max: null,
     label: 'Very large',
-    token: '--drift-5',
     note: 'The largest movement in this run.',
+    colorLight: '#ea580c',
+    colorDark: '#ea580c',
   },
 ];
+
+const saved = readStoredContent()?.driftBands;
+const parsed = driftBandsSchema.safeParse(saved);
+
+export const DRIFT_BAND_CONTENT: readonly DriftBandContent[] = parsed.success
+  ? parsed.data
+  : BASELINE_DRIFT_BANDS;
+
+export const DRIFT_BANDS: readonly DriftBand[] = DRIFT_BAND_CONTENT.map((band, index) => ({
+  id: band.id,
+  max: band.max ?? Infinity,
+  label: band.label,
+  token: `--drift-${index + 1}`,
+  note: band.note,
+  colorLight: band.colorLight,
+  colorDark: band.colorDark,
+}));
 
 /** Map a drift ratio (a fraction, e.g. 0.0034) onto its band. */
 export function driftBand(driftRatio: number): DriftBand {

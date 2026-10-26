@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
 import { ClipboardList, Download, Info, Save, Sun, Moon } from 'lucide-react';
 
+import { BrandMark } from '@/components/brand/BrandMark';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import { BRANDING, FEATURES } from '@/content/branding';
+import { t } from '@/content/copy';
 import { LazyFeedback } from '@/feedback/LazyFeedback';
 import { InstallButton } from '@/pwa/InstallButton';
 import { AssumptionsDialog } from './AssumptionsDialog';
@@ -85,13 +88,8 @@ export function TopBar({
   return (
     <header className="z-20 flex shrink-0 flex-wrap items-center gap-3 border-b border-line bg-surface px-3 py-2 sm:px-4">
       <div className="flex items-center gap-2">
-        <div
-          className="grid size-8 place-items-center rounded-app bg-primary text-primary-foreground"
-          aria-hidden="true"
-        >
-          <BuildingIcon />
-        </div>
-        <span className="text-lg font-semibold tracking-tight">QuakeStudio</span>
+        <BrandMark />
+        <span className="text-lg font-semibold tracking-tight">{BRANDING.appName}</span>
       </div>
 
       <div className="order-last w-full min-w-0 lg:order-none lg:mx-2 lg:w-auto lg:flex-1">
@@ -99,49 +97,55 @@ export function TopBar({
       </div>
 
       <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
-        <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+        {FEATURES.savedRunsEnabled ? (
+          <Dialog open={saveOpen} onOpenChange={setSaveOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" disabled={result.time.length === 0}>
+                    <Save aria-hidden="true" />
+                    <span className="hidden md:inline">{t('topbar.saveRun', undefined, 'Save run')}</span>
+                    <span className="md:hidden">{t('topbar.saveShort', undefined, 'Save')}</span>
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs">
+                {t('topbar.saveTooltip')}
+              </TooltipContent>
+            </Tooltip>
+
+            <SaveLoadDialog open={saveOpen} onOpenChange={setSaveOpen} />
+          </Dialog>
+        ) : null}
+
+        {FEATURES.csvExportEnabled ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button variant="outline" size="sm" disabled={result.time.length === 0}>
-                  <Save aria-hidden="true" />
-                  <span className="hidden md:inline">Save run</span>
-                  <span className="md:hidden">Save</span>
-                </Button>
-              </DialogTrigger>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportCsv}
+                disabled={result.time.length === 0}
+                aria-label="Export this run as a CSV file"
+              >
+                <Download aria-hidden="true" />
+                {/*
+                 * Same responsive shortening as Save and Assumptions.
+                 *
+                 * "Export CSV" is the widest label in the bar and was the
+                 * single biggest reason a 360px phone could not fit the row.
+                 */}
+                <span className="hidden md:inline">
+                  {t('topbar.exportCsv', undefined, 'Export CSV')}
+                </span>
+                <span className="md:hidden">{t('topbar.exportShort', undefined, 'Export')}</span>
+              </Button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-xs">
-              Saved in this browser. Export from the dialog to move runs elsewhere.
+              {t('topbar.exportTooltip')}
             </TooltipContent>
           </Tooltip>
-
-          <SaveLoadDialog open={saveOpen} onOpenChange={setSaveOpen} />
-        </Dialog>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={exportCsv}
-              disabled={result.time.length === 0}
-              aria-label="Export this run as a CSV file"
-            >
-              <Download aria-hidden="true" />
-              {/*
-               * Same responsive shortening as Save and Assumptions.
-               *
-               * "Export CSV" is the widest label in the bar and was the
-               * single biggest reason a 360px phone could not fit the row.
-               */}
-              <span className="hidden md:inline">Export CSV</span>
-              <span className="md:hidden">Export</span>
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs text-xs">
-            Writes the current run at full precision, in the same units shown on screen.
-          </TooltipContent>
-        </Tooltip>
+        ) : null}
 
         {/* Announces the result to assistive tech without shifting the toolbar
             with a toast. A FAILURE is announced too — a silent export is the
@@ -168,13 +172,15 @@ export function TopBar({
               <DialogTrigger asChild>
                 <Button variant="outline" size="sm">
                   <Info aria-hidden="true" />
-                  <span className="hidden md:inline">Assumptions</span>
-                  <span className="md:hidden">About</span>
+                  <span className="hidden md:inline">
+                    {t('topbar.assumptions', undefined, 'Assumptions')}
+                  </span>
+                  <span className="md:hidden">{t('topbar.assumptionsShort', undefined, 'About')}</span>
                 </Button>
               </DialogTrigger>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-xs">
-              What the model assumes, and what its results do not tell you.
+              {t('topbar.assumptionsTooltip')}
             </TooltipContent>
           </Tooltip>
 
@@ -186,35 +192,41 @@ export function TopBar({
             focus here on close. Driven by an onClick alone it did not, and a
             keyboard user dismissing the questionnaire was dropped onto <body>.
             See FeedbackDialog.tsx. */}
-        <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DialogTrigger asChild>
-                <Button variant="ghost" size="sm" aria-label="Usability feedback">
-                  <ClipboardList aria-hidden="true" />
-                  {/*
-                    The visible label is hidden below `lg` and this button has
-                    no short fallback, so without the aria-label it has NO
-                    accessible name on a phone or a tablet - a screen reader
-                    announces a bare "button" next to three others.
+        {FEATURES.feedbackEnabled ? (
+          <Dialog open={feedbackOpen} onOpenChange={setFeedbackOpen}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    aria-label={t('topbar.feedbackAria', undefined, 'Usability feedback')}
+                  >
+                    <ClipboardList aria-hidden="true" />
+                    {/*
+                      The visible label is hidden below `lg` and this button has
+                      no short fallback, so without the aria-label it has NO
+                      accessible name on a phone or a tablet - a screen reader
+                      announces a bare "button" next to three others.
 
-                    Found by the responsive audit timing out trying to click it:
-                    Playwright locates by accessible name, so a control with
-                    none of them is one this tool cannot even see.
-                  */}
-                  <span className="hidden lg:inline">Feedback</span>
-                </Button>
-              </DialogTrigger>
-            </TooltipTrigger>
-            <TooltipContent className="max-w-xs text-xs">
-              Ten usability questions. Answers stay in this browser until you export them.
-            </TooltipContent>
-          </Tooltip>
+                      Found by the responsive audit timing out trying to click it:
+                      Playwright locates by accessible name, so a control with
+                      none of them is one this tool cannot even see.
+                    */}
+                    <span className="hidden lg:inline">{t('topbar.feedback', undefined, 'Feedback')}</span>
+                  </Button>
+                </DialogTrigger>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-xs text-xs">
+                {t('topbar.feedbackTooltip')}
+              </TooltipContent>
+            </Tooltip>
 
-          <LazyFeedback />
-        </Dialog>
+            <LazyFeedback />
+          </Dialog>
+        ) : null}
 
-        <InstallButton />
+        {FEATURES.installPromptEnabled ? <InstallButton /> : null}
 
         <Separator orientation="vertical" className="hidden h-6 md:block" />
 
@@ -284,24 +296,4 @@ function ThemeToggle() {
   );
 }
 
-function BuildingIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="size-5" fill="none" aria-hidden="true">
-      <path
-        d="M4 20V7l5-3v16M9 20V4l5 3v13M14 20v-9l5-3v12M3 20h18"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M3 23c1.5-1 3-1 4.5 0s3 1 4.5 0 3-1 4.5 0 3 1 4.5 0"
-        stroke="currentColor"
-        strokeWidth="1.8"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
 
-export { DISCLAIMER_SHORT } from '@/config/engineeringAssumptions';

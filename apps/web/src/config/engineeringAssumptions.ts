@@ -22,6 +22,26 @@
  * exported as PLACEHOLDER_MARKER so tests can assert it is present.
  */
 
+// (engineering content validation lives in the content repository)
+// (engineering content validation lives in the content repository)
+import {
+  FRAME_TYPE_IDS,
+  GROUND_MOTION_PRESET_IDS,
+  MATERIAL_IDS,
+  OCCUPANCY_IDS,
+  type DefaultBuildingContent,
+  type DefaultGroundMotionContent,
+  type EngineeringContent,
+  type FrameTypeId,
+  type GroundMotionPresetId,
+  type MaterialId,
+  type OccupancyId,
+  type PlaybackSpeed,
+} from '@/content/types';
+
+export { FRAME_TYPE_IDS, GROUND_MOTION_PRESET_IDS, MATERIAL_IDS, OCCUPANCY_IDS };
+export type { FrameTypeId, GroundMotionPresetId, MaterialId, OccupancyId, PlaybackSpeed };
+
 /** The literal comment the spec requires next to every placeholder. */
 export const PLACEHOLDER_MARKER = '// PLACEHOLDER – needs engineer review';
 
@@ -38,8 +58,6 @@ export const GRAVITY_MS2 = 9.80665;
 // ===========================================================================
 // 1. MATERIALS
 // ===========================================================================
-
-export type MaterialId = 'concrete' | 'steel' | 'composite' | 'wood';
 
 export type MaterialAssumption = {
   /** Human label for the UI. */
@@ -109,8 +127,6 @@ export const MATERIALS: Record<MaterialId, MaterialAssumption> = {
 // 2. FRAME TYPES
 // ===========================================================================
 
-export type FrameTypeId = 'moment' | 'braced';
-
 export type FrameAssumption = {
   readonly label: string;
   /**
@@ -140,8 +156,7 @@ export const FRAME_TYPES: Record<FrameTypeId, FrameAssumption> = {
  * What a floor is used for. The use chooses the live-load preset; the user can
  * then edit the value, which is what `custom` records.
  */
-export const OCCUPANCY_IDS = ['office', 'residential', 'parking', 'storage', 'custom'] as const;
-export type Occupancy = (typeof OCCUPANCY_IDS)[number];
+export type Occupancy = OccupancyId;
 
 export type OccupancyAssumption = {
   readonly label: string;
@@ -163,7 +178,20 @@ export type OccupancyAssumption = {
  * The code basis is named because the adviser asked for it, not because this
  * file has been checked against the official code.
  */
-export const LOAD_ASSUMPTIONS = {
+type LoadAssumptionSet = {
+  codeBasis: string;
+  gravityMs2: number;
+  defaultDeadLoadKPa: number;
+  liveLoadParticipation: number;
+  minDeadLoadKPa: number;
+  maxDeadLoadKPa: number;
+  minLiveLoadKPa: number;
+  maxLiveLoadKPa: number;
+  occupancies: Record<Occupancy, OccupancyAssumption>;
+  sourceNote: string;
+};
+
+export const LOAD_ASSUMPTIONS: LoadAssumptionSet = {
   codeBasis: 'NSCP 2015 (Philippines), which follows ASCE 7 for earthquake provisions', // PLACEHOLDER – needs engineer review
   /** Standard gravity, used to turn a weight in kN into a mass in kg. */
   gravityMs2: GRAVITY_MS2,
@@ -208,17 +236,20 @@ export const LOAD_ASSUMPTIONS = {
    */
   sourceNote:
     'Values from published summaries of NSCP 2015 Table 205-1. Confirm against the official code.',
-} as const satisfies {
-  codeBasis: string;
-  gravityMs2: number;
-  defaultDeadLoadKPa: number;
-  liveLoadParticipation: number;
-  minDeadLoadKPa: number;
-  maxDeadLoadKPa: number;
-  minLiveLoadKPa: number;
-  maxLiveLoadKPa: number;
-  occupancies: Record<Occupancy, OccupancyAssumption>;
-  sourceNote: string;
+};
+
+/** Slab tints used by the 3D scene and floor chips. Editable in the admin. */
+export type OccupancyColors = {
+  colorLight: string;
+  colorDark: string;
+};
+
+export const OCCUPANCY_COLORS: Record<Occupancy, OccupancyColors> = {
+  office: { colorLight: '#dbeafe', colorDark: '#1e3a5f' },
+  residential: { colorLight: '#dcfce7', colorDark: '#14351f' },
+  parking: { colorLight: '#e2e8f0', colorDark: '#1e293b' },
+  storage: { colorLight: '#ebddc3', colorDark: '#3a2c14' },
+  custom: { colorLight: '#f1f5f9', colorDark: '#1f2937' },
 };
 
 /**
@@ -229,24 +260,39 @@ export const LOAD_ASSUMPTIONS = {
  * Wood framing is the one case in this set — heavy public uses on timber are
  * not typical construction, so Parking or Storage on a wood floor is flagged.
  */
-export const INCOMPATIBLE_USES = {
+export const INCOMPATIBLE_USES: Partial<Record<Occupancy, MaterialId[]>> = {
   parking: ['wood'],
   storage: ['wood'],
-} as const satisfies Partial<Record<Occupancy, readonly MaterialId[]>>;
+};
 
-export type IncompatibleUses = typeof INCOMPATIBLE_USES;
+export type IncompatibleUses = Partial<Record<Occupancy, readonly MaterialId[]>>;
 
 // ===========================================================================
 // 3. GEOMETRY & UI LIMITS
 // ===========================================================================
 
-export const GEOMETRY = {
+export type RangeAssumption = {
+  min: number;
+  max: number;
+  step: number;
+  default: number;
+};
+
+export type GeometryAssumption = {
+  minFloors: number;
+  maxFloors: number;
+  floorHeightM: RangeAssumption;
+  widthM: RangeAssumption;
+  depthM: RangeAssumption;
+};
+
+export const GEOMETRY: GeometryAssumption = {
   minFloors: 1, // PLACEHOLDER – needs engineer review
   maxFloors: 20, // PLACEHOLDER – needs engineer review
   floorHeightM: { min: 2.2, max: 5.0, step: 0.1, default: 3.0 },
   widthM: { min: 4, max: 40, step: 0.5, default: 14 },
   depthM: { min: 4, max: 40, step: 0.5, default: 10 },
-} as const;
+};
 
 // ===========================================================================
 // 4. SOLVER / NUMERICS
@@ -276,7 +322,18 @@ export const SOLVER = {
 // 5. GROUND MOTION
 // ===========================================================================
 
-export const GROUND_MOTION = {
+export type GroundMotionAssumption = {
+  pgaG: RangeAssumption;
+  frequencyHz: RangeAssumption;
+  gToMs2: number;
+  defaultSeed: number;
+  sampleDtS: number;
+  taperDurationS: number;
+  randomBandHz: { low: number; high: number };
+  impulseDurationS: number;
+};
+
+export const GROUND_MOTION: GroundMotionAssumption = {
   /** PGA range offered in the UI, in g. */
   pgaG: { min: 0.05, max: 0.6, step: 0.01, default: 0.3 },
   frequencyHz: { min: 0.2, max: 5.0, step: 0.1, default: 1.4 },
@@ -292,9 +349,7 @@ export const GROUND_MOTION = {
   randomBandHz: { low: 0.2, high: 4.0 },
   /** Impulse duration in seconds. */
   impulseDurationS: 0.15,
-} as const;
-
-export type GroundMotionPresetId = 'harmonic' | 'random' | 'impulse';
+};
 
 export const GROUND_MOTION_PRESETS: Record<
   GroundMotionPresetId,
@@ -319,17 +374,30 @@ export const GROUND_MOTION_PRESETS: Record<
 // 6. VIEWPORT
 // ===========================================================================
 
-export const VIEWPORT = {
+export type ViewportAssumption = {
+  defaultExaggeration: number;
+  minExaggeration: number;
+  maxExaggeration: number;
+  exaggerationStep: number;
+  defaultGridDivisions: number;
+  groundThicknessM: number;
+};
+
+export const VIEWPORT: ViewportAssumption = {
   defaultExaggeration: 20,
   minExaggeration: 1,
   maxExaggeration: 60,
   exaggerationStep: 1,
   defaultGridDivisions: 40,
   groundThicknessM: 0.6,
-} as const;
+};
 
-export const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2] as const;
-export type PlaybackSpeed = (typeof PLAYBACK_SPEEDS)[number];
+export let PLAYBACK_SPEEDS: readonly PlaybackSpeed[] = [0.25, 0.5, 1, 2];
+
+export const PLAYBACK_DEFAULTS: { defaultSpeed: PlaybackSpeed; defaultLoop: boolean } = {
+  defaultSpeed: 1,
+  defaultLoop: true,
+};
 
 // ===========================================================================
 // 7. STORAGE KEYS
@@ -385,7 +453,7 @@ export const STORAGE_KEYS = {
 // ===========================================================================
 
 /** Loads on first run, and is what the comparison "Copy from A" starts from. */
-export const DEFAULT_BUILDING = {
+export const DEFAULT_BUILDING: DefaultBuildingContent = {
   id: 'default-5-story-concrete',
   name: '5-story concrete frame',
   floors: 5,
@@ -394,14 +462,97 @@ export const DEFAULT_BUILDING = {
   depthM: GEOMETRY.depthM.default,
   material: 'concrete',
   frameType: 'moment',
-  dampingRatio: undefined, // falls back to the material's value
-} as const;
+};
 
-export const DEFAULT_GROUND_MOTION = {
+export const DEFAULT_GROUND_MOTION: DefaultGroundMotionContent = {
   preset: 'harmonic',
   pgaG: GROUND_MOTION.pgaG.default,
   frequencyHz: GROUND_MOTION.frequencyHz.default,
   durationS: SOLVER.defaultDurationS,
   dt: SOLVER.dtS,
   seed: GROUND_MOTION.defaultSeed,
-} as const;
+};
+
+/* =========================================================================
+   Saved content overlay
+   -------------------------------------------------------------------------
+   This runs when the module first loads, before any component or store reads
+   the exported objects. A saved document therefore changes the engine inputs,
+   labels and defaults on the next page load — without teaching every component
+   to subscribe to a second source of truth.
+
+   If the document is missing or invalid, every value stays exactly as compiled
+   above. The admin repository performs the full-document validation before it
+   writes, so this is a last line of defence rather than the main one.
+   ========================================================================= */
+
+export function applyEngineeringContent(content: EngineeringContent): void {
+  const value = content;
+
+  for (const id of MATERIAL_IDS) {
+    Object.assign(MATERIALS[id], value.materials[id]);
+  }
+  for (const id of FRAME_TYPE_IDS) {
+    Object.assign(FRAME_TYPES[id], value.frameTypes[id]);
+  }
+  for (const id of OCCUPANCY_IDS) {
+    Object.assign(LOAD_ASSUMPTIONS.occupancies[id], {
+      label: value.occupancies[id].label,
+      liveKPa: value.occupancies[id].liveKPa,
+      description: value.occupancies[id].description,
+    });
+    Object.assign(OCCUPANCY_COLORS[id], {
+      colorLight: value.occupancies[id].colorLight,
+      colorDark: value.occupancies[id].colorDark,
+    });
+  }
+
+  Object.assign(LOAD_ASSUMPTIONS, {
+    codeBasis: value.loadAssumptions.codeBasis,
+    gravityMs2: value.loadAssumptions.gravityMs2,
+    defaultDeadLoadKPa: value.loadAssumptions.defaultDeadLoadKPa,
+    liveLoadParticipation: value.loadAssumptions.liveLoadParticipation,
+    minDeadLoadKPa: value.loadAssumptions.minDeadLoadKPa,
+    maxDeadLoadKPa: value.loadAssumptions.maxDeadLoadKPa,
+    minLiveLoadKPa: value.loadAssumptions.minLiveLoadKPa,
+    maxLiveLoadKPa: value.loadAssumptions.maxLiveLoadKPa,
+    sourceNote: value.loadAssumptions.sourceNote,
+  });
+
+  for (const key of Object.keys(INCOMPATIBLE_USES) as Occupancy[]) {
+    delete INCOMPATIBLE_USES[key];
+  }
+  for (const [occupancy, materials] of Object.entries(value.incompatibleUses)) {
+    if (materials) INCOMPATIBLE_USES[occupancy as Occupancy] = [...materials];
+  }
+
+  Object.assign(GEOMETRY, {
+    minFloors: value.geometry.minFloors,
+    maxFloors: value.geometry.maxFloors,
+  });
+  Object.assign(GEOMETRY.floorHeightM, value.geometry.floorHeightM);
+  Object.assign(GEOMETRY.widthM, value.geometry.widthM);
+  Object.assign(GEOMETRY.depthM, value.geometry.depthM);
+
+  Object.assign(GROUND_MOTION.pgaG, value.groundMotion.pgaG);
+  Object.assign(GROUND_MOTION.frequencyHz, value.groundMotion.frequencyHz);
+  Object.assign(GROUND_MOTION.randomBandHz, value.groundMotion.randomBandHz);
+  Object.assign(GROUND_MOTION, {
+    defaultSeed: value.groundMotion.defaultSeed,
+    sampleDtS: value.groundMotion.sampleDtS,
+    taperDurationS: value.groundMotion.taperDurationS,
+    impulseDurationS: value.groundMotion.impulseDurationS,
+  });
+
+  Object.assign(VIEWPORT, value.viewport);
+
+  PLAYBACK_SPEEDS = [...value.playback.speeds];
+  PLAYBACK_DEFAULTS.defaultSpeed = value.playback.defaultSpeed;
+  PLAYBACK_DEFAULTS.defaultLoop = value.playback.defaultLoop;
+
+  Object.assign(DEFAULT_BUILDING, value.defaultBuilding);
+  Object.assign(DEFAULT_GROUND_MOTION, value.defaultGroundMotion);
+  for (const id of GROUND_MOTION_PRESET_IDS) {
+    Object.assign(GROUND_MOTION_PRESETS[id], value.groundMotionPresets[id]);
+  }
+}

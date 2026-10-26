@@ -17,7 +17,7 @@ cannot drift apart silently.
 
 | Chunk | Raw | Gzipped | When it loads |
 |---|---|---|---|
-| **Entry (`index-*.js`)** | 575 KB | **176 KB** | Immediately — the app shell |
+| **Entry (`index-*.js`)** | 533 KB | **157 KB** | Immediately - the app shell |
 | `Viewport3D-*.js` | 943 KB | 251 KB | On demand — Three.js and both viewports |
 | `Charts-*.js` | 380 KB | 109 KB | On demand — Recharts and the three charts |
 | `FeedbackDialog-*.js` | 16 KB | 6 KB | On demand — the usability questionnaire |
@@ -123,7 +123,7 @@ regression, not to police kilobytes.
 
 | Budget | Limit | Actual |
 |---|---|---|
-| Entry chunk, gzipped | 220 KB | 176 KB |
+| Entry chunk, gzipped | 220 KB | 157 KB |
 | Total JavaScript, gzipped | 620 KB | 528 KB |
 | Simulation worker, gzipped | 30 KB | 3 KB |
 | `Viewport3D`, `Charts` and `FeedbackDialog` must exist as separate chunks | — | ✅ |

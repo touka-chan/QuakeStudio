@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 
+import { FEATURES } from '@/content/branding';
+
 /* =========================================================================
    UI store — cross-panel view state
    -------------------------------------------------------------------------
@@ -38,7 +40,7 @@ export const useUiStore = create<UiState>((set) => ({
   setAssumptionsTab: (assumptionsTab) => set({ assumptionsTab }),
   openAssumptions: (tab = 'about') => set({ assumptionsOpen: true, assumptionsTab: tab }),
 
-  cutaway: false,
+  cutaway: FEATURES.defaultCutaway,
   setCutaway: (cutaway) => set({ cutaway }),
   toggleCutaway: () => set((state) => ({ cutaway: !state.cutaway })),
 }));

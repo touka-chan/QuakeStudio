@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { TOUR_UI } from '@/content/branding';
 
 /* =========================================================================
    Tour store
@@ -73,7 +74,7 @@ function tourSuppressed(): boolean {
  * this that decided them in two places is the lockout described above.
  */
 function initial(): { open: boolean; step: number; settled: boolean } {
-  const show = !tourSuppressed();
+  const show = TOUR_UI.enabled && !tourSuppressed();
   return { open: show, step: 0, settled: !show };
 }
 

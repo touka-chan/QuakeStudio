@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 
+import { FEATURES } from '@/content/branding';
 import { DEFAULT_BUILDING_CONFIG } from '@/config/templates';
 import { normalizeFloorLoads } from '@/config/floorLoads';
 import { MATERIAL_IDS, type BuildingConfig } from '@/types';
@@ -46,7 +47,10 @@ export const COMPARE_SIDES = ['A', 'B', 'C', 'D'] as const;
 export type CompareSide = (typeof COMPARE_SIDES)[number];
 
 /** The most buildings that can be in play at once. */
-export const MAX_BUILDINGS = COMPARE_SIDES.length;
+export const MAX_BUILDINGS = Math.min(
+  COMPARE_SIDES.length,
+  Math.max(2, Math.floor(FEATURES.maxBuildings)),
+);
 
 /**
  * Above this many, side by side lays out two per row rather than one long one.
@@ -56,7 +60,10 @@ export const MAX_BUILDINGS = COMPARE_SIDES.length;
  * is not a comparison. Exported because `layoutSideBySide` asks the same
  * question, and two answers to it is how they drift.
  */
-export const MAX_SIDE_BY_SIDE = 2;
+export const MAX_SIDE_BY_SIDE = Math.min(
+  MAX_BUILDINGS,
+  Math.max(1, Math.floor(FEATURES.maxSideBySide)),
+);
 
 /** Zero-based position of a side. A is 0. */
 export function sideIndex(side: CompareSide): number {
@@ -106,10 +113,10 @@ type CompareState = {
 
 export const useCompareStore = create<CompareState>((set) => ({
   count: 1,
-  view: 'sideBySide',
+  view: FEATURES.defaultCompareView,
   editing: 'B',
 
-  enable: () => set({ count: 2, editing: 'B' }),
+  enable: () => set({ count: Math.min(2, MAX_BUILDINGS), editing: 'B' }),
   disable: () => set({ count: 1, editing: 'A' }),
 
   addSide: () =>

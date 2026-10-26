@@ -1,13 +1,23 @@
+import { lazy, Suspense } from 'react';
+
+import { ContentEffects } from '@/components/content/ContentEffects';
 import { AppShell } from '@/components/layout/AppShell';
 
-/**
- * QuakeStudio — Phase 1 UI shell.
- *
- * The Phase 0 design-system proof page has been replaced by the real
- * three-zone workspace. Token utilities and their definitions are unchanged;
- * the proof page's content can be recovered from git history if it is ever
- * useful again.
- */
+const AdminApp = lazy(() => import('./admin/AdminApp'));
+
 export default function App() {
-  return <AppShell />;
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
+    return (
+      <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-background text-muted-foreground">Loading admin…</div>}>
+        <AdminApp />
+      </Suspense>
+    );
+  }
+
+  return (
+    <>
+      <ContentEffects />
+      <AppShell />
+    </>
+  );
 }

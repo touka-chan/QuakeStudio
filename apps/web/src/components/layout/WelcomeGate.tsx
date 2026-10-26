@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeftRight, Play, Waves } from 'lucide-react';
 
+import { BRANDING, WELCOME } from '@/content/branding';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DISCLAIMER_LONG, STORAGE_KEYS } from '@/config/engineeringAssumptions';
+import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 
 /* =========================================================================
    The welcome gate.
@@ -33,23 +34,11 @@ import { DISCLAIMER_LONG, STORAGE_KEYS } from '@/config/engineeringAssumptions';
    `blocked` below.
    ========================================================================= */
 
-const STEPS = [
-  {
-    icon: Play,
-    title: 'Build',
-    body: 'Pick a template or change the floors, size, material and frame type.',
-  },
-  {
-    icon: Waves,
-    title: 'Shake',
-    body: 'Choose how strong and how fast the ground moves, then press play.',
-  },
-  {
-    icon: ArrowLeftRight,
-    title: 'Compare',
-    body: 'Add a second building and see how the sway and the numbers differ.',
-  },
-] as const;
+const STEP_ICONS = {
+  play: Play,
+  waves: Waves,
+  compare: ArrowLeftRight,
+} as const;
 
 /**
  * Whether something has asked for the gate to stay out of the way.
@@ -101,7 +90,7 @@ export function WelcomeGate({
   const [suppressed] = useState(gateSuppressed);
   const [dismissed, setDismissed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const open = !suppressed && !dismissed && !blocked;
+  const open = WELCOME.enabled && !suppressed && !dismissed && !blocked;
 
   function start() {
     // Nothing is written down, on purpose. It closes for the rest of this
@@ -121,35 +110,34 @@ export function WelcomeGate({
             >
               <Play className="size-5" />
             </div>
-            <DialogTitle className="text-2xl">Welcome to QuakeStudio</DialogTitle>
+            <DialogTitle className="text-2xl">{WELCOME.title}</DialogTitle>
           </div>
-          <DialogDescription>
-            Build a simple building, shake it, and watch how it sways.
-          </DialogDescription>
+          <DialogDescription>{WELCOME.description}</DialogDescription>
         </DialogHeader>
 
         <ol className="grid gap-3 sm:grid-cols-3">
-          {STEPS.map((step, index) => (
-            <li key={step.title} className="rounded-card border border-line bg-surface-2 p-4">
-              <div className="mb-2 flex items-center gap-2">
-                <span
-                  className="grid size-6 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
-                  aria-hidden="true"
-                >
-                  {index + 1}
-                </span>
-                <step.icon aria-hidden="true" className="size-4 text-muted-foreground" />
-              </div>
-              <p className="font-semibold">{step.title}</p>
-              <p className="mt-1 text-sm text-muted-foreground">{step.body}</p>
-            </li>
-          ))}
+          {WELCOME.steps.map((step, index) => {
+            const Icon = STEP_ICONS[step.icon] ?? Play;
+            return (
+              <li key={step.id} className="rounded-card border border-line bg-surface-2 p-4">
+                <div className="mb-2 flex items-center gap-2">
+                  <span
+                    className="grid size-6 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground"
+                    aria-hidden="true"
+                  >
+                    {index + 1}
+                  </span>
+                  <Icon aria-hidden="true" className="size-4 text-muted-foreground" />
+                </div>
+                <p className="font-semibold">{step.title}</p>
+                <p className="mt-1 text-sm text-muted-foreground">{step.body}</p>
+              </li>
+            );
+          })}
         </ol>
 
         <p className="rounded-app border border-warning/40 bg-warning-bg px-4 py-3 text-sm text-warning-text">
-          {/* DISCLAIMER_LONG already opens with "This is a learning tool, not
-              a safety check." — restating it here duplicated the sentence. */}
-          {DISCLAIMER_LONG}
+          {BRANDING.disclaimerLong}
         </p>
 
         <label className="flex cursor-pointer items-start gap-2.5 text-sm">
@@ -160,7 +148,7 @@ export function WelcomeGate({
             }
             className="mt-0.5"
           />
-          <span>I understand that results are for learning only.</span>
+          <span>{WELCOME.acknowledgement}</span>
         </label>
 
         <DialogFooter>
@@ -179,17 +167,13 @@ export function WelcomeGate({
               onOpenAssumptions();
             }}
           >
-            Read the assumptions
+            {WELCOME.assumptionsLabel}
           </Button>
           <Button onClick={start} disabled={!acknowledged}>
-            Start exploring
+            {WELCOME.startLabel}
           </Button>
         </DialogFooter>
-        <p className="text-center text-xs text-muted-foreground">
-          Every coefficient in this tool is a placeholder waiting for review by a structural
-          engineer. The <span className="font-medium">Assumptions</span> button in the top bar lists
-          them all.
-        </p>
+        <p className="text-center text-xs text-muted-foreground">{WELCOME.footer}</p>
       </DialogContent>
     </Dialog>
   );

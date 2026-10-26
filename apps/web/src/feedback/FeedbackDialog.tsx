@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { downloadCsv } from '@/lib/csv';
 import { SUS_ITEMS, SUS_SCALE, type SusAnswers, type SusScaleValue } from './susItems';
+import { appendFeedback } from './feedbackStorage';
 import { aggregateSus, scoreSus, SUS_TARGET_SCORE } from './susScore';
 
 /* =========================================================================
@@ -91,6 +92,7 @@ export function FeedbackDialog() {
       participantId: participantId.trim() || undefined,
     };
     setSubmitted((previous) => [...previous, response]);
+    appendFeedback(response);
     setAnswers({});
     setComments('');
     setParticipantId('');
