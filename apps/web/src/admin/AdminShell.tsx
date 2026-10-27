@@ -119,10 +119,10 @@ export function AdminShell({
             )}
           </nav>
 
-          <div className="mt-4 flex flex-col gap-2 border-t border-line pt-4">
+          <div className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
             <a
               href="/"
-              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
             >
               <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
               Open simulator
@@ -130,11 +130,23 @@ export function AdminShell({
             <button
               type="button"
               onClick={onLogout}
-              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
             >
               <LogOut className="size-4 shrink-0" aria-hidden="true" />
               Sign out
             </button>
+          </div>
+
+          <div className="mt-3 border-t border-line pt-3">
+            <div className="flex items-center gap-2.5 px-2">
+              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/15 text-xs font-bold text-primary ring-1 ring-primary/20">
+                AD
+              </div>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium">Administrator</p>
+                <p className="truncate text-xs text-muted-foreground">admin@quakestudio.local</p>
+              </div>
+            </div>
           </div>
         </aside>
 
