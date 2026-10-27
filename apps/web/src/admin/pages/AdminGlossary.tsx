@@ -12,6 +12,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminGlossary() {
   const { content, update } = useAdminContent();
@@ -71,6 +72,7 @@ export function AdminGlossary() {
     }
   }
 
+  <AdminPageHeader title="Glossary" description="Admin content management." />
   return (
     <div>
       <div className="mb-4">

@@ -15,6 +15,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 const EMPTY_TEMPLATE = {
   id: '',
@@ -103,6 +104,7 @@ export function AdminTemplates() {
     }
   }
 
+  <AdminPageHeader title="Templates" description="Admin content management." />
   return (
     <div>
       <div className="mb-4">

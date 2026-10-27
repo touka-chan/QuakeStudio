@@ -11,6 +11,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminFeatures() {
   const { content, update, errors } = useAdminContent();
@@ -40,6 +41,7 @@ export function AdminFeatures() {
     setDraft({ ...draft, [key]: !draft[key] } as any);
   }
 
+  <AdminPageHeader title="Features" description="Admin content management." />
   return (
     <div>
       

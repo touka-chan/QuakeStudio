@@ -10,6 +10,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminReview() {
   const { content, update, errors } = useAdminContent();
@@ -41,6 +42,7 @@ export function AdminReview() {
     rows: ASSUMPTIONS.filter((row) => row.group === group),
   })).filter((group) => group.rows.length > 0);
 
+  <AdminPageHeader title="Assumptions review" description="Admin content management." />
   return (
     <div>
       

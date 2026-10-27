@@ -14,6 +14,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminTour() {
   const { content, update } = useAdminContent();
@@ -154,6 +155,7 @@ export function AdminTour() {
     }
   }
 
+  <AdminPageHeader title="Tour & welcome" description="Admin content management." />
   return (
     <div className="space-y-6">
       

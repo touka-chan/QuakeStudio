@@ -12,6 +12,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminDrift() {
   const { content, update } = useAdminContent();
@@ -68,6 +69,7 @@ export function AdminDrift() {
     setDeleteId(null);
   }
 
+  <AdminPageHeader title="Drift bands" description="Admin content management." />
   return (
     <div>
       

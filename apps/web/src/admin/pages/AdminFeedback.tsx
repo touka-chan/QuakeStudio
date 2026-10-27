@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { clearFeedback, readFeedback } from '@/feedback/feedbackStorage';
 import { downloadCsv } from '@/lib/csv';
 import { ConfirmDialog, SectionCard } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminFeedback() {
   const [responses, setResponses] = useState(() => readFeedback());
@@ -33,6 +34,7 @@ export function AdminFeedback() {
     ? Math.round((responses.reduce((sum, item) => sum + item.score, 0) / responses.length) * 10) / 10
     : 0;
 
+  <AdminPageHeader title="Feedback" description="Admin content management." />
   return (
     <div>
       

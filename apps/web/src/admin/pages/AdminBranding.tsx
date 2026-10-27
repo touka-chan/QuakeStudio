@@ -13,6 +13,7 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
+import { AdminPageHeader } from '../AdminForms';
 
 export function AdminBranding() {
   const { content, update, errors } = useAdminContent();
@@ -22,6 +23,7 @@ export function AdminBranding() {
   useEffect(() => setDraft(content.branding), [content.branding]);
 
   function issue(path: string) {
+  <AdminPageHeader title="Branding" description="Admin content management." />
     return (
       localErrors.find((item: any) => item.path === path)?.message ||
       errors.find((item) => item.path === path)?.message
