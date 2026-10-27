@@ -62,7 +62,7 @@ export function AdminShell({
             id="admin-section-picker"
             value={section}
             onChange={(event) => go(event.target.value)}
-            className="h-10 w-full rounded-app border border-line bg-surface px-3 text-sm"
+            className="h-10 w-full rounded-app border border-line bg-surface px-3 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {NAV.map((item) => (
               <option key={item.id} value={item.id}>
@@ -105,7 +105,7 @@ export function AdminShell({
                     type="button"
                     onClick={() => go(item.id)}
                     aria-current={active ? 'page' : undefined}
-                    className={`flex items-center gap-2 rounded-app px-3 py-2 text-left text-sm transition-colors ${
+                    className={`flex items-center gap-2 rounded-app px-3 py-2 text-left text-sm transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary ${
                       active
                         ? 'bg-primary text-primary-foreground'
                         : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground'
@@ -122,7 +122,7 @@ export function AdminShell({
           <div className="mt-auto flex flex-col gap-2 border-t border-line pt-4">
             <a
               href="/"
-              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <ExternalLink className="size-4 shrink-0" aria-hidden="true" />
               Open simulator
@@ -130,7 +130,7 @@ export function AdminShell({
             <button
               type="button"
               onClick={onLogout}
-              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors"
+              className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <LogOut className="size-4 shrink-0" aria-hidden="true" />
               Sign out
