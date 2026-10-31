@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { ASSUMPTION_GROUPS, ASSUMPTIONS, type AssumptionRow } from '@/config/assumptionCatalogue';
 import { assumptionReviewSchema } from '@/content/schema';
 import { useAdminContent } from '../AdminContext';
+import { showSaved } from '../adminToast';
 import {
   AdminTextarea,
   Field,
@@ -10,7 +11,6 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminReview() {
   const { content, update, errors } = useAdminContent();
@@ -35,6 +35,7 @@ export function AdminReview() {
     update((document) => {
       document.assumptionReview = parsed.data;
     });
+    showSaved();
   }
 
   const rowsByGroup = ASSUMPTION_GROUPS.map((group) => ({
@@ -42,7 +43,6 @@ export function AdminReview() {
     rows: ASSUMPTIONS.filter((row) => row.group === group),
   })).filter((group) => group.rows.length > 0);
 
-  <AdminPageHeader title="Assumptions review" description="Admin content management." />
   return (
     <div>
       

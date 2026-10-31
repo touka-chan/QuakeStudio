@@ -4,17 +4,17 @@ import { tourStepSchema, welcomeStepSchema } from '@/content/schema';
 import { contentId } from '@/content/types';
 import { TOUR_ICONS, TOUR_TARGETS, WELCOME_ICONS } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { swalConfirm } from '../adminSwal';
+import { showSaved, showDeleted } from '../adminToast';
 import {
   AdminInput,
   AdminSelect,
   AdminTextarea,
-  ConfirmDialog,
   Field,
   IssueList,
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminTour() {
   const { content, update } = useAdminContent();
@@ -35,8 +35,6 @@ export function AdminTour() {
   const [editingTourStep, setEditingTourStep] = useState<any>(null);
   const [editingWelcomeStep, setEditingWelcomeStep] = useState<any>(null);
   const [errors, setErrors] = useState<{ path: string; message: string }[]>([]);
-  const [deleteTourStep, setDeleteTourStep] = useState<string | null>(null);
-  const [deleteWelcomeStep, setDeleteWelcomeStep] = useState<string | null>(null);
 
   useEffect(() => {
     setTourForm({
@@ -62,6 +60,7 @@ export function AdminTour() {
         document.tour = { ...document.tour, ...tourForm };
       });
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'tour', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
@@ -74,6 +73,7 @@ export function AdminTour() {
         document.welcome = { ...document.welcome, ...welcomeForm };
       });
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'welcome', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
@@ -100,6 +100,7 @@ export function AdminTour() {
       }
       setEditingTourStep(null);
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'tour.steps', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
@@ -126,36 +127,48 @@ export function AdminTour() {
       }
       setEditingWelcomeStep(null);
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'welcome.steps', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
   }
 
-  function confirmDeleteTourStep() {
-    if (!deleteTourStep) return;
-    try {
-      update((document) => {
-        document.tour.steps = document.tour.steps.filter((step) => step.id !== deleteTourStep);
-      });
-      setDeleteTourStep(null);
-    } catch (error) {
-      setErrors([{ path: 'tour.steps', message: error instanceof Error ? error.message : 'Delete failed.' }]);
-    }
+  function deleteTourStep(stepId: string) {
+    swalConfirm({
+      title: 'Delete tour step',
+      text: 'This removes the step from the saved document.',
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        try {
+          update((document) => {
+            document.tour.steps = document.tour.steps.filter((step) => step.id !== stepId);
+          });
+          showDeleted('Tour step');
+        } catch (error) {
+          setErrors([{ path: 'tour.steps', message: error instanceof Error ? error.message : 'Delete failed.' }]);
+        }
+      },
+    });
   }
 
-  function confirmDeleteWelcomeStep() {
-    if (!deleteWelcomeStep) return;
-    try {
-      update((document) => {
-        document.welcome.steps = document.welcome.steps.filter((step) => step.id !== deleteWelcomeStep);
-      });
-      setDeleteWelcomeStep(null);
-    } catch (error) {
-      setErrors([{ path: 'welcome.steps', message: error instanceof Error ? error.message : 'Delete failed.' }]);
-    }
+  function deleteWelcomeStep(stepId: string) {
+    swalConfirm({
+      title: 'Delete welcome step',
+      text: 'This removes the step from the saved document.',
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        try {
+          update((document) => {
+            document.welcome.steps = document.welcome.steps.filter((step) => step.id !== stepId);
+          });
+          showDeleted('Welcome step');
+        } catch (error) {
+          setErrors([{ path: 'welcome.steps', message: error instanceof Error ? error.message : 'Delete failed.' }]);
+        }
+      },
+    });
   }
 
-  <AdminPageHeader title="Tour & welcome" description="Admin content management." />
   return (
     <div className="space-y-6">
       
@@ -186,7 +199,7 @@ export function AdminTour() {
                 <button type="button" onClick={() => { setEditingTourStep({ ...step }); setErrors([]); }} className="rounded-app border border-line px-3 py-1.5 text-sm">
                   Edit
                 </button>
-                <button type="button" onClick={() => setDeleteTourStep(step.id)} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
+                <button type="button" onClick={() => deleteTourStep(step.id)} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
                   Delete
                 </button>
               </div>
@@ -242,7 +255,7 @@ export function AdminTour() {
                 <button type="button" onClick={() => { setEditingWelcomeStep({ ...step }); setErrors([]); }} className="rounded-app border border-line px-3 py-1.5 text-sm">
                   Edit
                 </button>
-                <button type="button" onClick={() => setDeleteWelcomeStep(step.id)} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
+                <button type="button" onClick={() => deleteWelcomeStep(step.id)} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
                   Delete
                 </button>
               </div>
@@ -334,8 +347,6 @@ export function AdminTour() {
         </div>
       ) : null}
 
-      <ConfirmDialog open={Boolean(deleteTourStep)} title="Delete tour step" description="This removes the step from the saved document." onConfirm={confirmDeleteTourStep} onCancel={() => setDeleteTourStep(null)} />
-      <ConfirmDialog open={Boolean(deleteWelcomeStep)} title="Delete welcome step" description="This removes the step from the saved document." onConfirm={confirmDeleteWelcomeStep} onCancel={() => setDeleteWelcomeStep(null)} />
     </div>
   );
 }

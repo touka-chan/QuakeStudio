@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { brandingSchema } from '@/content/schema';
 import { LOGO_ICONS } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { showSaved } from '../adminToast';
 import {
   AdminInput,
   AdminSelect,
@@ -13,7 +14,6 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminBranding() {
   const { content, update, errors } = useAdminContent();
@@ -23,7 +23,6 @@ export function AdminBranding() {
   useEffect(() => setDraft(content.branding), [content.branding]);
 
   function issue(path: string) {
-  <AdminPageHeader title="Branding" description="Admin content management." />
     return (
       localErrors.find((item: any) => item.path === path)?.message ||
       errors.find((item) => item.path === path)?.message
@@ -41,6 +40,7 @@ export function AdminBranding() {
     update((document) => {
       document.branding = parsed.data;
     });
+    showSaved();
   }
 
   return (

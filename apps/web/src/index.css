@@ -268,3 +268,91 @@
 
 /* Keep the scrollbar gutter stable so admin navigation does not shift when page length changes. */
 html { scrollbar-gutter: stable; }
+
+/* =========================================================================
+   SweetAlert2 — QuakeStudio theme
+   -------------------------------------------------------------------------
+   SweetAlert2 injects its own stylesheet at runtime, after Tailwind, so its
+   `.swal2-*` selectors would otherwise win on source order. These rules are
+   scoped to the `.qs-swal` class the admin passes in and use the design
+   tokens, so confirmations follow the app in both light and dark mode.
+   ========================================================================= */
+.swal2-popup.qs-swal {
+  width: min(32rem, calc(100vw - 2rem));
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-sans);
+  box-shadow: 0 24px 64px -28px rgb(0 0 0 / 0.45);
+}
+
+.swal2-title.qs-swal-title {
+  padding: 0;
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.swal2-html-container.qs-swal-text {
+  margin: var(--space-3) 0 0;
+  color: var(--text-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.qs-swal-actions {
+  margin-top: var(--space-6);
+  gap: var(--space-2);
+}
+
+.qs-swal .qs-swal-confirm,
+.qs-swal .qs-swal-cancel {
+  margin: 0;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.4;
+  box-shadow: none;
+  transition: background-color 120ms ease, border-color 120ms ease;
+}
+
+.qs-swal .qs-swal-confirm:focus-visible,
+.qs-swal .qs-swal-cancel:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.qs-swal-confirm--danger {
+  background: var(--danger);
+  color: var(--bg);
+}
+
+.qs-swal-confirm--danger:hover {
+  background: color-mix(in srgb, var(--danger) 88%, var(--text));
+}
+
+.qs-swal-confirm--primary {
+  background: var(--primary);
+  color: var(--primary-fg);
+}
+
+.qs-swal-confirm--primary:hover {
+  background: color-mix(in srgb, var(--primary) 88%, var(--text));
+}
+
+.qs-swal-cancel {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.qs-swal-cancel:hover {
+  background: var(--surface-2);
+}

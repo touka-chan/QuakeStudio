@@ -4,6 +4,9 @@ import { useState } from 'react';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { useAdminContent } from './AdminContext';
 import { AdminDocumentTitle } from './AdminApp';
+import { Toaster } from './AdminToaster';
+import { AdminPageHeader } from './AdminForms';
+import { swalConfirm } from './adminSwal';
 import { AdminDashboard } from './pages/AdminDashboard';
 import { AdminBranding } from './pages/AdminBranding';
 import { AdminTemplates } from './pages/AdminTemplates';
@@ -39,7 +42,7 @@ export function AdminShell({
   navigate: (to: string) => void;
   onLogout: () => void;
 }) {
-  const { content, notice, clearNotice } = useAdminContent();
+  const { content } = useAdminContent();
   const section = (path.replace(/^\/admin\/?/, '').split('/')[0] || 'dashboard').toLowerCase();
   const current = SECTION_INFO[section] ?? SECTION_INFO.dashboard;
   const [search, setSearch] = useState('');
@@ -48,6 +51,16 @@ export function AdminShell({
   function go(id: string) {
     navigate(id === 'dashboard' ? '/admin' : `/admin/${id}`);
     window.scrollTo(0, 0);
+  }
+
+  function confirmLogout() {
+    swalConfirm({
+      title: 'Sign out of admin?',
+      text: 'You can sign back in with the demo credentials.',
+      confirmLabel: 'Sign out',
+      tone: 'primary',
+      onConfirm: onLogout,
+    });
   }
 
   return (
@@ -129,7 +142,7 @@ export function AdminShell({
             </a>
             <button
               type="button"
-              onClick={onLogout}
+              onClick={confirmLogout}
               className="flex items-center gap-2 rounded-app px-3 py-2 text-sm text-muted-foreground hover:bg-surface-2 hover:text-foreground transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
               <LogOut className="size-4 shrink-0" aria-hidden="true" />
@@ -151,19 +164,9 @@ export function AdminShell({
         </aside>
 
         <main className="min-w-0 flex-1">
-          {notice ? (
-            <div className="mb-4 flex items-center justify-between gap-3 rounded-app border border-primary/30 bg-primary/10 px-4 py-3 text-sm">
-              <span>{notice}</span>
-              <button type="button" onClick={clearNotice} className="text-muted-foreground hover:text-foreground">
-                Dismiss
-              </button>
-            </div>
-          ) : null}
+          <Toaster />
 
-          <header className="mb-6">
-            <h1 className="text-2xl font-semibold">{current.label}</h1>
-            <p className="mt-1 text-sm text-muted-foreground">{current.description}</p>
-          </header>
+          <AdminPageHeader title={current.label} description={current.description} />
 
           {renderPage(section)}
         </main>

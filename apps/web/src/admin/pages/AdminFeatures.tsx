@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 
 import { featuresSchema } from '@/content/schema';
 import { useAdminContent } from '../AdminContext';
+import { showSaved } from '../adminToast';
 import {
   AdminInput,
   AdminSelect,
@@ -11,7 +12,6 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminFeatures() {
   const { content, update, errors } = useAdminContent();
@@ -35,13 +35,13 @@ export function AdminFeatures() {
     update((document) => {
       document.features = parsed.data;
     });
+    showSaved();
   }
 
   function toggle(key: keyof typeof draft) {
     setDraft({ ...draft, [key]: !draft[key] } as any);
   }
 
-  <AdminPageHeader title="Features" description="Admin content management." />
   return (
     <div>
       

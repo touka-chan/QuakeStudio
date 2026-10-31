@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { engineeringContentSchema } from '@/content/schema';
 import { FRAME_TYPE_IDS, GROUND_MOTION_PRESET_IDS, MATERIAL_IDS, OCCUPANCY_IDS } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { showSaved } from '../adminToast';
 import {
   AdminInput,
   AdminSelect,
@@ -13,7 +14,6 @@ import {
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminEngineering() {
   const { content, update, errors } = useAdminContent();
@@ -54,9 +54,9 @@ export function AdminEngineering() {
     update((document) => {
       document.engineering = parsed.data;
     });
+    showSaved();
   }
 
-  <AdminPageHeader title="Engineering assumptions" description="Admin content management." />
   return (
     <div>
       

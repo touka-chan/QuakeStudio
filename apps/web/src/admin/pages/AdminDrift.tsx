@@ -3,23 +3,22 @@ import { useEffect, useState } from 'react';
 import { driftBandsSchema } from '@/content/schema';
 import { contentId } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { swalConfirm } from '../adminSwal';
+import { showSaved, showNotice } from '../adminToast';
 import {
   AdminInput,
   AdminTextarea,
-  ConfirmDialog,
   Field,
   IssueList,
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminDrift() {
   const { content, update } = useAdminContent();
   const [draft, setDraft] = useState(content.driftBands);
   const [editing, setEditing] = useState<any>(null);
   const [errors, setErrors] = useState<{ path: string; message: string }[]>([]);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => setDraft(content.driftBands), [content.driftBands]);
 
@@ -51,6 +50,7 @@ export function AdminDrift() {
         document.driftBands = parsed.data;
       });
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'driftBands', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
@@ -63,13 +63,6 @@ export function AdminDrift() {
     setEditing(null);
   }
 
-  function confirmDelete() {
-    if (!deleteId) return;
-    setDraft(draft.filter((band) => band.id !== deleteId));
-    setDeleteId(null);
-  }
-
-  <AdminPageHeader title="Drift bands" description="Admin content management." />
   return (
     <div>
       
@@ -92,7 +85,17 @@ export function AdminDrift() {
               </button>
               <button
                 type="button"
-                onClick={() => setDeleteId(band.id)}
+                onClick={() => {
+                  swalConfirm({
+                    title: 'Delete drift band',
+                    text: `Remove "${band.label}" from the saved document.`,
+                    confirmLabel: 'Delete',
+                    onConfirm: () => {
+                      setDraft(draft.filter((item) => item.id !== band.id));
+                      showNotice('Band removed from the draft. Save bands to apply.');
+                    },
+                  });
+                }}
                 disabled={index === draft.length - 1 || draft.length <= 2}
                 className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive disabled:opacity-50"
               >
@@ -140,7 +143,6 @@ export function AdminDrift() {
         </div>
       ) : null}
 
-      <ConfirmDialog open={Boolean(deleteId)} title="Delete drift band" description="This removes the band from the saved document." onConfirm={confirmDelete} onCancel={() => setDeleteId(null)} />
     </div>
   );
 }

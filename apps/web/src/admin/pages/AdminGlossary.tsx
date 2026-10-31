@@ -3,22 +3,21 @@ import { useState } from 'react';
 import { glossaryEntrySchema } from '@/content/schema';
 import { contentId, slugify } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { swalConfirm } from '../adminSwal';
+import { showSaved, showDeleted } from '../adminToast';
 import {
   AdminInput,
   AdminTextarea,
-  ConfirmDialog,
   Field,
   IssueList,
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 export function AdminGlossary() {
   const { content, update } = useAdminContent();
   const [editing, setEditing] = useState<{ id: string; term: string; definition: string } | null>(null);
   const [errors, setErrors] = useState<{ path: string; message: string }[]>([]);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
   const [search, setSearch] = useState('');
 
   const filtered = content.glossary.filter((entry) =>
@@ -55,24 +54,12 @@ export function AdminGlossary() {
       }
       setEditing(null);
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
   }
 
-  function confirmDelete() {
-    if (!deleteId) return;
-    try {
-      update((document) => {
-        document.glossary = document.glossary.filter((entry) => entry.id !== deleteId);
-      });
-      setDeleteId(null);
-    } catch (error) {
-      setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Delete failed.' }]);
-    }
-  }
-
-  <AdminPageHeader title="Glossary" description="Admin content management." />
   return (
     <div>
       <div className="mb-4">
@@ -98,7 +85,23 @@ export function AdminGlossary() {
               <button type="button" onClick={() => { setEditing({ ...entry }); setErrors([]); }} className="rounded-app border border-line px-3 py-1.5 text-sm">
                 Edit
               </button>
-              <button type="button" onClick={() => setDeleteId(entry.id)} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
+              <button type="button" onClick={() => {
+                swalConfirm({
+                  title: 'Delete glossary entry',
+                  text: `Remove "${entry.term}" from the saved document.`,
+                  confirmLabel: 'Delete',
+                  onConfirm: () => {
+                    try {
+                      update((document) => {
+                        document.glossary = document.glossary.filter((e) => e.id !== entry.id);
+                      });
+                      showDeleted('Glossary entry');
+                    } catch (error) {
+                      setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Delete failed.' }]);
+                    }
+                  },
+                });
+              }} className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive">
                 Delete
               </button>
             </div>
@@ -129,7 +132,6 @@ export function AdminGlossary() {
         </div>
       ) : null}
 
-      <ConfirmDialog open={Boolean(deleteId)} title="Delete glossary entry" description="This removes the term from the saved document." onConfirm={confirmDelete} onCancel={() => setDeleteId(null)} />
     </div>
   );
 }

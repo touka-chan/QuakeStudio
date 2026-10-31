@@ -2,12 +2,12 @@ import { useState } from 'react';
 
 import { clearFeedback, readFeedback } from '@/feedback/feedbackStorage';
 import { downloadCsv } from '@/lib/csv';
-import { ConfirmDialog, SectionCard } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
+import { swalAlert, swalConfirm } from '../adminSwal';
+import { showDeleted, showExported } from '../adminToast';
+import { SectionCard } from '../AdminForms';
 
 export function AdminFeedback() {
   const [responses, setResponses] = useState(() => readFeedback());
-  const [clearOpen, setClearOpen] = useState(false);
 
   function refresh() {
     setResponses(readFeedback());
@@ -21,20 +21,34 @@ export function AdminFeedback() {
       targetScore: 68,
       responses,
     };
-    downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2)).catch(() => undefined);
+    downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2))
+      .then(() => showExported(`Exported ${responses.length} response${responses.length === 1 ? '' : 's'}.`))
+      .catch((error: unknown) => {
+        swalAlert({
+          title: 'Export failed',
+          text: error instanceof Error ? error.message : 'The responses could not be exported.',
+          icon: 'error',
+        });
+      });
   }
 
   function confirmClear() {
-    clearFeedback();
-    setResponses([]);
-    setClearOpen(false);
+    swalConfirm({
+      title: 'Clear feedback',
+      text: 'This removes all saved SUS responses from this browser.',
+      confirmLabel: 'Clear all',
+      onConfirm: () => {
+        clearFeedback();
+        setResponses([]);
+        showDeleted('Feedback responses');
+      },
+    });
   }
 
   const average = responses.length
     ? Math.round((responses.reduce((sum, item) => sum + item.score, 0) / responses.length) * 10) / 10
     : 0;
 
-  <AdminPageHeader title="Feedback" description="Admin content management." />
   return (
     <div>
       
@@ -42,10 +56,20 @@ export function AdminFeedback() {
         <button type="button" onClick={refresh} className="rounded-app border border-line px-4 py-2 text-sm">
           Refresh
         </button>
-        <button type="button" onClick={exportResponses} className="rounded-app bg-primary px-4 py-2 text-sm font-medium text-primary-foreground">
+        <button
+          type="button"
+          onClick={exportResponses}
+          disabled={responses.length === 0}
+          className="rounded-app bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+        >
           Export responses
         </button>
-        <button type="button" onClick={() => setClearOpen(true)} className="rounded-app border border-destructive/30 px-4 py-2 text-sm text-destructive">
+        <button
+          type="button"
+          onClick={confirmClear}
+          disabled={responses.length === 0}
+          className="rounded-app border border-destructive/30 px-4 py-2 text-sm text-destructive disabled:opacity-50"
+        >
           Clear all
         </button>
       </div>
@@ -72,14 +96,6 @@ export function AdminFeedback() {
           </SectionCard>
         ) : null}
       </div>
-
-      <ConfirmDialog
-        open={clearOpen}
-        title="Clear feedback"
-        description="This removes all saved SUS responses from this browser."
-        onConfirm={confirmClear}
-        onCancel={() => setClearOpen(false)}
-      />
     </div>
   );
 }

@@ -5,17 +5,17 @@ import { templateContentSchema } from '@/content/schema';
 import { contentId } from '@/content/types';
 import { MATERIAL_IDS, FRAME_TYPE_IDS } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
+import { swalConfirm } from '../adminSwal';
+import { showSaved, showDeleted } from '../adminToast';
 import {
   AdminInput,
   AdminSelect,
   AdminTextarea,
-  ConfirmDialog,
   Field,
   IssueList,
   SaveButton,
   SectionCard,
 } from '../AdminForms';
-import { AdminPageHeader } from '../AdminForms';
 
 const EMPTY_TEMPLATE = {
   id: '',
@@ -37,7 +37,6 @@ export function AdminTemplates() {
   const { content, update } = useAdminContent();
   const [editing, setEditing] = useState<TemplateDraft | null>(null);
   const [errors, setErrors] = useState<{ path: string; message: string }[]>([]);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!editing) return;
@@ -87,24 +86,12 @@ export function AdminTemplates() {
       }
       setEditing(null);
       setErrors([]);
+      showSaved();
     } catch (error) {
       setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Save failed.' }]);
     }
   }
 
-  function confirmDelete() {
-    if (!deleteId) return;
-    try {
-      update((document) => {
-        document.templates = document.templates.filter((item) => item.id !== deleteId);
-      });
-      setDeleteId(null);
-    } catch (error) {
-      setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Delete failed.' }]);
-    }
-  }
-
-  <AdminPageHeader title="Templates" description="Admin content management." />
   return (
     <div>
       <div className="mb-4">
@@ -132,6 +119,7 @@ export function AdminTemplates() {
                 update((document) => {
                   document.defaultTemplateId = event.target.value;
                 });
+                showSaved();
               } catch (error) {
                 setErrors([{ path: 'defaultTemplateId', message: error instanceof Error ? error.message : 'Update failed.' }]);
               }
@@ -167,7 +155,29 @@ export function AdminTemplates() {
               </button>
               <button
                 type="button"
-                onClick={() => setDeleteId(template.id)}
+                onClick={() => {
+                  const target = content.templates.find((t) => t.id === template.id);
+                  swalConfirm({
+                    title: 'Delete template',
+                    text: target ? `Remove "${target.label}" from the saved document.` : 'This removes the template from the saved document.',
+                    confirmLabel: 'Delete',
+                    onConfirm: () => {
+                      try {
+                        update((document) => {
+                          document.templates = document.templates.filter((item) => item.id !== template.id);
+                        });
+                        showDeleted('Template');
+                      } catch (error) {
+                        setErrors([
+                          {
+                            path: 'document',
+                            message: error instanceof Error ? error.message : 'Delete failed.',
+                          },
+                        ]);
+                      }
+                    },
+                  });
+                }}
                 className="rounded-app border border-destructive/30 px-3 py-1.5 text-sm text-destructive"
                 disabled={template.id === 'custom' || template.id === content.defaultTemplateId}
               >
@@ -231,13 +241,6 @@ export function AdminTemplates() {
         </div>
       ) : null}
 
-      <ConfirmDialog
-        open={Boolean(deleteId)}
-        title="Delete template"
-        description="This removes the template from the saved document."
-        onConfirm={confirmDelete}
-        onCancel={() => setDeleteId(null)}
-      />
     </div>
   );
 }

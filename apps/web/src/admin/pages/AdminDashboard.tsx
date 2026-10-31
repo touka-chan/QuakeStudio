@@ -1,5 +1,5 @@
 import { useAdminContent } from '../AdminContext';
-import { SectionCard, AdminPageHeader } from '../AdminForms';
+import { SectionCard } from '../AdminForms';
 
 export function AdminDashboard() {
   const { content } = useAdminContent();
@@ -14,7 +14,6 @@ export function AdminDashboard() {
 
   return (
     <div>
-      <AdminPageHeader title="Dashboard" description="Overview of stored content and system status." />
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {cards.map((card) => (
           <SectionCard key={card.label} title={card.label} description={`${card.value} items`}>
