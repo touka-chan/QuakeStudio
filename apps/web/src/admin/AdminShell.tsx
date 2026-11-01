@@ -247,16 +247,7 @@ export function AdminShell({
     <div className="min-h-dvh bg-background text-foreground">
       <AdminDocumentTitle />
 
-      <AdminTopBar
-        draftCount={draftCount}
-        searchValue={search}
-        searchPlaceholder="Search admin sections..."
-        onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)}
-        onPublish={publishChanges}
-        onPreview={() => navigate('/')}
-        onMenu={() => setMobileOpen(true)}
-      />
-
+      {/* Mobile drawer overlay */}
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <button
@@ -321,9 +312,10 @@ export function AdminShell({
         </div>
       ) : null}
 
-      <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 p-4 lg:flex-row lg:items-start lg:p-6">
-        <aside className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-card border border-line bg-surface lg:sticky lg:top-[5.5rem] lg:flex lg:h-[calc(100dvh-7rem)]">
-          <div className="flex items-center gap-3 px-4 pb-4 pt-4">
+      <div className="flex h-full lg:h-auto">
+        {/* Sidebar — always visible on desktop */}
+        <aside className="hidden lg:flex flex-col h-full w-64 shrink-0 bg-surface border-r border-line">
+          <div className="flex items-center gap-3 px-4 pb-4 pt-4 border-b border-line">
             <BrandMark className="size-9" iconClassName="size-[18px]" />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold leading-5">{content.branding.appName}</p>
@@ -342,14 +334,11 @@ export function AdminShell({
             />
           </div>
 
-          <nav
-            className="min-h-0 flex-1 overflow-y-auto px-2 pb-3 [scrollbar-width:thin]"
-            aria-label="Admin sections"
-          >
+          <nav className="flex-1 overflow-y-auto px-2 pb-3" aria-label="Admin sections">
             {nav}
           </nav>
 
-          <div className="border-t border-line p-2">
+          <div className="border-t border-line p-2 shrink-0">
             <a href="/" className={adminButtonClass('ghost', 'md', 'w-full justify-start')}>
               <ExternalLink className="size-4" aria-hidden="true" />
               Open simulator
@@ -366,20 +355,32 @@ export function AdminShell({
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">
-          <Toaster />
-          <AdminPageHeader
-            title={current.label}
-            description={current.description}
-            eyebrow={current.group}
-            actions={
-              <div className="hidden lg:block">
-                <AdminThemeToggle />
-              </div>
-            }
+        {/* Main content area — full width to the right of sidebar */}
+        <div className="flex-1 flex flex-col min-w-0 relative">
+          <AdminTopBar
+            draftCount={draftCount}
+            searchValue={search}
+            searchPlaceholder="Search settings, text, glossary..."
+            onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)}
+            onPublish={publishChanges}
+            onPreview={() => navigate('/')}
           />
-          {renderPage(section, go)}
-        </main>
+
+          <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+            <Toaster />
+            <AdminPageHeader
+              title={current.label}
+              description={current.description}
+              eyebrow={current.group}
+              actions={
+                <div className="hidden lg:block">
+                  <AdminThemeToggle />
+                </div>
+              }
+            />
+            {renderPage(section, go, draftCount)}
+          </main>
+        </div>
       </div>
     </div>
   );
@@ -465,7 +466,7 @@ function AccountRow() {
   );
 }
 
-function renderPage(section: string, go: (id: string) => void) {
+function renderPage(section: string, go: (id: string) => void, draftCount: number) {
   switch (section) {
     case 'branding':
       return <AdminBranding />;
@@ -486,6 +487,6 @@ function renderPage(section: string, go: (id: string) => void) {
     case 'review':
       return <AdminReview />;
     default:
-      return <AdminDashboard onNavigate={go} />;
+      return <AdminDashboard onNavigate={go} draftCount={draftCount} />;
   }
 }

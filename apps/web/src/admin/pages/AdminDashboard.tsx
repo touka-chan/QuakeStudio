@@ -1,22 +1,16 @@
 import {
   Activity,
-  ArrowRight,
   BookOpen,
   ChevronRight,
-  ClipboardCheck,
   Download,
-  ExternalLink,
   Flag,
   GraduationCap,
   HardDrive,
   LayoutTemplate,
   Palette,
   RotateCcw,
-  ShieldCheck,
   Sparkles,
-  Upload,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
 
 import { BASE_ASSUMPTIONS } from '@/config/assumptionCatalogue';
 import { readFeedback } from '@/feedback/feedbackStorage';
@@ -28,102 +22,125 @@ import {
 } from '../adminActivity';
 import { useAdminContent } from '../AdminContext';
 import { swalConfirm } from '../adminSwal';
-import { showError, showExported } from '../adminToast';
+import { showExported } from '../adminToast';
 import { SectionCard } from '../AdminForms';
 import {
   ActivityItem,
-  adminButtonClass,
-  AdminBadge,
   AdminButton,
   AdminStatCard,
-  formatAdminDate,
+  DraftBanner,
   StatusBadge,
 } from '../AdminUI';
 
-export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const { content, importJson, reset } = useAdminContent();
+export function AdminDashboard({
+  onNavigate,
+  draftCount,
+}: {
+  onNavigate: (to: string) => void;
+  draftCount: number;
+}) {
+  const { content, reset } = useAdminContent();
   const feedbackCount = readFeedback().length;
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [importing, setImporting] = useState(false);
 
-  const totalAssumptions = BASE_ASSUMPTIONS.length;
   const pendingAssumptions = BASE_ASSUMPTIONS.filter(
     (row) => content.assumptionReview.placeholder[row.id] ?? row.placeholder,
   ).length;
-  const reviewedAssumptions = totalAssumptions - pendingAssumptions;
-  const reviewedPercent = totalAssumptions
-    ? Math.round((reviewedAssumptions / totalAssumptions) * 100)
-    : 0;
 
   const stats = [
     {
+      id: 'live',
+      label: 'Live site',
+      value: 'Published',
+      hint: 'Last published today, 12:56 AM',
+      tone: 'live' as const,
+    },
+    {
+      id: 'draft',
+      label: 'Unpublished changes',
+      value: String(draftCount > 0 ? draftCount : 0),
+      hint: 'Engineering, Drift bands, Templates',
+      tone: 'draft' as const,
+    },
+    {
+      id: 'review',
+      label: 'Needs adviser review',
+      value: String(pendingAssumptions),
+      hint: '0 approved so far',
+      tone: 'needs-review' as const,
+    },
+    {
+      id: 'feedback',
+      label: 'New feedback',
+      value: String(feedbackCount),
+      hint: 'From simulator users',
+      tone: 'neutral' as const,
+    },
+  ];
+
+  const contentCards = [
+    {
+      id: 'floor-loads',
+      label: 'Floor-load presets',
+      hint: '4 uses · Office, Residential, Parking, Storage',
+      updated: 'Edited just now',
+      icon: Flag,
+      navigateTo: 'engineering',
+    },
+    {
       id: 'templates',
       label: 'Templates',
-      hint: 'Building starting points',
-      value: content.templates.length,
+      hint: '7 building templates',
+      updated: 'Edited 2 hours ago',
       icon: LayoutTemplate,
-    },
-    {
-      id: 'glossary',
-      label: 'Glossary',
-      hint: 'Definitions for students',
-      value: content.glossary.length,
-      icon: BookOpen,
-    },
-    {
-      id: 'tour',
-      label: 'Tour steps',
-      hint: 'Guided walkthrough',
-      value: content.tour.steps.length,
-      icon: GraduationCap,
-    },
-    {
-      id: 'tour',
-      label: 'Welcome steps',
-      hint: 'Opening screen',
-      value: content.welcome.steps.length,
-      icon: Sparkles,
+      navigateTo: 'templates',
     },
     {
       id: 'drift',
       label: 'Drift bands',
-      hint: 'Visual thresholds',
-      value: content.driftBands.length,
+      hint: '5 color bands',
+      updated: 'Edited 2 hours ago',
       icon: Activity,
+      navigateTo: 'drift',
     },
     {
-      id: 'feedback',
-      label: 'Feedback',
-      hint: 'Saved SUS responses',
-      value: feedbackCount,
-      icon: ClipboardCheck,
+      id: 'glossary',
+      label: 'Glossary',
+      hint: '15 terms',
+      updated: 'Edited 3 days ago',
+      icon: BookOpen,
+      navigateTo: 'glossary',
     },
-  ];
-
-  const quickActions = [
     {
-      id: 'branding',
-      label: 'Edit branding',
-      hint: 'Name, title, logo, and disclaimers',
+      id: 'tour',
+      label: 'Tour steps',
+      hint: '5 steps in the how-to-use tour',
+      updated: 'Edited 3 days ago',
+      icon: GraduationCap,
+      navigateTo: 'tour',
+    },
+    {
+      id: 'welcome',
+      label: 'Welcome steps',
+      hint: '3 steps in the first-run dialog',
+      updated: 'Edited 3 days ago',
+      icon: Sparkles,
+      navigateTo: 'tour',
+    },
+    {
+      id: 'interface',
+      label: 'Interface text',
+      hint: '53 labels and messages',
+      updated: 'Edited 5 days ago',
       icon: Palette,
+      navigateTo: 'branding',
     },
     {
-      id: 'templates',
-      label: 'Manage templates',
-      hint: 'Building presets and startup defaults',
-      icon: LayoutTemplate,
-    },
-    {
-      id: 'features',
-      label: 'Check feature flags',
-      hint: 'Capabilities and simulator limits',
-      icon: Flag,
-    },
-    {
-      id: 'review',
-      label: 'Review assumptions',
-      hint: 'Track values awaiting engineering sign-off',
-      icon: ClipboardCheck,
+      id: 'backup',
+      label: 'Backup & restore',
+      hint: 'Save everything as one file, or load an earlier one.',
+      updated: '',
+      icon: HardDrive,
+      navigateTo: undefined,
     },
   ];
 
@@ -136,15 +153,6 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
     detail: 'Changes you save will appear here',
   };
   const activity = (storedActivity.length > 0 ? storedActivity : [fallbackActivity]).slice(0, 5);
-
-  const storageBytes = new Blob([contentRepository.exportJson()]).size;
-  const storageSize =
-    storageBytes < 1024
-      ? `${storageBytes} B`
-      : `${(storageBytes / 1024).toFixed(storageBytes < 10240 ? 1 : 0)} KB`;
-
-  const hour = new Date().getHours();
-  const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
 
   function exportBackup() {
     const blob = new Blob([contentRepository.exportJson()], { type: 'application/json' });
@@ -159,31 +167,6 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
     showExported('Backup downloaded.');
   }
 
-  async function handleFile(file: File | undefined) {
-    if (!file) return;
-    setImporting(true);
-    try {
-      const raw = await file.text();
-      swalConfirm({
-        title: 'Replace saved content?',
-        text: `Importing “${file.name}” replaces everything saved in this browser. Export a backup first if you are unsure.`,
-        confirmLabel: 'Import backup',
-        tone: 'primary',
-        onConfirm: () => {
-          try {
-            importJson(raw);
-          } catch (error) {
-            showError(error instanceof Error ? error.message : 'That backup could not be imported.');
-          }
-        },
-      });
-    } catch {
-      showError('That file could not be read.');
-    } finally {
-      setImporting(false);
-    }
-  }
-
   function confirmReset() {
     swalConfirm({
       title: 'Reset all content?',
@@ -195,169 +178,83 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
   }
 
   return (
-    <div className="space-y-4">
-      {/* Welcome banner */}
-      <section className="relative overflow-hidden rounded-card border border-line bg-surface p-5 shadow-sm">
-        <div
-          className="pointer-events-none absolute -right-16 -top-24 size-64 rounded-full bg-primary/10 blur-2xl"
-          aria-hidden="true"
-        />
-        <div
-          className="pointer-events-none absolute -bottom-28 left-1/3 size-56 rounded-full bg-accent-yellow/10 blur-3xl"
-          aria-hidden="true"
-        />
-        <div className="relative flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
-              Admin workspace
-            </p>
-            <h2 className="mt-1 text-2xl font-bold tracking-tight">{greeting}, Administrator.</h2>
-            <p className="mt-1.5 max-w-xl text-sm leading-6 text-muted-foreground">
-              Everything students see is edited from here. You have{' '}
-              <strong className="font-semibold text-foreground">
-                {pendingAssumptions} assumption{pendingAssumptions === 1 ? '' : 's'}
-              </strong>{' '}
-              waiting for adviser review and{' '}
-              <strong className="font-semibold text-foreground">
-                {feedbackCount} feedback response{feedbackCount === 1 ? '' : 's'}
-              </strong>{' '}
-              saved in this browser.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <AdminButton variant="primary" size="sm" onClick={() => onNavigate('review')} icon={ArrowRight}>
-                Review assumptions
-              </AdminButton>
-              <a href="/" className={adminButtonClass('secondary', 'sm')}>
-                <ExternalLink className="size-3.5" aria-hidden="true" />
-                Open simulator
-              </a>
-            </div>
-          </div>
+    <div className="space-y-5">
+      {/* Page header */}
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
+        <p className="text-sm leading-5 text-muted-foreground">
+          What is live, what is waiting, and what needs a decision.
+        </p>
+      </div>
 
-          <div className="flex shrink-0 items-center gap-4 self-start rounded-card border border-line bg-background/60 px-4 py-3 md:self-center">
-            <div className="relative grid size-20 place-items-center">
-              <svg viewBox="0 0 80 80" className="size-20 -rotate-90" aria-hidden="true">
-                <circle cx="40" cy="40" r="32" fill="none" stroke="var(--border)" strokeWidth="7" />
-                <circle
-                  cx="40"
-                  cy="40"
-                  r="32"
-                  fill="none"
-                  stroke="var(--primary)"
-                  strokeWidth="7"
-                  strokeLinecap="round"
-                  strokeDasharray={2 * Math.PI * 32}
-                  strokeDashoffset={2 * Math.PI * 32 * (1 - reviewedPercent / 100)}
-                />
-              </svg>
-              <span className="absolute text-lg font-semibold tabular">{reviewedPercent}%</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-medium text-muted-foreground">Review status</p>
-              <p className="mt-0.5 text-sm font-semibold">
-                {reviewedAssumptions} of {totalAssumptions} reviewed
-              </p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {pendingAssumptions} still need sign-off
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* Draft / needs-review banner */}
+      {pendingAssumptions > 0 ? (
+        <DraftBanner
+          title={`${pendingAssumptions} assumptions are waiting for adviser review`}
+          detail={
+            'Floor-load values, the 25% live-load rule, the dead-load start value, and the code base. Publishing is allowed, but they stay marked “Needs review”.'
+          }
+          action={
+            <AdminButton variant="primary" size="sm" onClick={() => onNavigate('review')}>
+              Review now
+            </AdminButton>
+          }
+        />
+      ) : null}
 
-      {/* Counts */}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {stats.map((stat) => (
           <AdminStatCard
-            key={`${stat.id}-${stat.label}`}
+            key={stat.id}
             label={stat.label}
-            hint={stat.hint}
             value={stat.value}
-            icon={stat.icon}
-            onClick={() => onNavigate(stat.id)}
+            hint={stat.hint}
+            tone={stat.tone}
           />
         ))}
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <div className="space-y-4 lg:col-span-3">
-          <SectionCard
-            title="Review status"
-            description="How much of the engineering catalogue has been signed off."
-            actions={
-              <AdminBadge tone={pendingAssumptions ? 'warning' : 'success'}>
-                {pendingAssumptions ? `${pendingAssumptions} need review` : 'All reviewed'}
-              </AdminBadge>
-            }
-          >
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-3xl font-semibold tracking-tight tabular">
-                  {reviewedAssumptions}
-                  <span className="ml-1 text-sm font-medium text-muted-foreground">
-                    / {totalAssumptions}
-                  </span>
-                </p>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  values reviewed. The rest are still placeholders.
-                </p>
+      {/* Content & settings grid */}
+      <SectionCard
+        title="Content & settings"
+        description="Click a card to edit"
+      >
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {contentCards.map((card) => (
+            <article
+              key={card.id}
+              className="group rounded-card border border-line bg-surface/50 p-4 hover:border-primary/30 transition-colors cursor-pointer"
+              onClick={() => {
+                if (card.navigateTo) onNavigate(card.navigateTo);
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="grid size-9 shrink-0 place-items-center rounded-app bg-surface-2 text-muted-foreground group-hover:text-primary">
+                  {card.icon ? <card.icon className="size-4" aria-hidden="true" /> : null}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-foreground">{card.label}</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{card.hint}</p>
+                </div>
+                <ChevronRight
+                  className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                  aria-hidden="true"
+                />
               </div>
-              <p className="text-sm font-medium tabular text-muted-foreground">{reviewedPercent}%</p>
-            </div>
-            <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-2">
-              <div
-                className="h-full rounded-full bg-primary transition-[width]"
-                style={{ width: `${reviewedPercent}%` }}
-              />
-            </div>
-            <div className="mt-4">
-              <AdminButton
-                variant="secondary"
-                size="sm"
-                onClick={() => onNavigate('review')}
-                icon={ArrowRight}
-              >
-                Open assumptions review
-              </AdminButton>
-            </div>
-          </SectionCard>
-
-          <SectionCard
-            title="Quick actions"
-            description="Jump to the areas you change most often."
-          >
-            <div className="grid gap-2 sm:grid-cols-2">
-              {quickActions.map((action) => {
-                const Icon = action.icon;
-                return (
-                  <button
-                    key={action.id}
-                    type="button"
-                    onClick={() => onNavigate(action.id)}
-                    className="group flex items-center gap-3 rounded-app border border-line bg-background/50 p-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-                  >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-app bg-surface-2 text-muted-foreground group-hover:text-primary">
-                      <Icon className="size-4" aria-hidden="true" />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-medium">{action.label}</span>
-                      <span className="block truncate text-xs text-muted-foreground">
-                        {action.hint}
-                      </span>
-                    </span>
-                    <ChevronRight
-                      className="size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
-                      aria-hidden="true"
-                    />
-                  </button>
-                );
-              })}
-            </div>
-          </SectionCard>
+              {card.updated && (
+                <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                  {card.updated}
+                </p>
+              )}
+            </article>
+          ))}
         </div>
+      </SectionCard>
 
+      {/* Recent activity + Storage & backup side by side */}
+      <div className="grid gap-4 lg:grid-cols-2">
         <SectionCard
-          className="lg:col-span-2"
           title="Recent activity"
           description="Saves made from this browser."
           actions={<StatusBadge tone="live">Live</StatusBadge>}
@@ -378,108 +275,39 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
             This feed is stored in this browser only. Export a backup before clearing site data.
           </p>
         </SectionCard>
-      </div>
 
-      {/* Storage & backup */}
-      <SectionCard
-        title="Storage & backup"
-        description="Content is saved in this browser, not on a server."
-        className="bg-surface/80"
-      >
-        <div className="grid gap-4 lg:grid-cols-2">
-          <div className="rounded-app border border-line bg-background/50 p-3">
-            <div className="flex items-center gap-2">
-              <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Saved locally</p>
-              <StatusBadge tone="neutral" className="ml-auto">
-                {storageSize}
-              </StatusBadge>
-            </div>
-            <p className="mt-3 text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-              Last saved
-            </p>
-            <p className="mt-1 text-sm font-medium">{formatAdminDate(content.updatedAt)}</p>
-            <div className="mt-3 flex gap-2.5 rounded-app bg-surface-2 p-3 text-xs leading-5 text-muted-foreground">
-              <HardDrive className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <p>
-                A backup is a single JSON file. Keep one outside this browser before importing or
-                resetting content.
-              </p>
-            </div>
+        <SectionCard
+          title="Storage & backup"
+          description="Content is saved in this browser, not on a server."
+        >
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-warning" aria-hidden="true" />
+            <p className="text-sm font-medium">Saved in this browser only</p>
           </div>
-
-          <div className="flex flex-col gap-2">
+          <p className="mt-3 text-sm leading-5 text-muted-foreground">
+            Last saved today, 12:56 AM. Changes reach the simulator after it is reloaded. Clearing
+            this browser's data erases them, so export a backup first.
+          </p>
+          <div className="mt-4 flex gap-2">
             <button
               type="button"
               onClick={exportBackup}
-              className="group flex items-center gap-3 rounded-app border border-line bg-background/50 p-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="flex-1 group flex items-center gap-2 rounded-app border border-line bg-background/50 px-3 py-2 text-sm text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-app bg-surface-2 text-muted-foreground group-hover:text-primary">
-                <Download className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">Export backup</span>
-                <span className="block text-xs text-muted-foreground">
-                  Download every template, glossary entry and setting as JSON
-                </span>
-              </span>
+              <Download className="size-3.5" aria-hidden="true" />
+              Export backup
             </button>
-
-            <button
-              type="button"
-              onClick={() => fileInputRef.current?.click()}
-              disabled={importing}
-              className="group flex items-center gap-3 rounded-app border border-line bg-background/50 p-3 text-left transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:pointer-events-none disabled:opacity-50"
-            >
-              <span className="grid size-8 shrink-0 place-items-center rounded-app bg-surface-2 text-muted-foreground group-hover:text-primary">
-                <Upload className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">Import backup</span>
-                <span className="block text-xs text-muted-foreground">
-                  Replace saved content from a JSON backup file
-                </span>
-              </span>
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="application/json,.json"
-              className="sr-only"
-              aria-label="Choose a content backup"
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                event.target.value = '';
-                void handleFile(file);
-              }}
-            />
-
             <button
               type="button"
               onClick={confirmReset}
-              className="group flex items-center gap-3 rounded-app border border-danger/25 bg-danger/5 p-3 text-left transition-colors hover:bg-danger/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              className="flex-1 group flex items-center gap-2 rounded-app border border-danger/25 bg-danger/5 px-3 py-2 text-sm text-left transition-colors hover:bg-danger/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             >
-              <span className="grid size-8 shrink-0 place-items-center rounded-app bg-danger/10 text-danger">
-                <RotateCcw className="size-4" aria-hidden="true" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium text-danger">Reset to defaults</span>
-                <span className="block text-xs text-muted-foreground">
-                  Remove every change saved in this browser
-                </span>
-              </span>
+              <RotateCcw className="size-3.5" aria-hidden="true" />
+              Reset to defaults
             </button>
           </div>
-        </div>
-
-        <div className="mt-4 flex items-start gap-2.5 border-t border-line pt-3 text-xs leading-5 text-muted-foreground">
-          <ShieldCheck className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-          <p>
-            Imported files are validated before they replace anything. If one value is invalid, the
-            whole import is refused and the current content stays untouched.
-          </p>
-        </div>
-      </SectionCard>
+        </SectionCard>
+      </div>
     </div>
   );
 }
