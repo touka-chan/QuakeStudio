@@ -179,14 +179,6 @@ export function AdminDashboard({
 
   return (
     <div className="space-y-5">
-      {/* Page header */}
-      <div className="flex flex-col gap-2">
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">Dashboard</h1>
-        <p className="text-sm leading-5 text-muted-foreground">
-          What is live, what is waiting, and what needs a decision.
-        </p>
-      </div>
-
       {/* Draft / needs-review banner */}
       {pendingAssumptions > 0 ? (
         <DraftBanner
