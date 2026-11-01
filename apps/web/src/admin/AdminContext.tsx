@@ -1,5 +1,6 @@
 import { createContext, useContext, useState } from 'react';
 
+import { describeChangedSections, logActivity } from './adminActivity';
 import { showError, showImported, showReset } from './adminToast';
 
 import { contentRepository } from '@/content/repository';
@@ -24,6 +25,13 @@ export function AdminContentProvider({ children }: { children: React.ReactNode }
   function commit(next: ContentDocument): ContentDocument {
     try {
       const saved = contentRepository.replaceDocument(next);
+      const changed = describeChangedSections(content, saved);
+      logActivity({
+        kind: 'save',
+        title: changed.length > 0 ? `Updated ${changed.join(', ')}` : 'Saved content',
+        detail: 'Saved in this browser',
+        at: saved.updatedAt,
+      });
       setContent(saved);
       setErrors([]);
       return saved;
@@ -47,6 +55,12 @@ export function AdminContentProvider({ children }: { children: React.ReactNode }
 
   function importJson(raw: string): ContentDocument {
     const saved = contentRepository.importJson(raw);
+    logActivity({
+      kind: 'import',
+      title: 'Imported a content backup',
+      detail: 'Replaced the content saved in this browser',
+      at: saved.updatedAt,
+    });
     setContent(saved);
     setErrors([]);
     showImported();
@@ -55,6 +69,7 @@ export function AdminContentProvider({ children }: { children: React.ReactNode }
 
   function reset(): void {
     contentRepository.reset();
+    logActivity({ kind: 'reset', title: 'Reset content to defaults' });
     showReset();
     window.location.reload();
   }

@@ -1,22 +1,34 @@
 import React from 'react';
+import { Save } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
+import { AdminButton } from './AdminUI';
 
 export function AdminPageHeader({
   title,
   description,
+  eyebrow,
   actions,
 }: {
   title: string;
   description?: string;
+  eyebrow?: string;
   actions?: React.ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-foreground">{title}</h1>
-        {description ? <p className="mt-2 text-base text-muted-foreground leading-relaxed max-w-2xl">{description}</p> : null}
+    <div className="mb-7 flex flex-col gap-4 border-b border-line pb-6 sm:flex-row sm:items-end sm:justify-between">
+      <div className="min-w-0">
+        {eyebrow ? (
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            {eyebrow}
+          </p>
+        ) : null}
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
+        {description ? (
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
+        ) : null}
       </div>
-      {actions ? <div className="flex flex-wrap gap-2 sm:self-end">{actions}</div> : null}
+      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:self-end">{actions}</div> : null}
     </div>
   );
 }
@@ -24,19 +36,35 @@ export function AdminPageHeader({
 export function SectionCard({
   title,
   description,
+  actions,
   children,
   className,
 }: {
   title?: string;
   description?: string;
+  actions?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }) {
   return (
-    <section className={cn('rounded-card border border-line bg-surface/80 p-6 shadow-sm ring-1 ring-white/5 backdrop-blur-sm', className)}>
-      {title ? <h2 className="text-lg font-semibold">{title}</h2> : null}
-      {description ? <p className="mt-1 text-sm text-muted-foreground">{description}</p> : null}
-      <div className={title || description ? 'mt-4' : ''}>{children}</div>
+    <section
+      className={cn(
+        'rounded-card border border-line bg-surface/80 p-5 shadow-sm backdrop-blur-sm sm:p-6',
+        className,
+      )}
+    >
+      {title || description || actions ? (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            {title ? <h2 className="text-base font-semibold tracking-tight">{title}</h2> : null}
+            {description ? (
+              <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+        </div>
+      ) : null}
+      <div className={title || description || actions ? 'mt-4' : ''}>{children}</div>
     </section>
   );
 }
@@ -93,20 +121,24 @@ export function SaveButton({
   saving,
   onClick,
   children,
+  className,
 }: {
   saving?: boolean;
   onClick?: () => void;
   children: React.ReactNode;
+  className?: string;
 }) {
   return (
-    <button
-      type={onClick ? "button" : "submit"}
+    <AdminButton
+      type={onClick ? 'button' : 'submit'}
       onClick={onClick}
       disabled={saving}
-      className="rounded-app bg-gradient-to-br from-primary to-primary/90 px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-md shadow-primary/10 hover:shadow-lg hover:shadow-primary/20 hover:from-primary/95 hover:to-primary/85 disabled:opacity-40 disabled:cursor-not-allowed transition-all duration-200"
+      variant="primary"
+      icon={Save}
+      className={className}
     >
-      {saving ? "Saving..." : children}
-    </button>
+      {saving ? 'Saving...' : children}
+    </AdminButton>
   );
 }
 
