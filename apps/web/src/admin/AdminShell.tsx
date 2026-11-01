@@ -378,7 +378,7 @@ export function AdminShell({
                 </div>
               }
             />
-            {renderPage(section, go, draftCount)}
+            {renderPage(section, go)}
           </main>
         </div>
       </div>
@@ -466,7 +466,7 @@ function AccountRow() {
   );
 }
 
-function renderPage(section: string, go: (id: string) => void, draftCount: number) {
+function renderPage(section: string, go: (id: string) => void) {
   switch (section) {
     case 'branding':
       return <AdminBranding />;
@@ -487,6 +487,6 @@ function renderPage(section: string, go: (id: string) => void, draftCount: numbe
     case 'review':
       return <AdminReview />;
     default:
-      return <AdminDashboard onNavigate={go} draftCount={draftCount} />;
+      return <AdminDashboard onNavigate={go} />;
   }
 }
