@@ -312,10 +312,10 @@ export function AdminShell({
         </div>
       ) : null}
 
-      <div className="flex h-full lg:h-auto">
-        {/* Sidebar — always visible on desktop */}
-        <aside className="hidden lg:flex flex-col h-full w-64 shrink-0 bg-surface border-r border-line">
-          <div className="flex items-center gap-3 px-4 pb-4 pt-4 border-b border-line">
+      <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-4 p-4 lg:flex-row lg:items-start lg:p-6">
+        {/* Sidebar — sticky on desktop, does not scroll with page */}
+        <aside className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-card border border-line bg-surface lg:sticky lg:top-[5.5rem] lg:flex lg:h-[calc(100dvh-7rem)]">
+          <div className="flex items-center gap-3 px-4 pb-4 pt-4">
             <BrandMark className="size-9" iconClassName="size-[18px]" />
             <div className="min-w-0">
               <p className="truncate text-base font-semibold leading-5">{content.branding.appName}</p>
@@ -334,7 +334,7 @@ export function AdminShell({
             />
           </div>
 
-          <nav className="flex-1 overflow-y-auto px-2 pb-3" aria-label="Admin sections">
+          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Admin sections">
             {nav}
           </nav>
 
@@ -356,7 +356,7 @@ export function AdminShell({
         </aside>
 
         {/* Main content area — full width to the right of sidebar */}
-        <div className="flex-1 flex flex-col min-w-0 relative">
+        <div className="min-w-0 flex-1">
           <AdminTopBar
             draftCount={draftCount}
             searchValue={search}
@@ -366,7 +366,7 @@ export function AdminShell({
             onPreview={() => navigate('/')}
           />
 
-          <main className="flex-1 overflow-y-auto p-4 lg:p-6">
+          <main className="mt-4">
             <Toaster />
             <AdminPageHeader
               title={current.label}
