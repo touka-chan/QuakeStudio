@@ -2,13 +2,29 @@ import { useEffect, useState } from 'react';
 
 import { ContentEffects } from '@/components/content/ContentEffects';
 import { BRANDING } from '@/content/branding';
-import { readSession, signIn, signOut } from './auth';
+import { apiLogin, apiLogout, apiMe, type ApiLogin } from '@/api/auth';
+import { isLocalBackendAvailable } from '@/api/client';
+import { isLocalBackendEnabled } from '@/api/config';
+import { readSession, signIn, signOut, type AdminSession } from './auth';
 import { AdminContentProvider, useAdminContent } from './AdminContext';
 import { AdminLogin } from './AdminLogin';
 import { AdminShell } from './AdminShell';
 
+type AuthMode = 'checking' | 'backend' | 'local';
+
+function toSession(login: ApiLogin): AdminSession {
+  return {
+    email: login.admin.email,
+    signedInAt: new Date().toISOString(),
+  };
+}
+
 export default function AdminApp() {
-  const [session, setSession] = useState(() => readSession());
+  const localBackend = isLocalBackendEnabled();
+  const [mode, setMode] = useState<AuthMode>(() => (localBackend ? 'checking' : 'local'));
+  const [session, setSession] = useState<AdminSession | null>(() =>
+    localBackend ? null : readSession(),
+  );
   const [path, setPath] = useState(() => window.location.pathname || '/admin');
 
   useEffect(() => {
@@ -17,15 +33,84 @@ export default function AdminApp() {
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
+  useEffect(() => {
+    if (!localBackend) return;
+    let cancelled = false;
+
+    void (async () => {
+      const available = await isLocalBackendAvailable();
+      if (cancelled) return;
+      if (!available) {
+        setMode('local');
+        setSession(readSession());
+        return;
+      }
+
+      setMode('backend');
+      try {
+        const me = await apiMe();
+        if (!cancelled) setSession(me ? toSession(me) : null);
+      } catch {
+        if (cancelled) return;
+        // The probe succeeded but the session call failed. Falling back to the
+        // browser demo would be confusing, so show the sign-in screen instead.
+        setSession(null);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [localBackend]);
+
   function navigate(to: string): void {
+    // App decides between the simulator and the admin workspace from the
+    // initial pathname, so a pushState to "/" would leave the admin mounted.
+    // Leaving admin is a real page change: reload the simulator.
+    if (to === '/') {
+      window.location.assign('/');
+      return;
+    }
     window.history.pushState({}, '', to);
     setPath(to);
+  }
+
+  async function handleLogout(): Promise<void> {
+    if (mode === 'backend') {
+      try {
+        await apiLogout();
+      } catch {
+        // The cookie may already be gone. Clear the local view regardless.
+      }
+    }
+    signOut();
+    setSession(null);
+    navigate('/');
+  }
+
+  if (mode === 'checking') {
+    return (
+      <div className="grid min-h-dvh place-items-center bg-background text-sm text-muted-foreground">
+        Checking the local API…
+      </div>
+    );
   }
 
   if (!session) {
     return (
       <AdminLogin
-        onSignIn={(email, password) => {
+        backendEnabled={mode === 'backend'}
+        onSignIn={async (email, password) => {
+          if (mode === 'backend') {
+            try {
+              const result = await apiLogin(email, password);
+              setSession(toSession(result));
+              navigate('/admin');
+              return true;
+            } catch {
+              return false;
+            }
+          }
           if (!signIn(email, password)) return false;
           setSession(readSession());
           navigate('/admin');
@@ -36,9 +121,9 @@ export default function AdminApp() {
   }
 
   return (
-    <AdminContentProvider>
+    <AdminContentProvider backendEnabled={mode === 'backend'}>
       <ContentEffects />
-      <AdminShell path={path} navigate={navigate} onLogout={() => { signOut(); setSession(null); navigate('/'); }} />
+      <AdminShell path={path} navigate={navigate} email={session.email} onLogout={handleLogout} />
     </AdminContentProvider>
   );
 }

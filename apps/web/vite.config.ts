@@ -88,6 +88,21 @@ export default defineConfig({
   build: {
     target: 'es2022',
     /*
+     * Keep the validation library out of the entry chunk.
+     *
+     * The schema is shared by the simulator's storage reader and the lazy
+     * admin bundle. Rolldown may otherwise fold that shared chunk into the
+     * entry once the admin API modules are added. Naming it here makes the
+     * split explicit instead of dependent on chunking heuristics.
+     */
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [{ name: 'zod', test: /node_modules[\\/]zod[\\/]/ }],
+        },
+      },
+    },
+    /*
      * Source maps are OFF by default.
      *
      * With `sourcemap: true` every build emitted ~9 MB of `.map` files into

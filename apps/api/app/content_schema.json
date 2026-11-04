@@ -1,0 +1,1445 @@
+{
+  "title": "QuakeStudio content document",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "updatedAt": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branding": {
+      "type": "object",
+      "properties": {
+        "appName": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "documentTitle": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "metaDescription": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
+        "logoIcon": {
+          "type": "string",
+          "enum": [
+            "building",
+            "waves",
+            "layers",
+            "activity"
+          ]
+        },
+        "disclaimerShort": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "disclaimerLong": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 600
+        }
+      },
+      "required": [
+        "appName",
+        "documentTitle",
+        "metaDescription",
+        "logoIcon",
+        "disclaimerShort",
+        "disclaimerLong"
+      ]
+    },
+    "copy": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "maxLength": 4000
+      }
+    },
+    "engineering": {
+      "type": "object",
+      "properties": {
+        "materials": {
+          "type": "object",
+          "properties": {
+            "concrete": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "dampingRatio": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 0.2
+                },
+                "periodCt": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "periodExponentX": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "bareMassPerAreaKgM2": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "dampingRatio",
+                "periodCt",
+                "periodExponentX",
+                "bareMassPerAreaKgM2"
+              ]
+            },
+            "steel": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "dampingRatio": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 0.2
+                },
+                "periodCt": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "periodExponentX": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "bareMassPerAreaKgM2": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "dampingRatio",
+                "periodCt",
+                "periodExponentX",
+                "bareMassPerAreaKgM2"
+              ]
+            },
+            "composite": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "dampingRatio": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 0.2
+                },
+                "periodCt": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "periodExponentX": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "bareMassPerAreaKgM2": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "dampingRatio",
+                "periodCt",
+                "periodExponentX",
+                "bareMassPerAreaKgM2"
+              ]
+            },
+            "wood": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "dampingRatio": {
+                  "type": "number",
+                  "minimum": 0.001,
+                  "maximum": 0.2
+                },
+                "periodCt": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "periodExponentX": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "bareMassPerAreaKgM2": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "dampingRatio",
+                "periodCt",
+                "periodExponentX",
+                "bareMassPerAreaKgM2"
+              ]
+            }
+          },
+          "required": [
+            "concrete",
+            "steel",
+            "composite",
+            "wood"
+          ]
+        },
+        "frameTypes": {
+          "type": "object",
+          "properties": {
+            "moment": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "stiffnessFactor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "stiffnessFactor"
+              ]
+            },
+            "braced": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "stiffnessFactor": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "label",
+                "stiffnessFactor"
+              ]
+            }
+          },
+          "required": [
+            "moment",
+            "braced"
+          ]
+        },
+        "occupancies": {
+          "type": "object",
+          "properties": {
+            "office": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "liveKPa": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                },
+                "colorLight": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "colorDark": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "label",
+                "liveKPa",
+                "description",
+                "colorLight",
+                "colorDark"
+              ]
+            },
+            "residential": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "liveKPa": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                },
+                "colorLight": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "colorDark": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "label",
+                "liveKPa",
+                "description",
+                "colorLight",
+                "colorDark"
+              ]
+            },
+            "parking": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "liveKPa": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                },
+                "colorLight": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "colorDark": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "label",
+                "liveKPa",
+                "description",
+                "colorLight",
+                "colorDark"
+              ]
+            },
+            "storage": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "liveKPa": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                },
+                "colorLight": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "colorDark": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "label",
+                "liveKPa",
+                "description",
+                "colorLight",
+                "colorDark"
+              ]
+            },
+            "custom": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "liveKPa": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                },
+                "colorLight": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                },
+                "colorDark": {
+                  "type": "string",
+                  "pattern": "^#[0-9a-fA-F]{6}$"
+                }
+              },
+              "required": [
+                "label",
+                "liveKPa",
+                "description",
+                "colorLight",
+                "colorDark"
+              ]
+            }
+          },
+          "required": [
+            "office",
+            "residential",
+            "parking",
+            "storage",
+            "custom"
+          ]
+        },
+        "loadAssumptions": {
+          "type": "object",
+          "properties": {
+            "codeBasis": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            },
+            "gravityMs2": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "defaultDeadLoadKPa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "liveLoadParticipation": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 1
+            },
+            "minDeadLoadKPa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxDeadLoadKPa": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "minLiveLoadKPa": {
+              "type": "number",
+              "minimum": 0
+            },
+            "maxLiveLoadKPa": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "sourceNote": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 400
+            }
+          },
+          "required": [
+            "codeBasis",
+            "gravityMs2",
+            "defaultDeadLoadKPa",
+            "liveLoadParticipation",
+            "minDeadLoadKPa",
+            "maxDeadLoadKPa",
+            "minLiveLoadKPa",
+            "maxLiveLoadKPa",
+            "sourceNote"
+          ]
+        },
+        "incompatibleUses": {
+          "default": {},
+          "type": "object",
+          "properties": {
+            "office": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              }
+            },
+            "residential": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              }
+            },
+            "parking": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              }
+            },
+            "storage": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              }
+            },
+            "custom": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              }
+            }
+          }
+        },
+        "geometry": {
+          "type": "object",
+          "properties": {
+            "minFloors": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "maxFloors": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "floorHeightM": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "step": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "default": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max",
+                "step",
+                "default"
+              ]
+            },
+            "widthM": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "step": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "default": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max",
+                "step",
+                "default"
+              ]
+            },
+            "depthM": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "step": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "default": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max",
+                "step",
+                "default"
+              ]
+            }
+          },
+          "required": [
+            "minFloors",
+            "maxFloors",
+            "floorHeightM",
+            "widthM",
+            "depthM"
+          ]
+        },
+        "groundMotion": {
+          "type": "object",
+          "properties": {
+            "pgaG": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "step": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "default": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max",
+                "step",
+                "default"
+              ]
+            },
+            "frequencyHz": {
+              "type": "object",
+              "properties": {
+                "min": {
+                  "type": "number"
+                },
+                "max": {
+                  "type": "number"
+                },
+                "step": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "default": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "min",
+                "max",
+                "step",
+                "default"
+              ]
+            },
+            "defaultSeed": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "sampleDtS": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "taperDurationS": {
+              "type": "number",
+              "minimum": 0
+            },
+            "randomBandHz": {
+              "type": "object",
+              "properties": {
+                "low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                }
+              },
+              "required": [
+                "low",
+                "high"
+              ]
+            },
+            "impulseDurationS": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "pgaG",
+            "frequencyHz",
+            "defaultSeed",
+            "sampleDtS",
+            "taperDurationS",
+            "randomBandHz",
+            "impulseDurationS"
+          ]
+        },
+        "viewport": {
+          "type": "object",
+          "properties": {
+            "defaultExaggeration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "minExaggeration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "maxExaggeration": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "exaggerationStep": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "defaultGridDivisions": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            },
+            "groundThicknessM": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "defaultExaggeration",
+            "minExaggeration",
+            "maxExaggeration",
+            "exaggerationStep",
+            "defaultGridDivisions",
+            "groundThicknessM"
+          ]
+        },
+        "playback": {
+          "type": "object",
+          "properties": {
+            "speeds": {
+              "minItems": 1,
+              "maxItems": 8,
+              "type": "array",
+              "items": {
+                "type": "number",
+                "exclusiveMinimum": 0
+              }
+            },
+            "defaultSpeed": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "defaultLoop": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "speeds",
+            "defaultSpeed",
+            "defaultLoop"
+          ]
+        },
+        "defaultBuilding": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            },
+            "floors": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "floorHeightM": {
+              "type": "number",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "widthM": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 200
+            },
+            "depthM": {
+              "type": "number",
+              "minimum": 2,
+              "maximum": 200
+            },
+            "material": {
+              "type": "string",
+              "enum": [
+                "concrete",
+                "steel",
+                "composite",
+                "wood"
+              ]
+            },
+            "frameType": {
+              "type": "string",
+              "enum": [
+                "moment",
+                "braced"
+              ]
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "floors",
+            "floorHeightM",
+            "widthM",
+            "depthM",
+            "material",
+            "frameType"
+          ]
+        },
+        "defaultGroundMotion": {
+          "type": "object",
+          "properties": {
+            "preset": {
+              "type": "string",
+              "enum": [
+                "harmonic",
+                "random",
+                "impulse"
+              ]
+            },
+            "pgaG": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "frequencyHz": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "durationS": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "dt": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "seed": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "preset",
+            "pgaG",
+            "frequencyHz",
+            "durationS",
+            "dt",
+            "seed"
+          ]
+        },
+        "groundMotionPresets": {
+          "type": "object",
+          "properties": {
+            "harmonic": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                }
+              },
+              "required": [
+                "label",
+                "description"
+              ]
+            },
+            "random": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                }
+              },
+              "required": [
+                "label",
+                "description"
+              ]
+            },
+            "impulse": {
+              "type": "object",
+              "properties": {
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                },
+                "description": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 240
+                }
+              },
+              "required": [
+                "label",
+                "description"
+              ]
+            }
+          },
+          "required": [
+            "harmonic",
+            "random",
+            "impulse"
+          ]
+        }
+      },
+      "required": [
+        "materials",
+        "frameTypes",
+        "occupancies",
+        "loadAssumptions",
+        "geometry",
+        "groundMotion",
+        "viewport",
+        "playback",
+        "defaultBuilding",
+        "defaultGroundMotion",
+        "groundMotionPresets"
+      ]
+    },
+    "templates": {
+      "minItems": 1,
+      "maxItems": 30,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "building": {
+            "type": "object",
+            "properties": {
+              "floors": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 100
+              },
+              "floorHeightM": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 20
+              },
+              "widthM": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 200
+              },
+              "depthM": {
+                "type": "number",
+                "minimum": 2,
+                "maximum": 200
+              },
+              "material": {
+                "type": "string",
+                "enum": [
+                  "concrete",
+                  "steel",
+                  "composite",
+                  "wood"
+                ]
+              },
+              "frameType": {
+                "type": "string",
+                "enum": [
+                  "moment",
+                  "braced"
+                ]
+              }
+            },
+            "required": [
+              "floors",
+              "floorHeightM",
+              "widthM",
+              "depthM",
+              "material",
+              "frameType"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "description",
+          "building"
+        ]
+      }
+    },
+    "defaultTemplateId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "glossary": {
+      "maxItems": 200,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "term": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "definition": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 600
+          }
+        },
+        "required": [
+          "id",
+          "term",
+          "definition"
+        ]
+      }
+    },
+    "tour": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "buttonLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "buttonTooltip": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "steps": {
+          "minItems": 1,
+          "maxItems": 12,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "target": {
+                "type": "string",
+                "enum": [
+                  "controls",
+                  "loads",
+                  "play",
+                  "results",
+                  "compare"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 800
+              },
+              "icon": {
+                "type": "string",
+                "enum": [
+                  "building",
+                  "layers",
+                  "play",
+                  "waves",
+                  "compare"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "target",
+              "title",
+              "body",
+              "icon"
+            ]
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "buttonLabel",
+        "buttonTooltip",
+        "steps"
+      ]
+    },
+    "welcome": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "acknowledgement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "assumptionsLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "startLabel": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "footer": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "steps": {
+          "minItems": 1,
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "icon": {
+                "type": "string",
+                "enum": [
+                  "play",
+                  "waves",
+                  "compare"
+                ]
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 60
+              },
+              "body": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              }
+            },
+            "required": [
+              "id",
+              "icon",
+              "title",
+              "body"
+            ]
+          }
+        }
+      },
+      "required": [
+        "enabled",
+        "title",
+        "description",
+        "acknowledgement",
+        "assumptionsLabel",
+        "startLabel",
+        "footer",
+        "steps"
+      ]
+    },
+    "driftBands": {
+      "minItems": 2,
+      "maxItems": 8,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 60
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 240
+          },
+          "colorLight": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          },
+          "colorDark": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "required": [
+          "id",
+          "max",
+          "label",
+          "note",
+          "colorLight",
+          "colorDark"
+        ]
+      }
+    },
+    "features": {
+      "type": "object",
+      "properties": {
+        "compareEnabled": {
+          "type": "boolean"
+        },
+        "maxBuildings": {
+          "type": "integer",
+          "minimum": 2,
+          "maximum": 4
+        },
+        "maxSideBySide": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 4
+        },
+        "feedbackEnabled": {
+          "type": "boolean"
+        },
+        "installPromptEnabled": {
+          "type": "boolean"
+        },
+        "savedRunsEnabled": {
+          "type": "boolean"
+        },
+        "csvExportEnabled": {
+          "type": "boolean"
+        },
+        "welcomeEnabled": {
+          "type": "boolean"
+        },
+        "tourEnabled": {
+          "type": "boolean"
+        },
+        "defaultCutaway": {
+          "type": "boolean"
+        },
+        "defaultCompareView": {
+          "type": "string",
+          "enum": [
+            "sideBySide",
+            "ghost"
+          ]
+        }
+      },
+      "required": [
+        "compareEnabled",
+        "maxBuildings",
+        "maxSideBySide",
+        "feedbackEnabled",
+        "installPromptEnabled",
+        "savedRunsEnabled",
+        "csvExportEnabled",
+        "welcomeEnabled",
+        "tourEnabled",
+        "defaultCutaway",
+        "defaultCompareView"
+      ]
+    },
+    "assumptionReview": {
+      "type": "object",
+      "properties": {
+        "placeholder": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "boolean"
+          }
+        },
+        "notes": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 1000
+          }
+        }
+      },
+      "required": [
+        "placeholder",
+        "notes"
+      ]
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "updatedAt",
+    "branding",
+    "copy",
+    "engineering",
+    "templates",
+    "defaultTemplateId",
+    "glossary",
+    "tour",
+    "welcome",
+    "driftBands",
+    "features",
+    "assumptionReview"
+  ]
+}

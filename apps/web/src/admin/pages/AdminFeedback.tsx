@@ -1,17 +1,20 @@
-import {
-  ClipboardCheck,
-  Download,
-  ExternalLink,
-  RefreshCw,
-  Trash2,
-} from 'lucide-react';
-import { useState } from 'react';
+import { ClipboardCheck, Download, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import { useCallback, useEffect, useState } from 'react';
 
+import {
+  clearFeedbackFromApi,
+  exportFeedbackFromApi,
+  fetchAdminFeedback,
+  type ApiFeedback,
+  type ApiSusSummary,
+} from '@/api/feedback';
 import { clearFeedback, readFeedback } from '@/feedback/feedbackStorage';
+import type { SusResponse } from '@/feedback/FeedbackDialog';
 import { gradeSus, interpretSus, SUS_TARGET_SCORE } from '@/feedback/susScore';
 import { downloadCsv } from '@/lib/csv';
+import { useAdminContent } from '../AdminContext';
 import { swalAlert, swalConfirm } from '../adminSwal';
-import { showDeleted, showExported } from '../adminToast';
+import { showDeleted, showError, showExported } from '../adminToast';
 import { SectionCard } from '../AdminForms';
 import {
   adminButtonClass,
@@ -33,52 +36,163 @@ function scoreCircleClass(score: number) {
   return 'bg-danger/10 text-danger ring-danger/25';
 }
 
+function toSusResponse(item: ApiFeedback): SusResponse {
+  return {
+    submittedAt: item.submittedAt,
+    answers: item.answers as unknown as SusResponse['answers'],
+    score: item.score,
+    comments: item.comments ?? undefined,
+    participantId: item.participantId ?? undefined,
+  };
+}
+
 export function AdminFeedback() {
-  const [responses, setResponses] = useState(() => readFeedback());
+  const { backendEnabled, refreshFeedback } = useAdminContent();
+  const [localResponses, setLocalResponses] = useState(() => readFeedback());
+  const [serverItems, setServerItems] = useState<ApiFeedback[] | null>(null);
+  const [serverSummary, setServerSummary] = useState<ApiSusSummary | null>(null);
+  const [serverTotal, setServerTotal] = useState(0);
+  const [loading, setLoading] = useState(backendEnabled);
+
+  const loadServer = useCallback(async () => {
+    try {
+      const list = await fetchAdminFeedback();
+      setServerItems(list.items);
+      setServerSummary(list.summary);
+      setServerTotal(list.total);
+      void refreshFeedback();
+    } catch (error) {
+      setServerItems(null);
+      setServerSummary(null);
+      setServerTotal(0);
+      showError(
+        error instanceof Error
+          ? `Could not load feedback from the local API: ${error.message}`
+          : 'Could not load feedback from the local API.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, [refreshFeedback]);
+
+  useEffect(() => {
+    if (!backendEnabled) return;
+    let cancelled = false;
+
+    void (async () => {
+      try {
+        const list = await fetchAdminFeedback();
+        if (cancelled) return;
+        setServerItems(list.items);
+        setServerSummary(list.summary);
+        setServerTotal(list.total);
+      } catch (error) {
+        if (cancelled) return;
+        setServerItems(null);
+        setServerSummary(null);
+        setServerTotal(0);
+        showError(
+          error instanceof Error
+            ? `Could not load feedback from the local API: ${error.message}`
+            : 'Could not load feedback from the local API.',
+        );
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [backendEnabled]);
+
+  const responses = serverItems ? serverItems.map(toSusResponse) : localResponses;
+  const total = serverItems ? serverTotal : responses.length;
+  const average = serverSummary
+    ? serverSummary.mean
+    : responses.length
+      ? Math.round((responses.reduce((sum, item) => sum + item.score, 0) / responses.length) * 10) /
+        10
+      : null;
+  const meetsTarget = average !== null && average >= SUS_TARGET_SCORE;
 
   function refresh() {
-    setResponses(readFeedback());
+    if (backendEnabled) {
+      setLoading(true);
+      void loadServer();
+      return;
+    }
+    setLocalResponses(readFeedback());
   }
 
-  function exportResponses() {
-    const payload = {
-      format: 'quakestudio-sus',
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      targetScore: SUS_TARGET_SCORE,
-      responses,
-    };
-    downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2))
-      .then(() =>
-        showExported(`Exported ${responses.length} response${responses.length === 1 ? '' : 's'}.`),
-      )
-      .catch((error: unknown) => {
+  async function exportResponses() {
+    try {
+      if (backendEnabled) {
+        const payload = await exportFeedbackFromApi();
+        await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
+        showExported(`Exported ${serverTotal} response${serverTotal === 1 ? '' : 's'}.`);
+        return;
+      }
+
+      const payload = {
+        format: 'quakestudio-sus',
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        targetScore: SUS_TARGET_SCORE,
+        responses,
+      };
+      await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
+      showExported(`Exported ${responses.length} response${responses.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      swalAlert({
+        title: 'Export failed',
+        text: error instanceof Error ? error.message : 'The responses could not be exported.',
+        icon: 'error',
+      });
+    }
+  }
+
+  async function clearAll() {
+    if (backendEnabled) {
+      try {
+        const deleted = await clearFeedbackFromApi();
+        clearFeedback();
+        setLocalResponses([]);
+        setServerItems([]);
+        setServerSummary(null);
+        setServerTotal(0);
+        void refreshFeedback();
+        showDeleted(`${deleted} feedback response${deleted === 1 ? '' : 's'}`);
+      } catch (error) {
         swalAlert({
-          title: 'Export failed',
-          text: error instanceof Error ? error.message : 'The responses could not be exported.',
+          title: 'Clear failed',
+          text:
+            error instanceof Error ? error.message : 'The local API could not clear the feedback.',
           icon: 'error',
         });
-      });
+      }
+      return;
+    }
+
+    clearFeedback();
+    setLocalResponses([]);
+    showDeleted('Feedback responses');
   }
 
   function confirmClear() {
     swalConfirm({
       title: 'Clear feedback',
-      text: 'This removes all saved SUS responses from this browser.',
+      text: backendEnabled
+        ? 'This removes all saved SUS responses from the local PostgreSQL database.'
+        : 'This removes all saved SUS responses from this browser.',
       confirmLabel: 'Clear all',
       onConfirm: () => {
-        clearFeedback();
-        setResponses([]);
-        showDeleted('Feedback responses');
+        void clearAll();
       },
     });
   }
 
   const sorted = [...responses].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
-  const average = responses.length
-    ? Math.round((responses.reduce((sum, item) => sum + item.score, 0) / responses.length) * 10) / 10
-    : null;
-  const meetsTarget = average !== null && average >= SUS_TARGET_SCORE;
 
   return (
     <div>
@@ -86,17 +200,18 @@ export function AdminFeedback() {
         <div>
           <p className="text-sm font-medium">Saved responses</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {responses.length} response{responses.length === 1 ? '' : 's'} stored in this browser.
+            {total} response{total === 1 ? '' : 's'} stored in{' '}
+            {backendEnabled ? 'the local PostgreSQL database' : 'this browser'}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AdminButton icon={RefreshCw} onClick={refresh}>
-            Refresh
+          <AdminButton icon={RefreshCw} onClick={refresh} disabled={loading}>
+            {loading ? 'Loading…' : 'Refresh'}
           </AdminButton>
           <AdminButton
             variant="primary"
             icon={Download}
-            onClick={exportResponses}
+            onClick={() => void exportResponses()}
             disabled={responses.length === 0}
           >
             Export JSON
@@ -115,8 +230,10 @@ export function AdminFeedback() {
       <div className="grid gap-3 sm:grid-cols-3">
         <div className="rounded-card border border-line bg-surface p-4">
           <p className="text-xs font-medium text-muted-foreground">Responses</p>
-          <p className="mt-1 text-2xl font-semibold tracking-tight">{responses.length}</p>
-          <p className="mt-1 text-xs text-muted-foreground">Saved on this device</p>
+          <p className="mt-1 text-2xl font-semibold tracking-tight">{total}</p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {backendEnabled ? 'Stored in PostgreSQL' : 'Saved on this device'}
+          </p>
         </div>
         <div className="rounded-card border border-line bg-surface p-4">
           <p className="text-xs font-medium text-muted-foreground">Average SUS</p>

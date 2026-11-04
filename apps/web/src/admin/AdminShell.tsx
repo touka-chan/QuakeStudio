@@ -16,8 +16,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
+import { publishContent } from '@/api/content';
 import { placeholderCount } from '@/config/assumptionCatalogue';
-import { readFeedback } from '@/feedback/feedbackStorage';
 import { BrandMark } from '@/components/brand/BrandMark';
 import {
   countUnpublishedChanges,
@@ -25,7 +25,7 @@ import {
   markPublished,
   readLastPublishedAt,
 } from './adminActivity';
-import { showNotice } from './adminToast';
+import { showError, showNotice } from './adminToast';
 import {
   adminButtonClass,
   AdminButton,
@@ -144,10 +144,6 @@ const NAV_GROUPS: { label: string; items: Omit<NavItem, 'group'>[] }[] = [
         label: 'Feedback',
         icon: ClipboardCheck,
         description: 'Saved SUS responses from simulator users.',
-        badge: {
-          label: `${readFeedback().length} new`,
-          tone: 'success',
-        },
       },
     ],
   },
@@ -161,13 +157,15 @@ const SECTION_INFO = Object.fromEntries(NAV.map((item) => [item.id, item]));
 export function AdminShell({
   path,
   navigate,
+  email,
   onLogout,
 }: {
   path: string;
   navigate: (to: string) => void;
+  email: string;
   onLogout: () => void;
 }) {
-  const { content } = useAdminContent();
+  const { content, backendEnabled, feedbackCount } = useAdminContent();
   const section = (path.replace(/^\/admin\/?/, '').split('/')[0] || 'dashboard').toLowerCase();
   const current = SECTION_INFO[section] ?? SECTION_INFO.dashboard;
   const [search, setSearch] = useState('');
@@ -180,7 +178,16 @@ export function AdminShell({
   const query = search.trim().toLowerCase();
   const filteredGroups = NAV_GROUPS.map((group) => ({
     label: group.label,
-    items: group.items.filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(query)),
+    items: group.items
+      .filter((item) => `${item.label} ${item.description}`.toLowerCase().includes(query))
+      .map((item) =>
+        item.id === 'feedback'
+          ? {
+              ...item,
+              badge: { label: `${feedbackCount} new`, tone: 'success' as const },
+            }
+          : item,
+      ),
   })).filter((group) => group.items.length > 0);
   const noResults = query.length > 0 && filteredGroups.length === 0;
 
@@ -207,30 +214,58 @@ export function AdminShell({
   function confirmLogout() {
     swalConfirm({
       title: 'Sign out of admin?',
-      text: 'You can sign back in with the demo credentials.',
+      text: backendEnabled
+        ? 'The local API session will be revoked.'
+        : 'You can sign back in with the demo credentials.',
       confirmLabel: 'Sign out',
       tone: 'primary',
       onConfirm: onLogout,
     });
   }
 
-  function publishChanges() {
-    if (draftCount === 0) {
+  async function publishChanges() {
+    if (!backendEnabled && draftCount === 0) {
       showNotice('There are no unpublished changes.');
       return;
     }
-    const at = markPublished();
-    logActivity({
-      kind: 'publish',
-      title:
-        draftCount === 1
-          ? 'Published 1 change to the simulator'
-          : `Published ${draftCount} changes to the simulator`,
-      detail: 'Reload the simulator to see them',
-      at,
-    });
-    setPublishedAt(at);
-    showNotice('Published. Reload the simulator to see the changes.');
+
+    try {
+      if (backendEnabled) {
+        const published = await publishContent(content);
+        const at = published.publishedAt ?? new Date().toISOString();
+        markPublished(at);
+        logActivity({
+          kind: 'publish',
+          title: 'Published the current content',
+          detail: `Version ${published.version} in the local API`,
+          at,
+        });
+        setPublishedAt(at);
+        showNotice(
+          `Published version ${published.version}. Reload the simulator to see the changes.`,
+        );
+        return;
+      }
+
+      const at = markPublished();
+      logActivity({
+        kind: 'publish',
+        title:
+          draftCount === 1
+            ? 'Published 1 change to the simulator'
+            : `Published ${draftCount} changes to the simulator`,
+        detail: 'Reload the simulator to see them',
+        at,
+      });
+      setPublishedAt(at);
+      showNotice('Published. Reload the simulator to see the changes.');
+    } catch (error) {
+      showError(
+        error instanceof Error
+          ? `Publish failed: ${error.message}`
+          : 'Publish failed. The content was not sent to the local API.',
+      );
+    }
   }
 
   const nav = (
@@ -306,7 +341,7 @@ export function AdminShell({
               >
                 Sign out
               </AdminButton>
-              <AccountRow />
+              <AccountRow email={email} />
             </div>
           </div>
         </div>
@@ -318,7 +353,9 @@ export function AdminShell({
           <div className="flex items-center gap-3 px-4 pb-4 pt-4">
             <BrandMark className="size-9" iconClassName="size-[18px]" />
             <div className="min-w-0">
-              <p className="truncate text-base font-semibold leading-5">{content.branding.appName}</p>
+              <p className="truncate text-base font-semibold leading-5">
+                {content.branding.appName}
+              </p>
               <p className="text-[11px] text-muted-foreground">Admin workspace</p>
             </div>
           </div>
@@ -351,7 +388,7 @@ export function AdminShell({
             >
               Sign out
             </AdminButton>
-            <AccountRow />
+            <AccountRow email={email} />
           </div>
         </aside>
 
@@ -361,7 +398,9 @@ export function AdminShell({
             draftCount={draftCount}
             searchValue={search}
             searchPlaceholder="Search settings, text, glossary..."
-            onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) => setSearch(event.target.value)}
+            onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+              setSearch(event.target.value)
+            }
             onPublish={publishChanges}
             onPreview={() => navigate('/')}
           />
@@ -452,7 +491,7 @@ function SidebarNavigation({
   );
 }
 
-function AccountRow() {
+function AccountRow({ email }: { email: string }) {
   return (
     <div className="mt-2 flex items-center gap-2.5 border-t border-line px-2 pt-3">
       <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-[11px] font-bold text-primary ring-1 ring-primary/20">
@@ -460,7 +499,7 @@ function AccountRow() {
       </div>
       <div className="min-w-0">
         <p className="truncate text-sm font-medium leading-5">Administrator</p>
-        <p className="truncate text-[11px] text-muted-foreground">admin@quakestudio.local</p>
+        <p className="truncate text-[11px] text-muted-foreground">{email}</p>
       </div>
     </div>
   );

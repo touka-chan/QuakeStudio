@@ -19,13 +19,8 @@ import {
 import { useRef, useState } from 'react';
 
 import { BASE_ASSUMPTIONS } from '@/config/assumptionCatalogue';
-import { readFeedback } from '@/feedback/feedbackStorage';
 import { contentRepository } from '@/content/repository';
-import {
-  formatRelativeTime,
-  readActivity,
-  type AdminActivity,
-} from '../adminActivity';
+import { formatRelativeTime, readActivity, type AdminActivity } from '../adminActivity';
 import { useAdminContent } from '../AdminContext';
 import { swalConfirm } from '../adminSwal';
 import { showError, showExported } from '../adminToast';
@@ -41,8 +36,7 @@ import {
 } from '../AdminUI';
 
 export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => void }) {
-  const { content, importJson, reset } = useAdminContent();
-  const feedbackCount = readFeedback().length;
+  const { content, importJson, reset, backendEnabled, feedbackCount } = useAdminContent();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
 
@@ -132,8 +126,12 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
     id: 'content-ready',
     at: content.updatedAt,
     kind: 'save',
-    title: 'Content is ready in this browser',
-    detail: 'Changes you save will appear here',
+    title: backendEnabled
+      ? 'Content is ready on the local server'
+      : 'Content is ready in this browser',
+    detail: backendEnabled
+      ? 'Saved drafts appear in the server version history'
+      : 'Changes you save will appear here',
   };
   const activity = (storedActivity.length > 0 ? storedActivity : [fallbackActivity]).slice(0, 5);
 
@@ -166,14 +164,18 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
       const raw = await file.text();
       swalConfirm({
         title: 'Replace saved content?',
-        text: `Importing “${file.name}” replaces everything saved in this browser. Export a backup first if you are unsure.`,
+        text: `Importing “${file.name}” replaces everything ${
+          backendEnabled ? 'in the local draft' : 'saved in this browser'
+        }. Export a backup first if you are unsure.`,
         confirmLabel: 'Import backup',
         tone: 'primary',
         onConfirm: () => {
           try {
             importJson(raw);
           } catch (error) {
-            showError(error instanceof Error ? error.message : 'That backup could not be imported.');
+            showError(
+              error instanceof Error ? error.message : 'That backup could not be imported.',
+            );
           }
         },
       });
@@ -187,7 +189,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
   function confirmReset() {
     swalConfirm({
       title: 'Reset all content?',
-      text: 'Every change saved in this browser is removed and the original defaults are restored. This cannot be undone.',
+      text: `Every change ${
+        backendEnabled ? 'in the local draft' : 'saved in this browser'
+      } is removed and the original defaults are restored. This cannot be undone.`,
       confirmLabel: 'Reset content',
       tone: 'danger',
       onConfirm: reset,
@@ -221,10 +225,15 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
               <strong className="font-semibold text-foreground">
                 {feedbackCount} feedback response{feedbackCount === 1 ? '' : 's'}
               </strong>{' '}
-              saved in this browser.
+              {backendEnabled ? 'in the local database' : 'saved in this browser'}.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <AdminButton variant="primary" size="sm" onClick={() => onNavigate('review')} icon={ArrowRight}>
+              <AdminButton
+                variant="primary"
+                size="sm"
+                onClick={() => onNavigate('review')}
+                icon={ArrowRight}
+              >
                 Review assumptions
               </AdminButton>
               <a href="/" className={adminButtonClass('secondary', 'sm')}>
@@ -302,7 +311,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
                   values reviewed. The rest are still placeholders.
                 </p>
               </div>
-              <p className="text-sm font-medium tabular text-muted-foreground">{reviewedPercent}%</p>
+              <p className="text-sm font-medium tabular text-muted-foreground">
+                {reviewedPercent}%
+              </p>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-surface-2">
               <div
@@ -322,10 +333,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
             </div>
           </SectionCard>
 
-          <SectionCard
-            title="Quick actions"
-            description="Jump to the areas you change most often."
-          >
+          <SectionCard title="Quick actions" description="Jump to the areas you change most often.">
             <div className="grid gap-2 sm:grid-cols-2">
               {quickActions.map((action) => {
                 const Icon = action.icon;
@@ -359,7 +367,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
         <SectionCard
           className="lg:col-span-2"
           title="Recent activity"
-          description="Saves made from this browser."
+          description={
+            backendEnabled ? 'Saves made from this workspace.' : 'Saves made from this browser.'
+          }
           actions={<StatusBadge tone="live">Live</StatusBadge>}
         >
           <div className="-mx-3 divide-y divide-line">
@@ -375,7 +385,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
             ))}
           </div>
           <p className="mt-2 border-t border-line pt-3 text-xs leading-5 text-muted-foreground">
-            This feed is stored in this browser only. Export a backup before clearing site data.
+            {backendEnabled
+              ? 'This browser feed is a local convenience; server actions are also recorded in the API audit log.'
+              : 'This feed is stored in this browser only. Export a backup before clearing site data.'}
           </p>
         </SectionCard>
       </div>
@@ -383,14 +395,20 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
       {/* Storage & backup */}
       <SectionCard
         title="Storage & backup"
-        description="Content is saved in this browser, not on a server."
+        description={
+          backendEnabled
+            ? 'PostgreSQL keeps the draft and published versions; this browser keeps a working copy.'
+            : 'Content is saved in this browser, not on a server.'
+        }
         className="bg-surface/80"
       >
         <div className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-app border border-line bg-background/50 p-3">
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-primary" aria-hidden="true" />
-              <p className="text-sm font-medium">Saved locally</p>
+              <p className="text-sm font-medium">
+                {backendEnabled ? 'Working copy' : 'Saved locally'}
+              </p>
               <StatusBadge tone="neutral" className="ml-auto">
                 {storageSize}
               </StatusBadge>
@@ -465,7 +483,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
               <span className="min-w-0 flex-1">
                 <span className="block text-sm font-medium text-danger">Reset to defaults</span>
                 <span className="block text-xs text-muted-foreground">
-                  Remove every change saved in this browser
+                  {backendEnabled
+                    ? 'Remove every change in the local draft'
+                    : 'Remove every change saved in this browser'}
                 </span>
               </span>
             </button>

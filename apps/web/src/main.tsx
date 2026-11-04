@@ -25,9 +25,9 @@ import '@fontsource-variable/inter';
 import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
-import './config/hydrateEngineering';
-
 import App from './App';
+import { syncLocalPublishedContent } from './api/bootstrap';
+import './config/hydrateEngineering';
 import { registerBackButton } from './pwa/backButton';
 import { registerServiceWorker } from './pwa/registerServiceWorker';
 
@@ -35,23 +35,32 @@ const container = document.getElementById('root');
 if (!container) {
   throw new Error('Root element #root not found in index.html');
 }
+const root = container;
 
-createRoot(container).render(
+createRoot(root).render(
   <StrictMode>
     <App />
   </StrictMode>,
 );
 
 /*
+ * Localhost only. If the API has a different published document, this writes it
+ * to storage and reloads once so the content modules can read it. On the
+ * deployed site and in the APK the function returns immediately.
+ */
+void syncLocalPublishedContent();
+
+/*
  * Offline support for the PWA. Registered here rather than injected by
- * vite-plugin-pwa so it can be skipped inside the Android APK, where the assets
- * are already bundled and a worker would only serve a stale precache after an
- * update. See src/pwa/registerServiceWorker.ts.
+ * vite-plugin-pwa so it can be skipped inside the Android APK, where the
+ * assets are already bundled and a worker would only serve a stale precache
+ * after an update. See src/pwa/registerServiceWorker.ts.
  */
 void registerServiceWorker();
 
 /*
- * Android's hardware back button. Without this it closes the activity, so back
- * inside any dialog drops the user out of the app entirely. No-op in a browser.
+ * Android's hardware back button. Without this it closes the activity, so
+ * back inside any dialog drops the user out of the app entirely. No-op in a
+ * browser.
  */
 void registerBackButton();

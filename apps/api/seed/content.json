@@ -1,0 +1,560 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-11-04T07:21:48.557Z",
+  "branding": {
+    "appName": "QuakeStudio",
+    "documentTitle": "QuakeStudio",
+    "metaDescription": "QuakeStudio — an educational earthquake response simulator. Not a structural safety assessment.",
+    "logoIcon": "building",
+    "disclaimerShort": "Educational simulation using simplified assumptions. Not a structural safety assessment.",
+    "disclaimerLong": "This is a learning tool, not a safety check. QuakeStudio uses a simplified model with stated assumptions. Its results say nothing about whether a real building is safe."
+  },
+  "copy": {
+    "topbar.saveRun": "Save run",
+    "topbar.saveShort": "Save",
+    "topbar.saveTooltip": "Saved in this browser. Export from the dialog to move runs elsewhere.",
+    "topbar.exportCsv": "Export CSV",
+    "topbar.exportShort": "Export",
+    "topbar.exportTooltip": "Writes the current run at full precision, in the same units shown on screen.",
+    "topbar.assumptions": "Assumptions",
+    "topbar.assumptionsShort": "About",
+    "topbar.assumptionsTooltip": "What the model assumes, and what its results do not tell you.",
+    "topbar.feedback": "Feedback",
+    "topbar.feedbackAria": "Usability feedback",
+    "topbar.feedbackTooltip": "Ten usability questions. Answers stay in this browser until you export them.",
+    "results.heading": "Results",
+    "results.updating": "Updating…",
+    "results.updatingBuilding": "Updating building {side}",
+    "results.owner": "Building {side}",
+    "results.summary": "Summary",
+    "results.response": "Response",
+    "results.peakDisplacement": "Peak displacement",
+    "results.peakDisplacementDetail": "Floor {floor}, relative to ground",
+    "results.peakDisplacementHelp": "The furthest any floor moved sideways, measured from the ground beneath it.",
+    "results.maxStoryDrift": "Max story drift",
+    "results.maxStoryDriftDetail": "Story {story}",
+    "results.maxStoryDriftHelp": "The biggest gap between one floor and the floor below it, as a percentage of floor height.",
+    "results.naturalPeriod": "Natural period",
+    "results.naturalPeriodDetail": "1st mode",
+    "results.naturalPeriodHelp": "How long the building takes to sway back and forth once, at its natural rhythm.",
+    "results.compare": "Compare with another building",
+    "results.stopCompare": "Stop comparing",
+    "results.compareHelpOn": "{count} buildings felt the same earthquake. Pick one on the left to edit it.",
+    "results.compareHelpOff": "Adds a second, third or fourth configuration and runs them all under one earthquake.",
+    "results.dimensionsHeading": "Dimensions and formulas",
+    "results.height": "Height",
+    "results.floorArea": "Floor area",
+    "results.floorWeight": "Floor weight",
+    "results.displacementNote": "is sideways movement from the ground, in millimetres. Each line is one floor.",
+    "results.driftNote": "is the difference between one floor’s peak and the floor below’s, as a percentage of floor height. The difference is taken between the peaks, not instant by instant.",
+    "results.periodNote": "is the time for one full sway at the building’s natural rhythm. A longer period is not by itself better or worse.",
+    "playback.goToStart": "Go to start",
+    "playback.play": "Play",
+    "playback.pause": "Pause",
+    "playback.simulationTime": "Simulation time",
+    "playback.speed": "Speed",
+    "playback.playbackSpeed": "Playback speed",
+    "playback.motion": "Motion",
+    "playback.motionAria": "Motion exaggeration factor",
+    "playback.loop": "Loop",
+    "playback.note": "Motion is drawn {exaggeration}× larger so millimetres are visible. The numbers themselves are not exaggerated — but they are still the model’s output, not a validated result.",
+    "playback.reducedMotion": " Reduced-motion is on, so playback starts paused at half speed.",
+    "desktop.heading": "QuakeStudio is built for a laptop or desktop",
+    "desktop.body": "The workspace needs three columns side by side. On a smaller screen the panels would be too narrow to read.",
+    "desktop.continue": "Continue anyway",
+    "templates.label": "Start from a template"
+  },
+  "engineering": {
+    "materials": {
+      "concrete": {
+        "label": "Concrete",
+        "dampingRatio": 0.05,
+        "periodCt": 0.072,
+        "periodExponentX": 0.8,
+        "bareMassPerAreaKgM2": 600
+      },
+      "steel": {
+        "label": "Steel",
+        "dampingRatio": 0.02,
+        "periodCt": 0.072,
+        "periodExponentX": 0.8,
+        "bareMassPerAreaKgM2": 400
+      },
+      "composite": {
+        "label": "Composite",
+        "dampingRatio": 0.03,
+        "periodCt": 0.072,
+        "periodExponentX": 0.8,
+        "bareMassPerAreaKgM2": 500
+      },
+      "wood": {
+        "label": "Wood",
+        "dampingRatio": 0.05,
+        "periodCt": 0.072,
+        "periodExponentX": 0.8,
+        "bareMassPerAreaKgM2": 250
+      }
+    },
+    "frameTypes": {
+      "moment": {
+        "label": "Moment frame",
+        "stiffnessFactor": 1
+      },
+      "braced": {
+        "label": "Braced frame",
+        "stiffnessFactor": 2
+      }
+    },
+    "occupancies": {
+      "office": {
+        "label": "Office",
+        "liveKPa": 2.4,
+        "description": "Desks, people and light equipment.",
+        "colorLight": "#dbeafe",
+        "colorDark": "#1e3a5f"
+      },
+      "residential": {
+        "label": "Residential",
+        "liveKPa": 1.9,
+        "description": "Homes: beds, sofas and household furniture.",
+        "colorLight": "#dcfce7",
+        "colorDark": "#14351f"
+      },
+      "parking": {
+        "label": "Parking",
+        "liveKPa": 2.4,
+        "description": "Passenger cars parked on the floor.",
+        "colorLight": "#e2e8f0",
+        "colorDark": "#1e293b"
+      },
+      "storage": {
+        "label": "Storage",
+        "liveKPa": 6,
+        "description": "Light stored goods, crates and shelves.",
+        "colorLight": "#ebddc3",
+        "colorDark": "#3a2c14"
+      },
+      "custom": {
+        "label": "Custom",
+        "liveKPa": 2.4,
+        "description": "Type your own live load.",
+        "colorLight": "#f1f5f9",
+        "colorDark": "#1f2937"
+      }
+    },
+    "loadAssumptions": {
+      "codeBasis": "NSCP 2015 (Philippines), which follows ASCE 7 for earthquake provisions",
+      "gravityMs2": 9.80665,
+      "defaultDeadLoadKPa": 4.8,
+      "liveLoadParticipation": 0.25,
+      "minDeadLoadKPa": 0,
+      "maxDeadLoadKPa": 20,
+      "minLiveLoadKPa": 0,
+      "maxLiveLoadKPa": 30,
+      "sourceNote": "Values from published summaries of NSCP 2015 Table 205-1. Confirm against the official code."
+    },
+    "incompatibleUses": {
+      "parking": [
+        "wood"
+      ],
+      "storage": [
+        "wood"
+      ]
+    },
+    "geometry": {
+      "minFloors": 1,
+      "maxFloors": 20,
+      "floorHeightM": {
+        "min": 2.2,
+        "max": 5,
+        "step": 0.1,
+        "default": 3
+      },
+      "widthM": {
+        "min": 4,
+        "max": 40,
+        "step": 0.5,
+        "default": 14
+      },
+      "depthM": {
+        "min": 4,
+        "max": 40,
+        "step": 0.5,
+        "default": 10
+      }
+    },
+    "groundMotion": {
+      "pgaG": {
+        "min": 0.05,
+        "max": 0.6,
+        "step": 0.01,
+        "default": 0.3
+      },
+      "frequencyHz": {
+        "min": 0.2,
+        "max": 5,
+        "step": 0.1,
+        "default": 1.4
+      },
+      "defaultSeed": 20240501,
+      "sampleDtS": 0.01,
+      "taperDurationS": 0.5,
+      "randomBandHz": {
+        "low": 0.2,
+        "high": 4
+      },
+      "impulseDurationS": 0.15
+    },
+    "viewport": {
+      "defaultExaggeration": 20,
+      "minExaggeration": 1,
+      "maxExaggeration": 60,
+      "exaggerationStep": 1,
+      "defaultGridDivisions": 40,
+      "groundThicknessM": 0.6
+    },
+    "playback": {
+      "speeds": [
+        0.25,
+        0.5,
+        1,
+        2
+      ],
+      "defaultSpeed": 1,
+      "defaultLoop": true
+    },
+    "defaultBuilding": {
+      "id": "default-5-story-concrete",
+      "name": "5-story concrete frame",
+      "floors": 5,
+      "floorHeightM": 3,
+      "widthM": 14,
+      "depthM": 10,
+      "material": "concrete",
+      "frameType": "moment"
+    },
+    "defaultGroundMotion": {
+      "preset": "harmonic",
+      "pgaG": 0.3,
+      "frequencyHz": 1.4,
+      "durationS": 20,
+      "dt": 0.01,
+      "seed": 20240501
+    },
+    "groundMotionPresets": {
+      "harmonic": {
+        "label": "Harmonic pulse",
+        "description": "A smooth, repeating shake at one chosen frequency. Good for seeing resonance."
+      },
+      "random": {
+        "label": "Random shaking",
+        "description": "Band-limited random motion from a fixed seed, so every run is reproducible."
+      },
+      "impulse": {
+        "label": "Single impulse",
+        "description": "One short sharp jolt, like a nearby shock. Shows how the building rings afterwards."
+      }
+    }
+  },
+  "templates": [
+    {
+      "id": "custom",
+      "label": "Custom",
+      "description": "Start from scratch, or edit any field on a template to leave the presets.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      }
+    },
+    {
+      "id": "tpl-3-concrete",
+      "label": "3-story concrete",
+      "description": "A short, stiff block. Barely moves — a good starting point.",
+      "building": {
+        "floors": 3,
+        "floorHeightM": 3.2,
+        "widthM": 16,
+        "depthM": 12,
+        "material": "concrete",
+        "frameType": "moment"
+      }
+    },
+    {
+      "id": "tpl-5-concrete",
+      "label": "5-story concrete frame",
+      "description": "A typical small mid-rise. The default building.",
+      "building": {
+        "floors": 5,
+        "floorHeightM": 3,
+        "widthM": 14,
+        "depthM": 10,
+        "material": "concrete",
+        "frameType": "moment"
+      }
+    },
+    {
+      "id": "tpl-10-steel",
+      "label": "10-story steel tower",
+      "description": "Taller and lighter. Sways more slowly and further than the concrete ones.",
+      "building": {
+        "floors": 10,
+        "floorHeightM": 3.3,
+        "widthM": 16,
+        "depthM": 14,
+        "material": "steel",
+        "frameType": "moment"
+      }
+    },
+    {
+      "id": "tpl-8-composite-braced",
+      "label": "8-story composite, braced",
+      "description": "Same height as a steel tower, but braced, so it is much stiffer.",
+      "building": {
+        "floors": 8,
+        "floorHeightM": 3.2,
+        "widthM": 18,
+        "depthM": 16,
+        "material": "composite",
+        "frameType": "braced"
+      }
+    },
+    {
+      "id": "tpl-4-wood",
+      "label": "4-story wood house",
+      "description": "Light and flexible. A good contrast with the concrete buildings.",
+      "building": {
+        "floors": 4,
+        "floorHeightM": 2.8,
+        "widthM": 10,
+        "depthM": 8,
+        "material": "wood",
+        "frameType": "moment"
+      }
+    },
+    {
+      "id": "tpl-15-concrete",
+      "label": "15-story concrete high-rise",
+      "description": "Tall enough to move a lot. Watch the top floor drift.",
+      "building": {
+        "floors": 15,
+        "floorHeightM": 3.4,
+        "widthM": 20,
+        "depthM": 18,
+        "material": "concrete",
+        "frameType": "moment"
+      }
+    }
+  ],
+  "defaultTemplateId": "tpl-5-concrete",
+  "glossary": [
+    {
+      "id": "displacement",
+      "term": "displacement",
+      "definition": "How far a floor moves sideways, measured relative to the ground beneath it."
+    },
+    {
+      "id": "drift",
+      "term": "drift",
+      "definition": "How much one floor moves compared with the floor below it. A bigger gap means more strain between the two."
+    },
+    {
+      "id": "drift-ratio",
+      "term": "drift ratio",
+      "definition": "Drift as a percentage of floor height, so tall and short floors can be compared fairly."
+    },
+    {
+      "id": "damping",
+      "term": "damping",
+      "definition": "How quickly the shaking dies away after it stops. More damping means the building settles sooner."
+    },
+    {
+      "id": "period",
+      "term": "period",
+      "definition": "The time it takes the building to sway back and forth once. Taller buildings have a longer period."
+    },
+    {
+      "id": "natural-period",
+      "term": "natural period",
+      "definition": "The building’s own natural rhythm — it always sways at this pace unless something forces it faster."
+    },
+    {
+      "id": "pga",
+      "term": "pga",
+      "definition": "Peak Ground Acceleration — how strong the shaking is at its most intense moment."
+    },
+    {
+      "id": "stiffness",
+      "term": "stiffness",
+      "definition": "How hard the building resists being pushed sideways. Stiffer buildings sway less."
+    },
+    {
+      "id": "mass",
+      "term": "mass",
+      "definition": "How heavy the building is. Heavier buildings respond more slowly."
+    },
+    {
+      "id": "moment-frame",
+      "term": "moment frame",
+      "definition": "Rigid corners join the beams and columns, so the frame bends rather than folding inward."
+    },
+    {
+      "id": "braced-frame",
+      "term": "braced frame",
+      "definition": "Diagonal braces stiffen the frame, so it resists sideways movement much more strongly."
+    },
+    {
+      "id": "resonance",
+      "term": "resonance",
+      "definition": "When the shaking rhythm matches the building’s own rhythm, it builds up much more than you would expect."
+    },
+    {
+      "id": "exaggeration",
+      "term": "exaggeration",
+      "definition": "Real movement is tiny, so the 3D view multiplies it so you can see it. The numbers stay true."
+    },
+    {
+      "id": "ground-motion",
+      "term": "ground motion",
+      "definition": "The movement of the ground itself, which the building has to follow."
+    },
+    {
+      "id": "seed",
+      "term": "seed",
+      "definition": "A number that makes random shaking repeatable, so the same shake comes back every time."
+    }
+  ],
+  "tour": {
+    "enabled": true,
+    "buttonLabel": "How to use",
+    "buttonTooltip": "Walk through the five things you can do here. Drag it anywhere.",
+    "steps": [
+      {
+        "id": "tour-controls",
+        "target": "controls",
+        "title": "Set up your building",
+        "body": "Pick a template, then set how many floors it has, how big each one is, what it is made of, and whether the frame is braced. Every one of those changes how the building answers a shake.",
+        "icon": "building"
+      },
+      {
+        "id": "tour-loads",
+        "target": "loads",
+        "title": "Give each floor a use",
+        "body": "Choose what each floor is for — office, home, parking or storage — or type your own dead and live loads. The use sets how much live load is counted, which changes the building’s weight and how it sways. These are teaching defaults, not a design check.",
+        "icon": "layers"
+      },
+      {
+        "id": "tour-play",
+        "target": "play",
+        "title": "Shake it",
+        "body": "Press play to run the earthquake. The movement you see is drawn about {exaggeration} times larger than it really is, so the sway is easy to follow — but the numbers are never scaled. That setting only changes the drawing.",
+        "icon": "waves"
+      },
+      {
+        "id": "tour-results",
+        "target": "results",
+        "title": "Read the numbers",
+        "body": "Peak displacement, max story drift and natural period. Colour on the building shows how far each floor moved compared to its own height. These come from a teaching model, not from a safety check.",
+        "icon": "play"
+      },
+      {
+        "id": "tour-compare",
+        "target": "compare",
+        "title": "Compare two buildings",
+        "body": "Turn on compare to add a second building and watch both react to the same earthquake. Useful for asking what actually makes a building handle shaking better.",
+        "icon": "compare"
+      }
+    ]
+  },
+  "welcome": {
+    "enabled": true,
+    "title": "Welcome to QuakeStudio",
+    "description": "Build a simple building, shake it, and watch how it sways.",
+    "acknowledgement": "I understand that results are for learning only.",
+    "assumptionsLabel": "Read the assumptions",
+    "startLabel": "Start exploring",
+    "footer": "Every coefficient in this tool is a placeholder waiting for review by a structural engineer. The Assumptions button in the top bar lists them all.",
+    "steps": [
+      {
+        "id": "welcome-build",
+        "icon": "play",
+        "title": "Build",
+        "body": "Pick a template or change the floors, size, material and frame type."
+      },
+      {
+        "id": "welcome-shake",
+        "icon": "waves",
+        "title": "Shake",
+        "body": "Choose how strong and how fast the ground moves, then press play."
+      },
+      {
+        "id": "welcome-compare",
+        "icon": "compare",
+        "title": "Compare",
+        "body": "Add a second building and see how the sway and the numbers differ."
+      }
+    ]
+  },
+  "driftBands": [
+    {
+      "id": "drift-very-small",
+      "max": 0.001,
+      "label": "Very small",
+      "note": "The floors stay close together.",
+      "colorLight": "#bfdbfe",
+      "colorDark": "#bfdbfe"
+    },
+    {
+      "id": "drift-small",
+      "max": 0.002,
+      "label": "Small",
+      "note": "A small gap opens between floors.",
+      "colorLight": "#86efac",
+      "colorDark": "#86efac"
+    },
+    {
+      "id": "drift-moderate",
+      "max": 0.0035,
+      "label": "Moderate",
+      "note": "The gap is easy to see.",
+      "colorLight": "#fde047",
+      "colorDark": "#fde047"
+    },
+    {
+      "id": "drift-large",
+      "max": 0.005,
+      "label": "Large",
+      "note": "Neighbouring floors move noticeably apart.",
+      "colorLight": "#fb923c",
+      "colorDark": "#fb923c"
+    },
+    {
+      "id": "drift-very-large",
+      "max": null,
+      "label": "Very large",
+      "note": "The largest movement in this run.",
+      "colorLight": "#ea580c",
+      "colorDark": "#ea580c"
+    }
+  ],
+  "features": {
+    "compareEnabled": true,
+    "maxBuildings": 4,
+    "maxSideBySide": 2,
+    "feedbackEnabled": true,
+    "installPromptEnabled": true,
+    "savedRunsEnabled": true,
+    "csvExportEnabled": true,
+    "welcomeEnabled": true,
+    "tourEnabled": true,
+    "defaultCutaway": false,
+    "defaultCompareView": "sideBySide"
+  },
+  "assumptionReview": {
+    "placeholder": {},
+    "notes": {}
+  }
+}

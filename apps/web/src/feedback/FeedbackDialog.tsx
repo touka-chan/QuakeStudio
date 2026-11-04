@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, Download } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
@@ -14,6 +14,9 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { downloadCsv } from '@/lib/csv';
+import { submitFeedbackToApi } from '@/api/feedback';
+import { isLocalBackendAvailable } from '@/api/client';
+import { APP_VERSION } from '@/types';
 import { SUS_ITEMS, SUS_SCALE, type SusAnswers, type SusScaleValue } from './susItems';
 import { appendFeedback } from './feedbackStorage';
 import { aggregateSus, scoreSus, SUS_TARGET_SCORE } from './susScore';
@@ -44,9 +47,10 @@ import { aggregateSus, scoreSus, SUS_TARGET_SCORE } from './susScore';
      should be able to reopen and finish; silently persisting a half-finished
      form is how a study ends up with responses nobody knowingly submitted.
 
-   • Nothing leaves the device. There is no backend, so "export" is a file the
-     researcher chooses to send on. That is also the honest privacy story for a
-     tool used by students.
+   • On the deployed site and in the APK, nothing leaves the device. On
+     localhost only, the local FastAPI service may store the response in the
+     development database; the dialog says so before submission. There is still
+     no third-party or internet service involved.
    ========================================================================= */
 
 export type SusResponse = {
@@ -61,11 +65,22 @@ export type SusResponse = {
 };
 
 export function FeedbackDialog() {
+  const [localApiEnabled, setLocalApiEnabled] = useState(false);
   const [answers, setAnswers] = useState<SusAnswers>({});
   const [comments, setComments] = useState('');
   const [participantId, setParticipantId] = useState('');
   const [submitted, setSubmitted] = useState<SusResponse[]>([]);
   const [status, setStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isLocalBackendAvailable().then((available) => {
+      if (!cancelled) setLocalApiEnabled(available);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const answeredCount = useMemo(
     () => SUS_ITEMS.filter((item) => typeof answers[item.number] === 'number').length,
@@ -82,7 +97,7 @@ export function FeedbackDialog() {
 
   const aggregate = useMemo(() => aggregateSus(submitted.map((r) => r.score)), [submitted]);
 
-  const submit = () => {
+  const submit = async () => {
     if (!preview) return;
     const response: SusResponse = {
       submittedAt: new Date().toISOString(),
@@ -91,12 +106,39 @@ export function FeedbackDialog() {
       comments: comments.trim() || undefined,
       participantId: participantId.trim() || undefined,
     };
-    setSubmitted((previous) => [...previous, response]);
-    appendFeedback(response);
+
+    if (localApiEnabled) {
+      try {
+        const saved = await submitFeedbackToApi({
+          answers: response.answers as Record<string, number>,
+          comments: response.comments,
+          participantId: response.participantId,
+          appVersion: APP_VERSION,
+        });
+        const mirrored: SusResponse = {
+          ...response,
+          submittedAt: saved.submittedAt,
+          score: saved.score,
+        };
+        setSubmitted((previous) => [...previous, mirrored]);
+        appendFeedback(mirrored);
+        setStatus('Response recorded in the local study database.');
+      } catch {
+        setSubmitted((previous) => [...previous, response]);
+        appendFeedback(response);
+        setStatus(
+          'The local API did not confirm the save. A copy is stored in this browser; check the admin list before submitting again.',
+        );
+      }
+    } else {
+      setSubmitted((previous) => [...previous, response]);
+      appendFeedback(response);
+      setStatus('Response recorded locally. Nothing has been sent anywhere.');
+    }
+
     setAnswers({});
     setComments('');
     setParticipantId('');
-    setStatus('Response recorded locally. Nothing has been sent anywhere.');
   };
 
   const exportResponses = async () => {
@@ -128,8 +170,9 @@ export function FeedbackDialog() {
       <DialogHeader>
         <DialogTitle>Usability feedback</DialogTitle>
         <DialogDescription>
-          Ten questions about your experience. Your answers stay in this browser until you export
-          them, and are never sent anywhere automatically.
+          {localApiEnabled
+            ? 'Ten questions about your experience. Your answers are sent to the local study database running on this computer, not to the internet.'
+            : 'Ten questions about your experience. Your answers stay in this browser until you export them, and are never sent anywhere automatically.'}
         </DialogDescription>
       </DialogHeader>
 
@@ -304,7 +347,7 @@ export function FeedbackDialog() {
             {answeredCount}/{SUS_ITEMS.length} answered
             {preview ? ` · would score ${preview.score}` : ''}
           </span>
-          <Button size="sm" onClick={submit} disabled={!preview}>
+          <Button size="sm" onClick={() => void submit()} disabled={!preview}>
             <Check aria-hidden="true" />
             Submit response
           </Button>
