@@ -50,6 +50,8 @@ export function AdminTour() {
   const [errors, setErrors] = useState<{ path: string; message: string }[]>([]);
 
   useEffect(() => {
+    // The provider can replace the document after a reload or a server restore.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setTourForm({
       enabled: content.tour.enabled,
       buttonLabel: content.tour.buttonLabel,

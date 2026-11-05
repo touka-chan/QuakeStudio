@@ -22,6 +22,8 @@ export function AdminEngineering({ onNavigate }: { onNavigate: (to: string) => v
   const [activeTab, setActiveTab] = useState<TabId>('floor-loads');
 
   useEffect(() => {
+    // The provider can replace the document after a reload or a server restore.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraft(content.engineering);
     setSpeedsText(content.engineering.playback.speeds.join(', '));
   }, [content.engineering]);

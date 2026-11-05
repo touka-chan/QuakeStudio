@@ -721,7 +721,7 @@ export function AdminEmptySection({
   description,
   action,
 }: {
-  icon: React.ComponentType<any>;
+  icon: LucideIcon;
   title: string;
   description: string;
   action?: React.ReactNode;

@@ -23,6 +23,8 @@ export function AdminReview() {
   const [query, setQuery] = useState('');
 
   useEffect(() => {
+    // The provider can replace the document after a reload or a server restore.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setPlaceholder(content.assumptionReview.placeholder);
     setNotes(content.assumptionReview.notes);
   }, [content.assumptionReview]);

@@ -20,6 +20,8 @@ export function AdminBranding() {
   const [draft, setDraft] = useState(content.branding);
   const [localErrors, setLocalErrors] = useState<{ path: string; message: string }[]>([]);
 
+  // The provider can replace the document after a reload or a server restore.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setDraft(content.branding), [content.branding]);
 
   function issue(path: string) {
