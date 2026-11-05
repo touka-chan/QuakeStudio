@@ -10,7 +10,7 @@ import { PlaybackClock } from './PlaybackClock';
 import { ResultsPanel } from './ResultsPanel';
 import { TopBar } from './TopBar';
 import { LazyViewport } from '@/components/viewport/LazyViewport';
-import { TOUR_UI } from '@/content/branding';
+import { FEATURES, TOUR_UI } from '@/content/branding';
 import { Tour } from '@/components/tutorial/Tour';
 import { TourButton } from '@/components/tutorial/TourButton';
 import { useTourStore } from '@/store/tourStore';
@@ -99,14 +99,16 @@ export function AppShell({ forceDesktopLayout }: { forceDesktopLayout?: boolean 
         {/* The guided tour. Mounted above the gate on purpose: the tour is
             skippable, the gate is not, so the tour gets the first beat and
             releases the gate when it is done. */}
-        {TOUR_UI.enabled ? <Tour forceDesktopLayout={forceDesktopLayout} /> : null}
+        {FEATURES.tourEnabled && TOUR_UI.enabled ? (
+          <Tour forceDesktopLayout={forceDesktopLayout} />
+        ) : null}
 
         {/*
           Re-entry for the tour, floating at the bottom of the screen rather
           than in the top bar. Hidden while the tour itself is up — the card
           already offers a way out.
         */}
-        {TOUR_UI.enabled ? <TourButton /> : null}
+        {FEATURES.tourEnabled && TOUR_UI.enabled ? <TourButton /> : null}
 
         {/*
           The gate stays blocking. `blocked` is true only while the tour is

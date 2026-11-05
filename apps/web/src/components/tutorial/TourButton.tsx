@@ -3,7 +3,7 @@ import { CircleHelp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { TOUR_UI } from '@/content/branding';
+import { FEATURES, TOUR_UI } from '@/content/branding';
 import { STORAGE_KEYS } from '@/config/engineeringAssumptions';
 import { cn } from '@/lib/utils';
 import { useTourStore } from '@/store/tourStore';
@@ -272,7 +272,9 @@ export function TourButton() {
     start();
   }
 
-  if (!TOUR_UI.enabled) return null;
+  // The admin capability is the master switch; the Tour & welcome page keeps
+  // its own per-section switch, and both have to agree.
+  if (!FEATURES.tourEnabled || !TOUR_UI.enabled) return null;
 
   return (
     <Tooltip>

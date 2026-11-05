@@ -7,6 +7,7 @@ import { ComparisonTable } from '@/components/charts/ComparisonTable';
 import { LazyCharts } from '@/components/charts/LazyCharts';
 import { MetricCard } from '@/components/charts/MetricCard';
 import { WeightSummary } from '@/components/charts/WeightSummary';
+import { FEATURES } from '@/content/branding';
 import { formatGrouped, formatMm, formatPct } from '@/lib/utils';
 import {
   defaultCompareBuilding,
@@ -56,10 +57,11 @@ export function ResultsPanel() {
   const count = useCompareStore((s) => s.count);
   const enable = useCompareStore((s) => s.enable);
   const disable = useCompareStore((s) => s.disable);
-  const compareEnabled = count > 1;
+  const canCompare = FEATURES.compareEnabled;
+  const comparing = count > 1;
 
   const toggleCompare = () => {
-    if (compareEnabled) {
+    if (comparing) {
       disable();
       resolveNow();
       return;
@@ -98,7 +100,7 @@ export function ResultsPanel() {
             The letter is text, not just a coloured badge, so this survives a
             colour deficiency, a greyscale print and a screen in sunlight.
           */}
-          {compareEnabled ? (
+          {comparing ? (
             <span
               className="flex items-center gap-1.5 text-xs text-muted-foreground"
               data-testid="results-owner"
@@ -119,7 +121,7 @@ export function ResultsPanel() {
           ) : null}
         </header>
 
-        {compareEnabled && status === 'computing' ? (
+        {comparing && status === 'computing' ? (
           <span className="sr-only" aria-live="polite">
             Updating building {editing}
           </span>
@@ -182,31 +184,33 @@ export function ResultsPanel() {
                 building={building}
                 result={result}
                 side={editing}
-                showOwner={compareEnabled}
+                showOwner={comparing}
               />
 
               {/* The table stays eager: it carries the numbers, and there is
                   nothing to gain by deferring it. */}
               <ComparisonTable />
 
-              <div className="space-y-2">
-                <Button
-                  className="h-11 w-full"
-                  variant={compareEnabled ? 'outline' : 'default'}
-                  onClick={toggleCompare}
-                  data-tour="compare"
-                >
-                  <Columns2 aria-hidden="true" />
-                  {compareEnabled ? 'Stop comparing' : 'Compare with another building'}
-                </Button>
-                <p className="text-xs text-muted-foreground">
-                  {compareEnabled
-                    ? // Generated from the count, because "Both buildings" under
-                      // four columns is a caption that is quietly wrong.
-                      `${count} buildings felt the same earthquake. Pick one on the left to edit it.`
-                    : 'Adds a second, third or fourth configuration and runs them all under one earthquake.'}
-                </p>
-              </div>
+              {canCompare ? (
+                <div className="space-y-2">
+                  <Button
+                    className="h-11 w-full"
+                    variant={comparing ? 'outline' : 'default'}
+                    onClick={toggleCompare}
+                    data-tour="compare"
+                  >
+                    <Columns2 aria-hidden="true" />
+                    {comparing ? 'Stop comparing' : 'Compare with another building'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground">
+                    {comparing
+                      ? // Generated from the count, because "Both buildings" under
+                        // four columns is a caption that is quietly wrong.
+                        `${count} buildings felt the same earthquake. Pick one on the left to edit it.`
+                      : 'Adds a second, third or fourth configuration and runs them all under one earthquake.'}
+                  </p>
+                </div>
+              ) : null}
             </TabsContent>
 
             {/* ---- Response ------------------------------------------------ */}

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeftRight, Play, Waves } from 'lucide-react';
 
-import { BRANDING, WELCOME } from '@/content/branding';
+import { BRANDING, FEATURES, WELCOME } from '@/content/branding';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -90,7 +90,9 @@ export function WelcomeGate({
   const [suppressed] = useState(gateSuppressed);
   const [dismissed, setDismissed] = useState(false);
   const [acknowledged, setAcknowledged] = useState(false);
-  const open = WELCOME.enabled && !suppressed && !dismissed && !blocked;
+  // Both switches have to agree: the admin capability is the master switch,
+  // and the Tour & welcome page keeps its own per-section switch.
+  const open = FEATURES.welcomeEnabled && WELCOME.enabled && !suppressed && !dismissed && !blocked;
 
   function start() {
     // Nothing is written down, on purpose. It closes for the rest of this

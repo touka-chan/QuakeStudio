@@ -1,3 +1,4 @@
+import { FEATURES } from '@/content/branding';
 import { formatGrouped, formatMm, formatPct } from '@/lib/utils';
 import { describeBuilding } from '@/lib/describeBuilding';
 import { seriesColor, useCompareStore, type CompareSide } from '@/store/compareStore';
@@ -148,6 +149,8 @@ export function ComparisonTable() {
   const resultA = useConfigStore((s) => s.result);
   const results = useConfigStore((s) => s.results);
   const motion = useConfigStore((s) => s.motion);
+
+  if (!FEATURES.compareEnabled) return null;
 
   if (!compareEnabled) {
     return (

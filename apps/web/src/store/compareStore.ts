@@ -116,11 +116,16 @@ export const useCompareStore = create<CompareState>((set) => ({
   view: FEATURES.defaultCompareView,
   editing: 'B',
 
-  enable: () => set({ count: Math.min(2, MAX_BUILDINGS), editing: 'B' }),
+  // The feature switch in admin decides whether comparison exists at all. The
+  // store guards here as well as in the UI so a stale control, a keyboard path
+  // or a future caller cannot turn on a capability the admin switched off.
+  enable: () =>
+    set((s) => (FEATURES.compareEnabled ? { count: Math.min(2, MAX_BUILDINGS), editing: 'B' } : s)),
   disable: () => set({ count: 1, editing: 'A' }),
 
   addSide: () =>
     set((s) => {
+      if (!FEATURES.compareEnabled) return s;
       if (s.count >= MAX_BUILDINGS) return s;
       const count = s.count + 1;
       // Move the editing hand to the building just added, so it is obvious that
