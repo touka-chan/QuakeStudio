@@ -1,4 +1,11 @@
-import { ClipboardCheck, Download, ExternalLink, RefreshCw, Trash2 } from 'lucide-react';
+import {
+  ChevronRight,
+  ClipboardCheck,
+  Download,
+  ExternalLink,
+  RefreshCw,
+  Trash2,
+} from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 
 import {
@@ -16,10 +23,12 @@ import { useAdminContent } from '../AdminContext';
 import { swalAlert, swalConfirm } from '../adminSwal';
 import { showDeleted, showError, showExported } from '../adminToast';
 import { SectionCard } from '../AdminForms';
+import { reviewSusAnswers } from '../feedbackReview';
 import {
   adminButtonClass,
   AdminBadge,
   AdminButton,
+  AdminDialog,
   AdminEmptyState,
   formatAdminDate,
 } from '../AdminUI';
@@ -46,6 +55,20 @@ function toSusResponse(item: ApiFeedback): SusResponse {
   };
 }
 
+/** A response plus the server metadata the review dialog can show. */
+type FeedbackEntry = SusResponse & {
+  appVersion?: string | null;
+  contentVersion?: number | null;
+};
+
+function toFeedbackEntry(item: ApiFeedback): FeedbackEntry {
+  return {
+    ...toSusResponse(item),
+    appVersion: item.appVersion,
+    contentVersion: item.contentVersion,
+  };
+}
+
 export function AdminFeedback() {
   const { backendEnabled, refreshFeedback } = useAdminContent();
   const [localResponses, setLocalResponses] = useState(() => readFeedback());
@@ -53,6 +76,7 @@ export function AdminFeedback() {
   const [serverSummary, setServerSummary] = useState<ApiSusSummary | null>(null);
   const [serverTotal, setServerTotal] = useState(0);
   const [loading, setLoading] = useState(backendEnabled);
+  const [selected, setSelected] = useState<{ entry: FeedbackEntry; position: number } | null>(null);
 
   const loadServer = useCallback(async () => {
     try {
@@ -106,7 +130,9 @@ export function AdminFeedback() {
     };
   }, [backendEnabled]);
 
-  const responses = serverItems ? serverItems.map(toSusResponse) : localResponses;
+  const responses: FeedbackEntry[] = serverItems
+    ? serverItems.map(toFeedbackEntry)
+    : localResponses;
   const total = serverItems ? serverTotal : responses.length;
   const average = serverSummary
     ? serverSummary.mean
@@ -192,6 +218,7 @@ export function AdminFeedback() {
   }
 
   const sorted = [...responses].sort((a, b) => b.submittedAt.localeCompare(a.submittedAt));
+  const review = selected ? reviewSusAnswers(selected.entry.answers) : null;
 
   return (
     <div>
@@ -258,7 +285,7 @@ export function AdminFeedback() {
       <SectionCard
         className="mt-4"
         title="Response log"
-        description="Newest responses appear first. Scores are calculated when a response is submitted."
+        description="Newest responses appear first. Select a response to see every answer and how the score was built."
       >
         {sorted.length === 0 ? (
           <AdminEmptyState
@@ -274,50 +301,145 @@ export function AdminFeedback() {
           />
         ) : (
           <div className="space-y-3">
-            {sorted.map((response, index) => (
-              <div
-                key={`${response.submittedAt}-${index}`}
-                className="rounded-app border border-line bg-background/40 p-4"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span
-                      className={`grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold ring-1 ${scoreCircleClass(response.score)}`}
-                    >
-                      {Math.round(response.score)}
+            {sorted.map((response, index) => {
+              const position = sorted.length - index;
+              return (
+                <button
+                  key={`${response.submittedAt}-${index}`}
+                  type="button"
+                  onClick={() => setSelected({ entry: response, position })}
+                  className="block w-full rounded-app border border-line bg-background/40 p-4 text-left transition-colors hover:border-primary/40 hover:bg-surface-2/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  <span className="flex flex-wrap items-start justify-between gap-3">
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span
+                        className={`grid size-10 shrink-0 place-items-center rounded-full text-sm font-semibold ring-1 ${scoreCircleClass(response.score)}`}
+                      >
+                        {Math.round(response.score)}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-medium">
+                          Response {position}
+                          {response.participantId ? (
+                            <span className="font-normal text-muted-foreground">
+                              {' '}
+                              · {response.participantId}
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className="mt-0.5 block text-xs text-muted-foreground">
+                          {formatAdminDate(response.submittedAt)}
+                        </span>
+                      </span>
                     </span>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        Response {sorted.length - index}
-                        {response.participantId ? (
-                          <span className="font-normal text-muted-foreground">
-                            {' '}
-                            · {response.participantId}
-                          </span>
-                        ) : null}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {formatAdminDate(response.submittedAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <AdminBadge tone={scoreTone(response.score)}>
-                      {interpretSus(response.score)}
-                    </AdminBadge>
-                    <AdminBadge>{gradeSus(response.score)}</AdminBadge>
-                  </div>
-                </div>
-                {response.comments ? (
-                  <p className="mt-3 rounded-app bg-surface-2 p-3 text-sm leading-6 text-foreground">
-                    “{response.comments}”
-                  </p>
-                ) : null}
-              </div>
-            ))}
+                    <span className="flex flex-wrap items-center gap-1.5">
+                      <AdminBadge tone={scoreTone(response.score)}>
+                        {interpretSus(response.score)}
+                      </AdminBadge>
+                      <AdminBadge>{gradeSus(response.score)}</AdminBadge>
+                      <span className="inline-flex items-center gap-0.5 text-xs font-medium text-primary">
+                        Review answers
+                        <ChevronRight className="size-3.5" aria-hidden="true" />
+                      </span>
+                    </span>
+                  </span>
+                  {response.comments ? (
+                    <span className="mt-3 block rounded-app bg-surface-2 p-3 text-sm leading-6 text-foreground">
+                      “{response.comments}”
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         )}
       </SectionCard>
+
+      {selected && review ? (
+        <AdminDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setSelected(null);
+          }}
+          title={`Response ${selected.position}${
+            selected.entry.participantId ? ` · ${selected.entry.participantId}` : ''
+          }`}
+          description={`${formatAdminDate(selected.entry.submittedAt)} · SUS ${selected.entry.score} · ${interpretSus(
+            selected.entry.score,
+          )} (${gradeSus(selected.entry.score)})`}
+          size="lg"
+          footer={<AdminButton onClick={() => setSelected(null)}>Close</AdminButton>}
+        >
+          <div className="flex flex-wrap items-center gap-3">
+            <span
+              className={`grid size-12 place-items-center rounded-full text-base font-semibold ring-1 ${scoreCircleClass(selected.entry.score)}`}
+            >
+              {Math.round(selected.entry.score)}
+            </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <AdminBadge tone={scoreTone(selected.entry.score)}>
+                {interpretSus(selected.entry.score)}
+              </AdminBadge>
+              <AdminBadge>{gradeSus(selected.entry.score)}</AdminBadge>
+              <AdminBadge tone={selected.entry.score >= SUS_TARGET_SCORE ? 'success' : 'warning'}>
+                {selected.entry.score >= SUS_TARGET_SCORE ? 'Meets target' : 'Below target'}
+              </AdminBadge>
+            </div>
+          </div>
+
+          <dl className="mt-4 grid gap-2 text-xs sm:grid-cols-3">
+            <div className="rounded-app bg-surface-2 p-3">
+              <dt className="text-muted-foreground">Submitted</dt>
+              <dd className="mt-0.5 font-medium">{formatAdminDate(selected.entry.submittedAt)}</dd>
+            </div>
+            <div className="rounded-app bg-surface-2 p-3">
+              <dt className="text-muted-foreground">Participant ID</dt>
+              <dd className="mt-0.5 break-words font-medium">
+                {selected.entry.participantId ?? '—'}
+              </dd>
+            </div>
+            <div className="rounded-app bg-surface-2 p-3">
+              <dt className="text-muted-foreground">App / content</dt>
+              <dd className="mt-0.5 break-words font-medium">
+                {selected.entry.appVersion ?? '—'}
+                {selected.entry.contentVersion !== undefined &&
+                selected.entry.contentVersion !== null
+                  ? ` · v${selected.entry.contentVersion}`
+                  : ''}
+              </dd>
+            </div>
+          </dl>
+
+          {selected.entry.comments ? (
+            <blockquote className="mt-4 rounded-app bg-surface-2 p-3 text-sm leading-6 text-foreground">
+              “{selected.entry.comments}”
+            </blockquote>
+          ) : null}
+
+          <h3 className="mt-5 text-sm font-semibold">Answers</h3>
+          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+            {review.raw !== null
+              ? `Raw ${review.raw} of 40 × 2.5 = ${review.computedScore}. Item points follow the published parity rule.`
+              : 'This response is incomplete, so it has no SUS score. The stored answers are shown as they arrived.'}
+          </p>
+          <ol className="mt-3 space-y-2">
+            {review.rows.map((row) => (
+              <li key={row.item} className="rounded-app border border-line bg-background/40 p-3">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <p className="text-sm leading-6">
+                    <span className="font-semibold">{row.item}.</span> {row.text}
+                  </p>
+                  {row.points !== null ? <AdminBadge>{row.points} pt</AdminBadge> : null}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {row.label}
+                  {row.points !== null ? ` · ${row.points} of 4 points` : ''}
+                </p>
+              </li>
+            ))}
+          </ol>
+        </AdminDialog>
+      ) : null}
     </div>
   );
 }

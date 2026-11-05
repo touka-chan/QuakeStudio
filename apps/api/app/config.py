@@ -41,7 +41,7 @@ class Settings(BaseSettings):
     allowed_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     session_cookie_name: str = "quakestudio_admin_session"
-    session_ttl_hours: int = 12
+    session_ttl_hours: int = 4
     cookie_secure: bool = False
     cookie_samesite: Literal["lax", "strict", "none"] = "lax"
 

@@ -51,3 +51,14 @@ def test_cleared_cookie_matches_hosted_settings() -> None:
     assert "max-age=0" in cookie
     assert "secure" in cookie
     assert "samesite=none" in cookie
+
+
+def test_default_admin_session_is_four_hours() -> None:
+    assert Settings().session_ttl_hours == 4
+
+
+def test_session_cookie_max_age_matches_four_hours() -> None:
+    response = Response()
+    set_session_cookie(response, name="session", token="token", ttl_hours=4, secure=False)
+    cookie = response.headers["set-cookie"].lower()
+    assert "max-age=14400" in cookie
