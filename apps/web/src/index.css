@@ -267,7 +267,9 @@
 }
 
 /* Keep the scrollbar gutter stable so admin navigation does not shift when page length changes. */
-html { scrollbar-gutter: stable; }
+html {
+  scrollbar-gutter: stable;
+}
 
 /* =========================================================================
    SweetAlert2 — QuakeStudio theme
@@ -320,7 +322,9 @@ html { scrollbar-gutter: stable; }
   font-weight: 500;
   line-height: 1.4;
   box-shadow: none;
-  transition: background-color 120ms ease, border-color 120ms ease;
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease;
 }
 
 .qs-swal .qs-swal-confirm:focus-visible,

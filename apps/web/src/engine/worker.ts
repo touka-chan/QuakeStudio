@@ -41,4 +41,4 @@ ctx.addEventListener('message', (event: MessageEvent<SolveRequest>) => {
   }
 });
 
-export {}
+export {};

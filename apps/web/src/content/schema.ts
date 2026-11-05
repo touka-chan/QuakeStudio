@@ -35,7 +35,11 @@ const rangeSchema = z
   })
   .superRefine((value, ctx) => {
     if (value.min >= value.max) {
-      ctx.addIssue({ code: 'custom', path: ['min'], message: 'The minimum must be below the maximum.' });
+      ctx.addIssue({
+        code: 'custom',
+        path: ['min'],
+        message: 'The minimum must be below the maximum.',
+      });
     }
     if (value.default < value.min || value.default > value.max) {
       ctx.addIssue({
@@ -107,7 +111,10 @@ const loadAssumptionsSchema = z
         message: 'The minimum dead load must be below the maximum.',
       });
     }
-    if (value.defaultDeadLoadKPa < value.minDeadLoadKPa || value.defaultDeadLoadKPa > value.maxDeadLoadKPa) {
+    if (
+      value.defaultDeadLoadKPa < value.minDeadLoadKPa ||
+      value.defaultDeadLoadKPa > value.maxDeadLoadKPa
+    ) {
       ctx.addIssue({
         code: 'custom',
         path: ['defaultDeadLoadKPa'],
@@ -295,10 +302,7 @@ export const engineeringContentSchema = z
     }
 
     const motion = value.defaultGroundMotion;
-    if (
-      motion.pgaG < value.groundMotion.pgaG.min ||
-      motion.pgaG > value.groundMotion.pgaG.max
-    ) {
+    if (motion.pgaG < value.groundMotion.pgaG.min || motion.pgaG > value.groundMotion.pgaG.max) {
       ctx.addIssue({
         code: 'custom',
         path: ['defaultGroundMotion', 'pgaG'],
@@ -485,7 +489,10 @@ export const contentDocumentSchema = z
       ids.add(template.id);
 
       const geometry = value.engineering.geometry;
-      if (template.building.floors < geometry.minFloors || template.building.floors > geometry.maxFloors) {
+      if (
+        template.building.floors < geometry.minFloors ||
+        template.building.floors > geometry.maxFloors
+      ) {
         ctx.addIssue({
           code: 'custom',
           path: ['templates', index, 'building', 'floors'],
@@ -588,9 +595,9 @@ export function contentIssues(error: z.ZodError): ContentIssue[] {
   }));
 }
 
-export function parseContent(value: unknown):
-  | { success: true; data: ContentDocument }
-  | { success: false; issues: ContentIssue[] } {
+export function parseContent(
+  value: unknown,
+): { success: true; data: ContentDocument } | { success: false; issues: ContentIssue[] } {
   const parsed = contentDocumentSchema.safeParse(value);
   if (!parsed.success) return { success: false, issues: contentIssues(parsed.error) };
   return { success: true, data: parsed.data };

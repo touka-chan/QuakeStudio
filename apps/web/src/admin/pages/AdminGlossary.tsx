@@ -6,19 +6,8 @@ import { contentId, slugify } from '@/content/types';
 import { useAdminContent } from '../AdminContext';
 import { swalConfirm } from '../adminSwal';
 import { showSaved, showDeleted } from '../adminToast';
-import {
-  AdminInput,
-  AdminTextarea,
-  Field,
-  IssueList,
-  SaveButton,
-} from '../AdminForms';
-import {
-  AdminButton,
-  AdminEditPanel,
-  AdminEmptyState,
-  AdminSearchInput,
-} from '../AdminUI';
+import { AdminInput, AdminTextarea, Field, IssueList, SaveButton } from '../AdminForms';
+import { AdminButton, AdminEditPanel, AdminEmptyState, AdminSearchInput } from '../AdminUI';
 
 export function AdminGlossary() {
   const { content, update } = useAdminContent();

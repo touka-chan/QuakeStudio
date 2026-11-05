@@ -245,9 +245,7 @@ export function AdminTour() {
             <Field label="Button label">
               <AdminInput
                 value={tourForm.buttonLabel}
-                onChange={(event) =>
-                  setTourForm({ ...tourForm, buttonLabel: event.target.value })
-                }
+                onChange={(event) => setTourForm({ ...tourForm, buttonLabel: event.target.value })}
               />
             </Field>
             <Field label="Button tooltip">
@@ -349,9 +347,7 @@ export function AdminTour() {
             <Field label="Title">
               <AdminInput
                 value={welcomeForm.title}
-                onChange={(event) =>
-                  setWelcomeForm({ ...welcomeForm, title: event.target.value })
-                }
+                onChange={(event) => setWelcomeForm({ ...welcomeForm, title: event.target.value })}
               />
             </Field>
             <Field label="Start label">
@@ -392,9 +388,7 @@ export function AdminTour() {
           <Field label="Footer">
             <AdminTextarea
               value={welcomeForm.footer}
-              onChange={(event) =>
-                setWelcomeForm({ ...welcomeForm, footer: event.target.value })
-              }
+              onChange={(event) => setWelcomeForm({ ...welcomeForm, footer: event.target.value })}
               className="min-h-20"
             />
           </Field>

@@ -266,8 +266,7 @@ export function AdminThemeToggle({ className }: { className?: string }) {
   }, [preference]);
 
   const resolved = (preference === 'system' ? (systemDark ? 'dark' : 'light') : preference) as
-    | 'light'
-    | 'dark';
+    'light' | 'dark';
 
   useEffect(() => {
     applyTheme(resolved);
@@ -287,7 +286,11 @@ export function AdminThemeToggle({ className }: { className?: string }) {
         className,
       )}
     >
-      {isDark ? <Sun className="size-4" aria-hidden="true" /> : <Moon className="size-4" aria-hidden="true" />}
+      {isDark ? (
+        <Sun className="size-4" aria-hidden="true" />
+      ) : (
+        <Moon className="size-4" aria-hidden="true" />
+      )}
     </button>
   );
 }
@@ -382,7 +385,8 @@ export function AdminStatCard({
       </div>
       {trend ? (
         <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          {trend.tone === 'good' ? '▲' : trend.tone === 'bad' ? '▼' : '—'} {trend.label.toLowerCase()}
+          {trend.tone === 'good' ? '▲' : trend.tone === 'bad' ? '▼' : '—'}{' '}
+          {trend.label.toLowerCase()}
         </p>
       ) : null}
     </>
@@ -420,7 +424,10 @@ export function DraftBanner({
     <div className="rounded-card border border-warning/35 bg-warning-bg p-4 text-warning-text">
       <div className="flex flex-wrap items-center gap-3">
         <div className="flex min-w-0 items-center gap-2.5">
-          <span className="flex size-6 shrink-0 items-center justify-center rounded-full border border-warning text-warning-text/70" aria-hidden="true">
+          <span
+            className="flex size-6 shrink-0 items-center justify-center rounded-full border border-warning text-warning-text/70"
+            aria-hidden="true"
+          >
             !
           </span>
           <div className="min-w-0">
@@ -492,7 +499,10 @@ export function AdminTopBar({
         <div className="flex items-center justify-between gap-2 lg:justify-end">
           {draftCount != null && draftCount > 0 ? (
             <span className="flex items-center gap-1.5 rounded-[10px] border border-warning/35 bg-warning-bg px-2.5 py-1.5 text-xs font-medium text-warning-text">
-              <span className="flex size-3 shrink-0 items-center justify-center rounded-full border border-warning text-warning-text/70" aria-hidden="true">
+              <span
+                className="flex size-3 shrink-0 items-center justify-center rounded-full border border-warning text-warning-text/70"
+                aria-hidden="true"
+              >
                 ·
               </span>
               <span className="hidden sm:inline">
@@ -606,7 +616,9 @@ export function AdminEditPanel({
         >
           <div className="flex items-center justify-between gap-4 border-b border-line px-5 py-4 shrink-0">
             <div className="min-w-0">
-              <DialogPrimitive.Title className="text-base font-semibold tracking-tight">{title}</DialogPrimitive.Title>
+              <DialogPrimitive.Title className="text-base font-semibold tracking-tight">
+                {title}
+              </DialogPrimitive.Title>
               {subtitle ? (
                 <DialogPrimitive.Description className="mt-0.5 text-xs leading-5 text-muted-foreground">
                   {subtitle}
@@ -674,7 +686,13 @@ export function AdminTableRow({
   );
 }
 
-export function AdminTableCell({ children, className }: { children: React.ReactNode; className?: string }) {
+export function AdminTableCell({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
   return <td className={cn('p-3 align-top text-sm', className)}>{children}</td>;
 }
 
@@ -697,14 +715,17 @@ export function ActivityItem({
 }) {
   return (
     <div className="flex items-start gap-3 p-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold">{avatar}</span>
+      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-primary/10 text-primary text-xs font-bold">
+        {avatar}
+      </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm leading-5">
           <span className="font-medium text-foreground">{name}</span>{' '}
           <span className="font-normal">{action}</span>
         </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
-          {meta ? <span>{meta} · </span> : null}{time}
+          {meta ? <span>{meta} · </span> : null}
+          {time}
         </p>
       </div>
     </div>
@@ -755,10 +776,11 @@ export function AdminSectionHeader({
     <div className="mb-6 flex items-start justify-between gap-4">
       <div className="min-w-0">
         <h2 className="text-xl font-semibold tracking-tight text-foreground">{title}</h2>
-        {description ? <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p> : null}
+        {description ? (
+          <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
+        ) : null}
       </div>
       {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
     </div>
   );
 }
-

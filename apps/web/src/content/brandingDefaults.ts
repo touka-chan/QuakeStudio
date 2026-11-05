@@ -1,9 +1,4 @@
-import type {
-  BrandingContent,
-  FeatureContent,
-  TourContent,
-  WelcomeContent,
-} from './types';
+import type { BrandingContent, FeatureContent, TourContent, WelcomeContent } from './types';
 
 /* =========================================================================
    Branding, welcome and feature defaults

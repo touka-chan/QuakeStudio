@@ -8,7 +8,13 @@ const AdminApp = lazy(() => import('./admin/AdminApp'));
 export default function App() {
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/admin')) {
     return (
-      <Suspense fallback={<div className="grid min-h-dvh place-items-center bg-background text-muted-foreground">Loading admin…</div>}>
+      <Suspense
+        fallback={
+          <div className="grid min-h-dvh place-items-center bg-background text-muted-foreground">
+            Loading admin…
+          </div>
+        }
+      >
         <AdminApp />
       </Suspense>
     );

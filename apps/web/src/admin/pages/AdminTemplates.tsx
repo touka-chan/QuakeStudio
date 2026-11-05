@@ -47,9 +47,7 @@ function TemplateThumbnail({ floors }: { floors: number }) {
       className="relative flex h-24 items-end justify-center overflow-hidden rounded-app border border-line bg-surface-2/70 px-3 pb-3"
       aria-hidden="true"
     >
-      <div
-        className="pointer-events-none absolute inset-x-6 bottom-2 h-16 rounded-full bg-primary/10 blur-xl"
-      />
+      <div className="pointer-events-none absolute inset-x-6 bottom-2 h-16 rounded-full bg-primary/10 blur-xl" />
       <div className="relative flex flex-col-reverse gap-[3px]" style={{ width: `${width}%` }}>
         {Array.from({ length: shown }).map((_, index) => (
           <div
@@ -90,11 +88,17 @@ export function AdminTemplates() {
   function validate(draft: TemplateDraft) {
     const parsed = templateContentSchema.safeParse(draft);
     if (!parsed.success) {
-      return parsed.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message }));
+      return parsed.error.issues.map((issue) => ({
+        path: issue.path.join('.'),
+        message: issue.message,
+      }));
     }
     const issues: { path: string; message: string }[] = [];
     if (draft.building.floors < geometry.minFloors || draft.building.floors > geometry.maxFloors) {
-      issues.push({ path: 'building.floors', message: `Must be ${geometry.minFloors}–${geometry.maxFloors}.` });
+      issues.push({
+        path: 'building.floors',
+        message: `Must be ${geometry.minFloors}–${geometry.maxFloors}.`,
+      });
     }
     for (const field of ['floorHeightM', 'widthM', 'depthM'] as const) {
       const range = geometry[field];
@@ -129,7 +133,9 @@ export function AdminTemplates() {
       closeEditor();
       showSaved();
     } catch (error) {
-      setErrors([{ path: 'document', message: error instanceof Error ? error.message : 'Save failed.' }]);
+      setErrors([
+        { path: 'document', message: error instanceof Error ? error.message : 'Save failed.' },
+      ]);
     }
   }
 
@@ -235,59 +241,59 @@ export function AdminTemplates() {
 
               <div className="mt-auto border-t border-line pt-3">
                 <div className="mt-3 flex items-center gap-1">
-                <AdminButton
-                  size="sm"
-                  icon={Pencil}
-                  onClick={() => {
-                    setEditing({ ...template });
-                    setErrors([]);
-                  }}
-                >
-                  Edit
-                </AdminButton>
-                <AdminButton
-                  size="sm"
-                  variant="ghost"
-                  icon={Trash2}
-                  className={`ml-auto hover:bg-danger/10 hover:text-danger ${isProtected ? 'text-muted-foreground' : 'text-danger'}`}
-                  disabled={isProtected}
-                  title={
-                    isDefault
-                      ? 'Choose another startup template before deleting this one.'
-                      : isBuiltIn
-                        ? 'The custom template is built in and cannot be deleted.'
-                        : undefined
-                  }
-                  onClick={() => {
-                    const target = content.templates.find((item) => item.id === template.id);
-                    swalConfirm({
-                      title: 'Delete template',
-                      text: target
-                        ? `Remove "${target.label}" from the saved document.`
-                        : 'This removes the template from the saved document.',
-                      confirmLabel: 'Delete',
-                      onConfirm: () => {
-                        try {
-                          update((document) => {
-                            document.templates = document.templates.filter(
-                              (item) => item.id !== template.id,
-                            );
-                          });
-                          showDeleted('Template');
-                        } catch (error) {
-                          setErrors([
-                            {
-                              path: 'document',
-                              message: error instanceof Error ? error.message : 'Delete failed.',
-                            },
-                          ]);
-                        }
-                      },
-                    });
-                  }}
-                >
-                  Delete
-                </AdminButton>
+                  <AdminButton
+                    size="sm"
+                    icon={Pencil}
+                    onClick={() => {
+                      setEditing({ ...template });
+                      setErrors([]);
+                    }}
+                  >
+                    Edit
+                  </AdminButton>
+                  <AdminButton
+                    size="sm"
+                    variant="ghost"
+                    icon={Trash2}
+                    className={`ml-auto hover:bg-danger/10 hover:text-danger ${isProtected ? 'text-muted-foreground' : 'text-danger'}`}
+                    disabled={isProtected}
+                    title={
+                      isDefault
+                        ? 'Choose another startup template before deleting this one.'
+                        : isBuiltIn
+                          ? 'The custom template is built in and cannot be deleted.'
+                          : undefined
+                    }
+                    onClick={() => {
+                      const target = content.templates.find((item) => item.id === template.id);
+                      swalConfirm({
+                        title: 'Delete template',
+                        text: target
+                          ? `Remove "${target.label}" from the saved document.`
+                          : 'This removes the template from the saved document.',
+                        confirmLabel: 'Delete',
+                        onConfirm: () => {
+                          try {
+                            update((document) => {
+                              document.templates = document.templates.filter(
+                                (item) => item.id !== template.id,
+                              );
+                            });
+                            showDeleted('Template');
+                          } catch (error) {
+                            setErrors([
+                              {
+                                path: 'document',
+                                message: error instanceof Error ? error.message : 'Delete failed.',
+                              },
+                            ]);
+                          }
+                        },
+                      });
+                    }}
+                  >
+                    Delete
+                  </AdminButton>
                 </div>
               </div>
             </article>
@@ -325,9 +331,7 @@ export function AdminTemplates() {
               >
                 <AdminTextarea
                   value={editing.description}
-                  onChange={(event) =>
-                    setEditing({ ...editing, description: event.target.value })
-                  }
+                  onChange={(event) => setEditing({ ...editing, description: event.target.value })}
                 />
               </Field>
             </div>

@@ -67,7 +67,9 @@ export function readActivity(): AdminActivity[] {
   }
 }
 
-export function logActivity(input: Omit<AdminActivity, 'id' | 'at'> & { at?: string }): AdminActivity {
+export function logActivity(
+  input: Omit<AdminActivity, 'id' | 'at'> & { at?: string },
+): AdminActivity {
   const entry: AdminActivity = {
     id: makeId(),
     at: input.at ?? new Date().toISOString(),

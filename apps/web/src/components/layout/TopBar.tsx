@@ -104,7 +104,9 @@ export function TopBar({
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" disabled={result.time.length === 0}>
                     <Save aria-hidden="true" />
-                    <span className="hidden md:inline">{t('topbar.saveRun', undefined, 'Save run')}</span>
+                    <span className="hidden md:inline">
+                      {t('topbar.saveRun', undefined, 'Save run')}
+                    </span>
                     <span className="md:hidden">{t('topbar.saveShort', undefined, 'Save')}</span>
                   </Button>
                 </DialogTrigger>
@@ -175,7 +177,9 @@ export function TopBar({
                   <span className="hidden md:inline">
                     {t('topbar.assumptions', undefined, 'Assumptions')}
                   </span>
-                  <span className="md:hidden">{t('topbar.assumptionsShort', undefined, 'About')}</span>
+                  <span className="md:hidden">
+                    {t('topbar.assumptionsShort', undefined, 'About')}
+                  </span>
                 </Button>
               </DialogTrigger>
             </TooltipTrigger>
@@ -213,7 +217,9 @@ export function TopBar({
                       Playwright locates by accessible name, so a control with
                       none of them is one this tool cannot even see.
                     */}
-                    <span className="hidden lg:inline">{t('topbar.feedback', undefined, 'Feedback')}</span>
+                    <span className="hidden lg:inline">
+                      {t('topbar.feedback', undefined, 'Feedback')}
+                    </span>
                   </Button>
                 </DialogTrigger>
               </TooltipTrigger>
@@ -295,5 +301,3 @@ function ThemeToggle() {
     </Tooltip>
   );
 }
-
-

@@ -1,10 +1,6 @@
 import { buildDefaultContent } from './defaults';
 import { contentIssues, parseContent, type ContentIssue } from './schema';
-import {
-  readStoredContentCheck,
-  removeStoredContent,
-  writeStoredContent,
-} from './storage';
+import { readStoredContentCheck, removeStoredContent, writeStoredContent } from './storage';
 import {
   CONTENT_SCHEMA_VERSION,
   type AssumptionReviewContent,
@@ -101,9 +97,7 @@ function parseOrThrow(value: unknown): ContentDocument {
 }
 
 export type ContentStatus =
-  | { status: 'defaults' }
-  | { status: 'saved'; updatedAt: string }
-  | { status: 'invalid-saved' };
+  { status: 'defaults' } | { status: 'saved'; updatedAt: string } | { status: 'invalid-saved' };
 
 export const contentRepository = {
   /** Current document, falling back to compiled defaults. */

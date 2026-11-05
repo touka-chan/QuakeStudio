@@ -4,14 +4,7 @@ import { useEffect, useState } from 'react';
 import { featuresSchema } from '@/content/schema';
 import { useAdminContent } from '../AdminContext';
 import { showSaved } from '../adminToast';
-import {
-  AdminInput,
-  AdminSelect,
-  Field,
-  IssueList,
-  SaveButton,
-  SectionCard,
-} from '../AdminForms';
+import { AdminInput, AdminSelect, Field, IssueList, SaveButton, SectionCard } from '../AdminForms';
 import { AdminSwitchRow } from '../AdminUI';
 
 const CAPABILITIES = [
@@ -106,23 +99,22 @@ export function AdminFeatures() {
               label={capability.label}
               description={capability.description}
               checked={Boolean(draft[capability.key])}
-              onCheckedChange={(checked) =>
-                setDraft({ ...draft, [capability.key]: checked })
-              }
+              onCheckedChange={(checked) => setDraft({ ...draft, [capability.key]: checked })}
             />
           ))}
         </div>
       </SectionCard>
 
-      <SectionCard title="Limits and defaults" description="Guardrails for comparison and saved work.">
+      <SectionCard
+        title="Limits and defaults"
+        description="Guardrails for comparison and saved work."
+      >
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="Max buildings" error={issue('maxBuildings')}>
             <AdminInput
               type="number"
               value={draft.maxBuildings}
-              onChange={(event) =>
-                setDraft({ ...draft, maxBuildings: Number(event.target.value) })
-              }
+              onChange={(event) => setDraft({ ...draft, maxBuildings: Number(event.target.value) })}
             />
           </Field>
           <Field label="Max side by side" error={issue('maxSideBySide')}>

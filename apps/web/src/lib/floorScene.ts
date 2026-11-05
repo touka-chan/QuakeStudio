@@ -74,10 +74,7 @@ export function floorContents(
       ];
     case 'residential':
       // Two beds — lower and longer, running front-to-back like real beds.
-      return [
-        place(-0.5, 0.05, [1.4, 0.38, 1.9], -0.05),
-        place(0.5, 0.05, [1.4, 0.38, 1.9], 0.05),
-      ];
+      return [place(-0.5, 0.05, [1.4, 0.38, 1.9], -0.05), place(0.5, 0.05, [1.4, 0.38, 1.9], 0.05)];
     case 'parking':
       // Four parking bays — flatter, wider, shorter height so they read
       // as parked vehicles / bays rather than thin lines.
@@ -90,7 +87,9 @@ export function floorContents(
     case 'storage':
       // A 3 × 2 grid of crates — square, slightly taller, rotated
       // individually so the grid reads as stacked storage.
-      return [-0.6, 0, 0.6].flatMap((x) => [-0.45, 0.45].map((z) => place(x, z, [0.72, 0.78, 0.72], (x + z) * 0.15)));
+      return [-0.6, 0, 0.6].flatMap((x) =>
+        [-0.45, 0.45].map((z) => place(x, z, [0.72, 0.78, 0.72], (x + z) * 0.15)),
+      );
     case 'custom':
       // Nothing invented for a floor whose use we do not know.
       return [];

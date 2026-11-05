@@ -45,7 +45,10 @@ const BASELINE_GLOSSARY: readonly GlossaryEntryContent[] = [
     'The building’s own natural rhythm — it always sways at this pace unless something forces it faster.',
   ),
   entry('pga', 'Peak Ground Acceleration — how strong the shaking is at its most intense moment.'),
-  entry('stiffness', 'How hard the building resists being pushed sideways. Stiffer buildings sway less.'),
+  entry(
+    'stiffness',
+    'How hard the building resists being pushed sideways. Stiffer buildings sway less.',
+  ),
   entry('mass', 'How heavy the building is. Heavier buildings respond more slowly.'),
   entry(
     'moment frame',

@@ -23,7 +23,10 @@ export function readSession(): AdminSession | null {
 }
 
 export function signIn(email: string, password: string): boolean {
-  if (email.trim().toLowerCase() !== DEMO_CREDENTIALS.email || password !== DEMO_CREDENTIALS.password) {
+  if (
+    email.trim().toLowerCase() !== DEMO_CREDENTIALS.email ||
+    password !== DEMO_CREDENTIALS.password
+  ) {
     return false;
   }
   const session: AdminSession = {

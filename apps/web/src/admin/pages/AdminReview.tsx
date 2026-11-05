@@ -4,13 +4,7 @@ import { ASSUMPTION_GROUPS, ASSUMPTIONS, type AssumptionRow } from '@/config/ass
 import { assumptionReviewSchema } from '@/content/schema';
 import { useAdminContent } from '../AdminContext';
 import { showSaved } from '../adminToast';
-import {
-  AdminTextarea,
-  Field,
-  IssueList,
-  SaveButton,
-  SectionCard,
-} from '../AdminForms';
+import { AdminTextarea, Field, IssueList, SaveButton, SectionCard } from '../AdminForms';
 import { AdminBadge, AdminSearchInput } from '../AdminUI';
 
 export function AdminReview() {
@@ -40,9 +34,7 @@ export function AdminReview() {
     ),
   })).filter((group) => group.rows.length > 0);
 
-  const pending = ASSUMPTIONS.filter(
-    (row) => placeholder[row.id] ?? row.placeholder,
-  ).length;
+  const pending = ASSUMPTIONS.filter((row) => placeholder[row.id] ?? row.placeholder).length;
   const total = ASSUMPTIONS.length;
   const reviewed = total - pending;
   const percent = total ? Math.round((reviewed / total) * 100) : 0;
@@ -83,14 +75,10 @@ export function AdminReview() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <AdminBadge
-            tone={pending ? 'warning' : 'success'}
-          >
+          <AdminBadge tone={pending ? 'warning' : 'success'}>
             {pending ? `${pending} of ${total} pending` : 'All reviewed'}
           </AdminBadge>
-          <SaveButton onClick={save}>
-            Save review status
-          </SaveButton>
+          <SaveButton onClick={save}>Save review status</SaveButton>
         </div>
       </div>
 
@@ -119,10 +107,7 @@ export function AdminReview() {
               {rows.map((row: AssumptionRow) => {
                 const reviewed = !(placeholder[row.id] ?? row.placeholder);
                 return (
-                  <div
-                    key={row.id}
-                    className="rounded-app border border-line bg-background/40 p-3"
-                  >
+                  <div key={row.id} className="rounded-app border border-line bg-background/40 p-3">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <div className="min-w-0">
                         <p className="text-sm font-medium">{row.label}</p>
@@ -149,9 +134,7 @@ export function AdminReview() {
                       <Field label="Review note">
                         <AdminTextarea
                           value={notes[row.id] ?? ''}
-                          onChange={(event) =>
-                            setNotes({ ...notes, [row.id]: event.target.value })
-                          }
+                          onChange={(event) => setNotes({ ...notes, [row.id]: event.target.value })}
                           placeholder={row.note}
                           className="min-h-[80px]"
                         />
@@ -167,9 +150,7 @@ export function AdminReview() {
 
       <div className="flex items-center justify-between rounded-card border border-line bg-surface p-3 shadow-sm">
         <div>
-          <p className="text-xs font-medium text-muted-foreground">
-            Reviewed
-          </p>
+          <p className="text-xs font-medium text-muted-foreground">Reviewed</p>
           <p className="mt-1 text-sm font-semibold tabular">
             {reviewed} / {total}
           </p>

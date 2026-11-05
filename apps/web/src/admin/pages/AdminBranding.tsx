@@ -54,10 +54,7 @@ export function AdminBranding() {
     <form onSubmit={save} className="space-y-4">
       <IssueList issues={[...localErrors, ...errors]} />
 
-      <SectionCard
-        title="Identity"
-        description="The name and icon students see across the app."
-      >
+      <SectionCard title="Identity" description="The name and icon students see across the app.">
         <div className="grid gap-4 md:grid-cols-2">
           <Field label="App name" error={issue('appName')}>
             <AdminInput
@@ -111,18 +108,14 @@ export function AdminBranding() {
           <Field label="Short disclaimer" error={issue('disclaimerShort')}>
             <AdminTextarea
               value={draft.disclaimerShort}
-              onChange={(event) =>
-                setDraft({ ...draft, disclaimerShort: event.target.value })
-              }
+              onChange={(event) => setDraft({ ...draft, disclaimerShort: event.target.value })}
               className="min-h-20"
             />
           </Field>
           <Field label="Long disclaimer" error={issue('disclaimerLong')}>
             <AdminTextarea
               value={draft.disclaimerLong}
-              onChange={(event) =>
-                setDraft({ ...draft, disclaimerLong: event.target.value })
-              }
+              onChange={(event) => setDraft({ ...draft, disclaimerLong: event.target.value })}
               className="min-h-32"
             />
           </Field>

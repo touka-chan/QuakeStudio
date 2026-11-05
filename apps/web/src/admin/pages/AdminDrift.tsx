@@ -222,9 +222,7 @@ export function AdminDrift() {
                   type="number"
                   step="0.0001"
                   value={editing.max}
-                  onChange={(event) =>
-                    setEditing({ ...editing, max: Number(event.target.value) })
-                  }
+                  onChange={(event) => setEditing({ ...editing, max: Number(event.target.value) })}
                 />
               </Field>
             ) : (

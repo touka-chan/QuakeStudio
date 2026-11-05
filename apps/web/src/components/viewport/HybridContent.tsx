@@ -17,7 +17,11 @@ export function HybridContent({
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const edges = new THREE.EdgesGeometry(geometry);
   const solidMaterial = new THREE.MeshLambertMaterial({ color, transparent: opacity < 1, opacity });
-  const wireMaterial = new THREE.LineBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0.55 });
+  const wireMaterial = new THREE.LineBasicMaterial({
+    color: '#ffffff',
+    transparent: true,
+    opacity: 0.55,
+  });
 
   return (
     <group>

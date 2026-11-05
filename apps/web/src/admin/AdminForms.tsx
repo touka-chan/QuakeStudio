@@ -23,12 +23,16 @@ export function AdminPageHeader({
             {eyebrow}
           </p>
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+          {title}
+        </h1>
         {description ? (
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{description}</p>
         ) : null}
       </div>
-      {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2 sm:self-end">{actions}</div> : null}
+      {actions ? (
+        <div className="flex shrink-0 flex-wrap items-center gap-2 sm:self-end">{actions}</div>
+      ) : null}
     </div>
   );
 }
@@ -61,7 +65,9 @@ export function SectionCard({
               <p className="mt-1 text-sm leading-5 text-muted-foreground">{description}</p>
             ) : null}
           </div>
-          {actions ? <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div> : null}
+          {actions ? (
+            <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
+          ) : null}
         </div>
       ) : null}
       <div className={title || description || actions ? 'mt-4' : ''}>{children}</div>
