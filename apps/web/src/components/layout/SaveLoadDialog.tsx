@@ -245,7 +245,7 @@ export function SaveLoadDialog({
             </Button>
             <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
               <Download aria-hidden="true" />
-              Export all
+              Export all (JSON)
             </Button>
           </div>
 
@@ -302,7 +302,7 @@ export function SaveLoadDialog({
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" onClick={exportAll} disabled={busy || runs.length === 0}>
               <Download aria-hidden="true" />
-              Export all runs
+              Export all runs (JSON)
             </Button>
             <label className="inline-flex cursor-pointer items-center gap-2 rounded-app border border-line px-3 py-2 text-sm hover:bg-surface-2">
               <Upload aria-hidden="true" className="size-4" />

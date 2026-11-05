@@ -593,8 +593,8 @@ test.describe('playback', () => {
   });
 });
 
-test.describe('CSV export', () => {
-  test('downloads a file whose headline numbers match the screen', async ({ page }) => {
+test.describe('Excel export', () => {
+  test('downloads a workbook whose headline numbers match the screen', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await page.goto('/');
 
@@ -609,30 +609,34 @@ test.describe('CSV export', () => {
     const shownDrift = (await page.getByTestId('metric-max-drift-value').innerText()).trim();
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: /export this run as a csv file/i }).click();
+    await page.getByRole('button', { name: /export this run as an excel workbook/i }).click();
     const download = await downloadPromise;
 
-    expect(download.suggestedFilename()).toMatch(/^quakestudio-.*\.csv$/);
+    expect(download.suggestedFilename()).toMatch(/^quakestudio-.*\.xlsx$/);
 
     const stream = await download.createReadStream();
     const chunks: Buffer[] = [];
     for await (const chunk of stream) chunks.push(chunk as Buffer);
-    const csv = Buffer.concat(chunks).toString('utf8');
+    // The XLSX writer stores XML uncompressed, so the sheet text is readable
+    // here without pulling a spreadsheet library into the test suite.
+    const xlsx = Buffer.concat(chunks).toString('utf8');
 
-    // The brief: "exported CSV matches the on-screen numbers". The card renders
-    // value and unit in one element, so strip the unit before comparing.
+    // The brief: "exported numbers match the screen". The card renders value
+    // and unit in one element, so strip the unit before comparing.
     const cardValue = (text: string) => text.replace(/[a-z%]+$/i, '').trim();
-    expect(csv).toContain(`# Peak displacement as shown on screen (mm),${cardValue(shownPeak)}`);
-    expect(csv).toContain(
-      `# Max interstory drift ratio as shown on screen (%),${cardValue(shownDrift)}`,
-    );
+    expect(xlsx).toContain('Peak displacement as shown (mm)');
+    expect(xlsx).toContain(cardValue(shownPeak));
+    expect(xlsx).toContain('Max interstory drift as shown (%)');
+    expect(xlsx).toContain(cardValue(shownDrift));
 
     // And the full-precision figures must round to what is on screen.
-    const fullPeak = Number(/# Peak displacement \(mm\),([\d.]+)/.exec(csv)?.[1] ?? 'NaN');
+    const fullPeak = Number(
+      /Peak displacement \(mm\)[\s\S]*?<v>([\d.]+)<\/v>/.exec(xlsx)?.[1] ?? 'NaN',
+    );
     expect(fullPeak.toFixed(1)).toBe(cardValue(shownPeak));
 
-    expect(csv).toContain('floor_1_disp_mm');
-    expect(csv).toMatch(/Not a structural safety assessment/i);
+    expect(xlsx).toContain('floor_1_disp_mm');
+    expect(xlsx).toMatch(/Not a structural safety assessment/i);
   });
 });
 

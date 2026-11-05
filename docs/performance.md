@@ -123,9 +123,9 @@ regression, not to police kilobytes.
 
 | Budget | Limit | Actual |
 |---|---|---|
-| Entry chunk, gzipped | 220 KB | 166 KB |
-| Total JavaScript, gzipped | 620 KB | 615 KB |
-| Simulation worker, gzipped | 30 KB | 3 KB |
+| Entry chunk, gzipped | 220 KB | 158 KB |
+| Total JavaScript, gzipped | 640 KB | 622 KB |
+| Simulation worker, gzipped | 30 KB | 5 KB |
 | `Viewport3D`, `Charts` and `FeedbackDialog` must exist as separate chunks | — | ✅ |
 | Every emitted chunk must be precached for offline | — | ✅ |
 | Source maps in `dist` | none | none |
@@ -133,6 +133,10 @@ regression, not to police kilobytes.
 The total-JavaScript budget alone would **not** catch an eager re-import: the
 total does not change when a lazy chunk is folded back in. Only the
 chunk-separation check notices, which is why it exists.
+
+Excel export adds two on-demand chunks — `xlsx-*.js` (~2 KB gzipped) and the
+shared `feedbackExport-*.js` (~2 KB) — with no spreadsheet dependency. The
+total ceiling moved from 620 to 640 KB to cover them.
 
 ## Offline
 

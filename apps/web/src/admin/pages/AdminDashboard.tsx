@@ -434,9 +434,9 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
                 <Download className="size-4" aria-hidden="true" />
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-medium">Export backup</span>
+                <span className="block text-sm font-medium">Export backup (JSON)</span>
                 <span className="block text-xs text-muted-foreground">
-                  Download every template, glossary entry and setting as JSON
+                  Download every template, glossary entry and setting as a restorable JSON backup
                 </span>
               </span>
             </button>

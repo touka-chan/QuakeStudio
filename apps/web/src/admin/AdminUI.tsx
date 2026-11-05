@@ -3,6 +3,7 @@ import { Dialog as DialogPrimitive } from 'radix-ui';
 import { Menu, Moon, Search, Sun, X, type LucideIcon } from 'lucide-react';
 
 import { Switch } from '@/components/ui/switch';
+import { AdminTopBarSlotTarget } from './AdminTopBarSlot';
 import {
   applyTheme,
   prefersDark,
@@ -520,6 +521,8 @@ export function AdminTopBar({
               <span className="hidden sm:inline">Publish changes</span>
               <span className="sm:hidden">Publish</span>
             </AdminButton>
+            <AdminTopBarSlotTarget />
+            <AdminThemeToggle />
           </div>
         </div>
       </div>

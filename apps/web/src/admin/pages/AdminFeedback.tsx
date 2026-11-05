@@ -18,11 +18,12 @@ import {
 import { clearFeedback, readFeedback } from '@/feedback/feedbackStorage';
 import type { SusResponse } from '@/feedback/FeedbackDialog';
 import { gradeSus, interpretSus, SUS_TARGET_SCORE } from '@/feedback/susScore';
-import { downloadCsv } from '@/lib/csv';
+import { buildFeedbackSheets, feedbackExportFilename } from '@/lib/feedbackExport';
 import { useAdminContent } from '../AdminContext';
 import { swalAlert, swalConfirm } from '../adminSwal';
 import { showDeleted, showError, showExported } from '../adminToast';
 import { SectionCard } from '../AdminForms';
+import { AdminTopBarActions } from '../AdminTopBarSlot';
 import { reviewSusAnswers } from '../feedbackReview';
 import {
   adminButtonClass,
@@ -68,6 +69,21 @@ function toFeedbackEntry(item: ApiFeedback): FeedbackEntry {
     contentVersion: item.contentVersion,
   };
 }
+
+/** The JSON the old export returned; kept as the source for the workbook. */
+type FeedbackExportFile = {
+  exportedAt?: string;
+  targetScore?: number;
+  responses?: Array<{
+    submittedAt?: string;
+    answers?: Record<string, number>;
+    score?: number;
+    comments?: string;
+    participantId?: string;
+    appVersion?: string | null;
+    contentVersion?: number | null;
+  }>;
+};
 
 export function AdminFeedback() {
   const { backendEnabled, refreshFeedback } = useAdminContent();
@@ -153,21 +169,41 @@ export function AdminFeedback() {
 
   async function exportResponses() {
     try {
+      const { downloadXlsx } = await import('@/lib/xlsx');
+
       if (backendEnabled) {
-        const payload = await exportFeedbackFromApi();
-        await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
-        showExported(`Exported ${serverTotal} response${serverTotal === 1 ? '' : 's'}.`);
+        // The export endpoint returns every response, not the 500 the list
+        // view loads, so the workbook is not silently truncated.
+        const payload = (await exportFeedbackFromApi()) as FeedbackExportFile;
+        const rows = (payload.responses ?? []).map((item) => ({
+          submittedAt: item.submittedAt ?? '',
+          answers: item.answers ?? {},
+          score: item.score ?? 0,
+          comments: item.comments ?? null,
+          participantId: item.participantId ?? null,
+          appVersion: item.appVersion ?? null,
+          contentVersion: item.contentVersion ?? null,
+        }));
+        await downloadXlsx(
+          feedbackExportFilename(),
+          buildFeedbackSheets({
+            exportedAt: payload.exportedAt,
+            targetScore: payload.targetScore,
+            responses: rows,
+          }),
+        );
+        showExported(`Exported ${rows.length} response${rows.length === 1 ? '' : 's'}.`);
         return;
       }
 
-      const payload = {
-        format: 'quakestudio-sus',
-        version: 1,
-        exportedAt: new Date().toISOString(),
-        targetScore: SUS_TARGET_SCORE,
-        responses,
-      };
-      await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
+      await downloadXlsx(
+        feedbackExportFilename(),
+        buildFeedbackSheets({
+          exportedAt: new Date().toISOString(),
+          targetScore: SUS_TARGET_SCORE,
+          responses,
+        }),
+      );
       showExported(`Exported ${responses.length} response${responses.length === 1 ? '' : 's'}.`);
     } catch (error) {
       swalAlert({
@@ -222,6 +258,24 @@ export function AdminFeedback() {
 
   return (
     <div>
+      {/*
+        Export lives in the top bar, next to Publish, because it is the same
+        kind of action: a workspace-level thing a researcher reaches for from
+        any scroll position. Refresh and Clear stay with the data they affect.
+      */}
+      <AdminTopBarActions>
+        <AdminButton
+          variant="primary"
+          size="sm"
+          icon={Download}
+          onClick={() => void exportResponses()}
+          disabled={responses.length === 0}
+        >
+          <span className="hidden sm:inline">Export Excel</span>
+          <span className="sm:hidden">Export</span>
+        </AdminButton>
+      </AdminTopBarActions>
+
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <p className="text-sm font-medium">Saved responses</p>
@@ -233,14 +287,6 @@ export function AdminFeedback() {
         <div className="flex flex-wrap items-center gap-2">
           <AdminButton icon={RefreshCw} onClick={refresh} disabled={loading}>
             {loading ? 'Loading…' : 'Refresh'}
-          </AdminButton>
-          <AdminButton
-            variant="primary"
-            icon={Download}
-            onClick={() => void exportResponses()}
-            disabled={responses.length === 0}
-          >
-            Export JSON
           </AdminButton>
           <AdminButton
             variant="danger"

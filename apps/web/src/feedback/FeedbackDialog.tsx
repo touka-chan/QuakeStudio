@@ -13,7 +13,7 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { downloadCsv } from '@/lib/csv';
+import { buildFeedbackSheets, feedbackExportFilename } from '@/lib/feedbackExport';
 import { submitFeedbackToApi } from '@/api/feedback';
 import { isBackendAvailable } from '@/api/client';
 import { isBackendEnabled, isBackendRequired } from '@/api/config';
@@ -143,19 +143,18 @@ export function FeedbackDialog() {
   };
 
   const exportResponses = async () => {
-    const payload = {
-      format: 'quakestudio-sus',
-      version: 1,
-      instrument: 'System Usability Scale — Bangor, Kortum & Miller (2008)',
-      exportedAt: new Date().toISOString(),
-      targetScore: SUS_TARGET_SCORE,
-      responses: submitted,
-    };
-
     try {
       // Awaited: on a phone the native write and share can fail, and a study
       // response silently lost is not recoverable by anyone.
-      await downloadCsv('quakestudio-sus-responses.json', JSON.stringify(payload, null, 2));
+      const { downloadXlsx } = await import('@/lib/xlsx');
+      await downloadXlsx(
+        feedbackExportFilename(),
+        buildFeedbackSheets({
+          exportedAt: new Date().toISOString(),
+          targetScore: SUS_TARGET_SCORE,
+          responses: submitted,
+        }),
+      );
       setStatus(`Exported ${submitted.length} response${submitted.length === 1 ? '' : 's'}.`);
     } catch (error) {
       setStatus(
@@ -342,7 +341,7 @@ export function FeedbackDialog() {
           disabled={submitted.length === 0}
         >
           <Download aria-hidden="true" />
-          Export responses
+          Export Excel
         </Button>
 
         <div className="flex items-center gap-2">

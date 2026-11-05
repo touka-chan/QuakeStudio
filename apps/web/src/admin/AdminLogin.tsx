@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { ExternalLink } from 'lucide-react';
 
 import { isBackendRequired } from '@/api/config';
 import { BrandMark } from '@/components/brand/BrandMark';
@@ -102,6 +103,13 @@ export function AdminLogin({
             <p>{DEMO_CREDENTIALS.password}</p>
           </div>
         )}
+
+        <Button asChild variant="outline" className="w-full">
+          <a href="/">
+            <ExternalLink aria-hidden="true" />
+            Open simulation
+          </a>
+        </Button>
       </form>
     </div>
   );

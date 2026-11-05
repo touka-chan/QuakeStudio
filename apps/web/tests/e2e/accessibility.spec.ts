@@ -202,7 +202,7 @@ test.describe('the 3D viewport', () => {
 });
 
 test.describe('live regions', () => {
-  test('announces a CSV export without moving focus', async ({ page }) => {
+  test('announces an Excel export without moving focus', async ({ page }) => {
     await page.goto('/');
 
     // Polite, so a screen reader mentions it without interrupting.
@@ -210,7 +210,7 @@ test.describe('live regions', () => {
     await expect(live).toBeAttached();
 
     const downloadPromise = page.waitForEvent('download');
-    await page.getByRole('button', { name: /export this run as a csv file/i }).click();
+    await page.getByRole('button', { name: /export this run as an excel workbook/i }).click();
     await downloadPromise;
 
     await expect(live).toContainText(/exported/i);

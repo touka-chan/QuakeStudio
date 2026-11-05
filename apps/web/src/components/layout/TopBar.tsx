@@ -13,7 +13,7 @@ import { SaveLoadDialog } from './SaveLoadDialog';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { buildCsv, csvFilename, downloadCsv } from '@/lib/csv';
+import { buildResultSheets, xlsxFilename } from '@/lib/csv';
 import { useConfigStore } from '@/store/configStore';
 import {
   applyTheme,
@@ -66,22 +66,27 @@ export function TopBar({
   const [exportError, setExportError] = useState<string | null>(null);
 
   // Export writes the SAME result object the charts render, so the file and
-  // the screen cannot disagree. See lib/csv.ts.
+  // the screen cannot disagree. See lib/csv.ts and lib/xlsx.ts.
   //
-  // It can now FAIL — on a phone the native write is not guaranteed — and a
+  // It can FAIL — on a phone the native write is not guaranteed — and a
   // silent failure here is precisely the bug this button used to have. If it
   // does not work, the user is told, in the live region, in words.
-  const exportCsv = async () => {
+  const exportWorkbook = async () => {
     if (result.time.length === 0) return;
     setExportError(null);
 
     try {
-      const filename = csvFilename(building);
-      await downloadCsv(filename, buildCsv(building, motion, result));
+      const filename = xlsxFilename(building);
+      // Loaded on demand: the writer is only needed by the one export click,
+      // and the entry chunk has a deliberate budget.
+      const { downloadXlsx } = await import('@/lib/xlsx');
+      await downloadXlsx(filename, buildResultSheets(building, motion, result));
       setExported(filename);
     } catch (error) {
       setExported(null);
-      setExportError(error instanceof Error ? error.message : 'The CSV could not be exported.');
+      setExportError(
+        error instanceof Error ? error.message : 'The Excel workbook could not be exported.',
+      );
     }
   };
 
@@ -126,25 +131,29 @@ export function TopBar({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={exportCsv}
+                onClick={exportWorkbook}
                 disabled={result.time.length === 0}
-                aria-label="Export this run as a CSV file"
+                aria-label="Export this run as an Excel workbook"
               >
                 <Download aria-hidden="true" />
                 {/*
                  * Same responsive shortening as Save and Assumptions.
                  *
-                 * "Export CSV" is the widest label in the bar and was the
+                 * "Export Excel" is the widest label in the bar and was the
                  * single biggest reason a 360px phone could not fit the row.
                  */}
                 <span className="hidden md:inline">
-                  {t('topbar.exportCsv', undefined, 'Export CSV')}
+                  {t('topbar.exportXlsx', undefined, 'Export Excel')}
                 </span>
                 <span className="md:hidden">{t('topbar.exportShort', undefined, 'Export')}</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent className="max-w-xs text-xs">
-              {t('topbar.exportTooltip')}
+              {t(
+                'topbar.exportXlsxTooltip',
+                undefined,
+                'Download this run as an Excel workbook (.xlsx).',
+              )}
             </TooltipContent>
           </Tooltip>
         ) : null}

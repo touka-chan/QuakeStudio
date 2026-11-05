@@ -76,7 +76,10 @@ describe('bundle budget', () => {
   it('keeps total JavaScript under a ceiling', () => {
     const js = assets().filter((name) => name.endsWith('.js'));
     const total = js.reduce((sum, name) => sum + gzipSize(join(DIST, name)), 0);
-    const budgetKb = 620;
+    // Raised from 620 when the dependency-free XLSX writer and its shared
+    // feedback-workbook builder landed: two on-demand chunks, ~5 KB gzipped
+    // together, replacing the CSV/JSON exports.
+    const budgetKb = 640;
 
     expect(
       Math.round(total / 1024),

@@ -11,9 +11,12 @@ export const DEFAULT_COPY = {
   'topbar.saveShort': 'Save',
   'topbar.saveTooltip': 'Saved in this browser. Export from the dialog to move runs elsewhere.',
   'topbar.exportCsv': 'Export CSV',
+  'topbar.exportXlsx': 'Export Excel',
   'topbar.exportShort': 'Export',
   'topbar.exportTooltip':
     'Writes the current run at full precision, in the same units shown on screen.',
+  'topbar.exportXlsxTooltip':
+    'Download this run as an Excel workbook (.xlsx), with a metadata sheet and the time series as numbers.',
   'topbar.assumptions': 'Assumptions',
   'topbar.assumptionsShort': 'About',
   'topbar.assumptionsTooltip': 'What the model assumes, and what its results do not tell you.',

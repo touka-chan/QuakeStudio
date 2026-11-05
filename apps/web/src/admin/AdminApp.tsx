@@ -93,7 +93,11 @@ export default function AdminApp() {
     }
     signOut();
     setSession(null);
-    navigate('/');
+    // Stay in the admin workspace and show the sign-in screen. A sign-out
+    // that drops the researcher into the public simulator makes it look like
+    // the account disappeared; the login page now carries its own link back
+    // to the simulation instead.
+    navigate('/admin');
   }
 
   if (mode === 'checking') {

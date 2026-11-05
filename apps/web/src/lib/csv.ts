@@ -5,6 +5,7 @@ import { normalizeFloorLoads, participationFor } from '@/config/floorLoads';
 import { APP_VERSION } from '@/types';
 import { formatMm, formatPct } from '@/lib/utils';
 import type { BuildingConfig, GroundMotionConfig, SimulationResult } from '@/types';
+import type { XlsxCell, XlsxSheet } from './xlsx';
 
 /* =========================================================================
    CSV export
@@ -274,6 +275,111 @@ export function csvFilename(building: BuildingConfig): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
   return `quakestudio-${slug || 'simulation'}.csv`;
+}
+
+/** The same name with the spreadsheet extension. */
+export function xlsxFilename(building: BuildingConfig): string {
+  return csvFilename(building).replace(/\.csv$/, '.xlsx');
+}
+
+/**
+ * The Excel counterpart of `buildCsv`.
+ *
+ * `buildCsv` writes a text file with a `#` comment header, because a CSV is a
+ * flat stream. A workbook can carry the same context on a Metadata sheet and
+ * the time series as numbers on a Response sheet, so the columns stay numeric
+ * and a student can chart or sum them without retyping anything.
+ */
+export function buildResultSheets(
+  building: BuildingConfig,
+  motion: GroundMotionConfig,
+  result: SimulationResult,
+): XlsxSheet[] {
+  const participation = participationFor(building);
+  const loadsOn = building.loadsEnabled !== false;
+  const weightsRecorded = (result.floorWeightsKN?.length ?? 0) > 0;
+
+  const metadata: XlsxCell[][] = [
+    ['QuakeStudio simulation export'],
+    ['Educational simulation using simplified assumptions. Not a structural safety assessment.'],
+    [],
+    ['Exported at', new Date().toISOString()],
+    ['QuakeStudio version', APP_VERSION],
+    [],
+    ['Building'],
+    ['Name', building.name],
+    ['Floors', building.floors],
+    ['Floor height (m)', building.floorHeightM],
+    ['Width (m)', building.widthM],
+    ['Depth (m)', building.depthM],
+    ['Material', building.material],
+    ['Frame type', building.frameType],
+    [],
+    ['Floor loads counted', loadsOn ? 'on' : 'off'],
+    ['Live-load participation (psi)', participation],
+  ];
+
+  if (!loadsOn) {
+    metadata.push(['Bare floor mass (kg/m2)', MATERIALS[building.material].bareMassPerAreaKgM2]);
+  }
+  if (weightsRecorded) {
+    const live = (result.floorLiveCountedKN ?? []).reduce((sum, value) => sum + value, 0);
+    metadata.push(
+      ['Total weight (kN)', Number(result.totalWeightKN.toFixed(4))],
+      [
+        'Counted live share of weight (%)',
+        result.totalWeightKN > 0 ? Number(((live / result.totalWeightKN) * 100).toFixed(4)) : 0,
+      ],
+    );
+  }
+
+  metadata.push(
+    [],
+    ['Earthquake'],
+    ['Preset', motion.preset],
+    ['Peak ground acceleration (g)', motion.pgaG],
+  );
+  if (motion.frequencyHz !== undefined) metadata.push(['Frequency (Hz)', motion.frequencyHz]);
+  if (motion.seed !== undefined) metadata.push(['Seed', motion.seed]);
+  metadata.push(
+    ['Duration (s)', motion.durationS],
+    ['Time step (s)', motion.dt],
+    [],
+    ['Results'],
+    ['Peak displacement (mm)', Number((result.maxDisp * 1000).toFixed(4))],
+    ['Peak displacement as shown (mm)', formatMm(result.maxDisp * 1000)],
+    ['Max interstory drift (%)', Number((result.maxDriftRatio * 100).toFixed(4))],
+    ['Max interstory drift as shown (%)', formatPct(result.maxDriftRatio * 100)],
+    ['Natural periods (s)', result.periodsS.map((p) => p.toFixed(4)).join(' ')],
+  );
+
+  const response: XlsxCell[][] = [];
+  const header: XlsxCell[] = ['time_s'];
+  for (let floor = 1; floor <= building.floors; floor++) {
+    header.push(`floor_${floor}_disp_mm`);
+  }
+  for (let floor = 1; floor <= building.floors; floor++) {
+    header.push(`floor_${floor}_drift_pct`);
+  }
+  header.push('ground_accel_ms2');
+  response.push(header);
+
+  for (let step = 0; step < result.time.length; step++) {
+    const row: XlsxCell[] = [result.time[step] ?? 0];
+    for (let floor = 0; floor < building.floors; floor++) {
+      row.push((result.floorDisp[floor]?.[step] ?? 0) * 1000);
+    }
+    for (let floor = 0; floor < building.floors; floor++) {
+      row.push((result.driftRatio[floor] ?? 0) * 100);
+    }
+    row.push(result.groundAccel[step] ?? 0);
+    response.push(row);
+  }
+
+  return [
+    { name: 'Metadata', rows: metadata },
+    { name: 'Response', rows: response },
+  ];
 }
 
 /** Quote a value if it contains a comma, quote or newline. */

@@ -30,10 +30,10 @@ import {
   adminButtonClass,
   AdminButton,
   AdminSearchInput,
-  AdminThemeToggle,
   AdminTopBar,
   StatusBadge,
 } from './AdminUI';
+import { AdminTopBarSlotProvider } from './AdminTopBarSlot';
 import { useAdminContent } from './AdminContext';
 import { AdminDocumentTitle } from './AdminApp';
 import { Toaster } from './AdminToaster';
@@ -279,42 +279,88 @@ export function AdminShell({
   );
 
   return (
-    <div className="min-h-dvh bg-background text-foreground">
-      <AdminDocumentTitle />
+    <AdminTopBarSlotProvider>
+      <div className="min-h-dvh bg-background text-foreground">
+        <AdminDocumentTitle />
 
-      {/* Mobile drawer overlay */}
-      {mobileOpen ? (
-        <div className="fixed inset-0 z-50 lg:hidden">
-          <button
-            type="button"
-            aria-label="Close admin navigation"
-            onClick={() => setMobileOpen(false)}
-            className="absolute inset-0 bg-black/60"
-          />
-          <div
-            id="admin-mobile-nav"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Admin navigation"
-            className="absolute inset-y-0 right-0 flex w-[min(22rem,calc(100vw-2.5rem))] flex-col border-l border-line bg-surface shadow-2xl"
-          >
-            <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <BrandMark />
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-semibold">{content.branding.appName}</p>
-                  <p className="text-[11px] text-muted-foreground">Admin workspace</p>
+        {/* Mobile drawer overlay */}
+        {mobileOpen ? (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <button
+              type="button"
+              aria-label="Close admin navigation"
+              onClick={() => setMobileOpen(false)}
+              className="absolute inset-0 bg-black/60"
+            />
+            <div
+              id="admin-mobile-nav"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Admin navigation"
+              className="absolute inset-y-0 right-0 flex w-[min(22rem,calc(100vw-2.5rem))] flex-col border-l border-line bg-surface shadow-2xl"
+            >
+              <div className="flex items-center justify-between gap-3 border-b border-line px-4 py-4">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <BrandMark />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{content.branding.appName}</p>
+                    <p className="text-[11px] text-muted-foreground">Admin workspace</p>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setMobileOpen(false)}
+                  aria-label="Close navigation"
+                  className="grid size-8 shrink-0 place-items-center rounded-app text-muted-foreground hover:bg-surface-2 hover:text-foreground"
+                >
+                  <X className="size-4" aria-hidden="true" />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setMobileOpen(false)}
-                aria-label="Close navigation"
-                className="grid size-8 shrink-0 place-items-center rounded-app text-muted-foreground hover:bg-surface-2 hover:text-foreground"
-              >
-                <X className="size-4" aria-hidden="true" />
-              </button>
+              <div className="px-3 pb-3">
+                <AdminSearchInput
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  onClear={() => setSearch('')}
+                  placeholder="Find a section"
+                  ariaLabel="Find an admin section"
+                  className="w-full"
+                />
+              </div>
+              <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Admin sections">
+                {nav}
+              </nav>
+              <div className="border-t border-line p-2">
+                <a href="/" className={adminButtonClass('ghost', 'md', 'w-full justify-start')}>
+                  <ExternalLink className="size-4" aria-hidden="true" />
+                  Open simulator
+                </a>
+                <AdminButton
+                  variant="ghost"
+                  onClick={confirmLogout}
+                  icon={LogOut}
+                  className="w-full justify-start"
+                >
+                  Sign out
+                </AdminButton>
+                <AccountRow email={email} />
+              </div>
             </div>
+          </div>
+        ) : null}
+
+        <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-4 p-4 lg:flex-row lg:items-start lg:p-6">
+          {/* Sidebar — sticky on desktop, does not scroll with page */}
+          <aside className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-card border border-line bg-surface lg:sticky lg:top-[5.5rem] lg:flex lg:h-[calc(100dvh-7rem)]">
+            <div className="flex items-center gap-3 px-4 pb-4 pt-4">
+              <BrandMark className="size-9" iconClassName="size-[18px]" />
+              <div className="min-w-0">
+                <p className="truncate text-base font-semibold leading-5">
+                  {content.branding.appName}
+                </p>
+                <p className="text-[11px] text-muted-foreground">Admin workspace</p>
+              </div>
+            </div>
+
             <div className="px-3 pb-3">
               <AdminSearchInput
                 value={search}
@@ -325,10 +371,12 @@ export function AdminShell({
                 className="w-full"
               />
             </div>
-            <nav className="min-h-0 flex-1 overflow-y-auto p-2" aria-label="Admin sections">
+
+            <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Admin sections">
               {nav}
             </nav>
-            <div className="border-t border-line p-2">
+
+            <div className="border-t border-line p-2 shrink-0">
               <a href="/" className={adminButtonClass('ghost', 'md', 'w-full justify-start')}>
                 <ExternalLink className="size-4" aria-hidden="true" />
                 Open simulator
@@ -343,85 +391,34 @@ export function AdminShell({
               </AdminButton>
               <AccountRow email={email} />
             </div>
-          </div>
-        </div>
-      ) : null}
+          </aside>
 
-      <div className="mx-auto flex w-full max-w-[90rem] flex-col gap-4 p-4 lg:flex-row lg:items-start lg:p-6">
-        {/* Sidebar — sticky on desktop, does not scroll with page */}
-        <aside className="hidden w-64 shrink-0 flex-col overflow-hidden rounded-card border border-line bg-surface lg:sticky lg:top-[5.5rem] lg:flex lg:h-[calc(100dvh-7rem)]">
-          <div className="flex items-center gap-3 px-4 pb-4 pt-4">
-            <BrandMark className="size-9" iconClassName="size-[18px]" />
-            <div className="min-w-0">
-              <p className="truncate text-base font-semibold leading-5">
-                {content.branding.appName}
-              </p>
-              <p className="text-[11px] text-muted-foreground">Admin workspace</p>
-            </div>
-          </div>
-
-          <div className="px-3 pb-3">
-            <AdminSearchInput
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              onClear={() => setSearch('')}
-              placeholder="Find a section"
-              ariaLabel="Find an admin section"
-              className="w-full"
-            />
-          </div>
-
-          <nav className="min-h-0 flex-1 overflow-y-auto px-2 pb-3" aria-label="Admin sections">
-            {nav}
-          </nav>
-
-          <div className="border-t border-line p-2 shrink-0">
-            <a href="/" className={adminButtonClass('ghost', 'md', 'w-full justify-start')}>
-              <ExternalLink className="size-4" aria-hidden="true" />
-              Open simulator
-            </a>
-            <AdminButton
-              variant="ghost"
-              onClick={confirmLogout}
-              icon={LogOut}
-              className="w-full justify-start"
-            >
-              Sign out
-            </AdminButton>
-            <AccountRow email={email} />
-          </div>
-        </aside>
-
-        {/* Main content area — full width to the right of sidebar */}
-        <div className="min-w-0 flex-1">
-          <AdminTopBar
-            draftCount={draftCount}
-            searchValue={search}
-            searchPlaceholder="Search settings, text, glossary..."
-            onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) =>
-              setSearch(event.target.value)
-            }
-            onPublish={publishChanges}
-            onPreview={() => navigate('/')}
-          />
-
-          <main className="mt-4">
-            <Toaster />
-            <AdminPageHeader
-              title={current.label}
-              description={current.description}
-              eyebrow={current.group}
-              actions={
-                <div className="hidden lg:block">
-                  <AdminThemeToggle />
-                </div>
+          {/* Main content area — full width to the right of sidebar */}
+          <div className="min-w-0 flex-1">
+            <AdminTopBar
+              draftCount={draftCount}
+              searchValue={search}
+              searchPlaceholder="Search settings, text, glossary..."
+              onSearchChange={(event: React.ChangeEvent<HTMLInputElement>) =>
+                setSearch(event.target.value)
               }
+              onPublish={publishChanges}
+              onPreview={() => navigate('/')}
             />
-            {renderPage(section, go)}
-          </main>
+
+            <main className="mt-4">
+              <Toaster />
+              <AdminPageHeader
+                title={current.label}
+                description={current.description}
+                eyebrow={current.group}
+              />
+              {renderPage(section, go)}
+            </main>
+          </div>
         </div>
       </div>
-    </div>
+    </AdminTopBarSlotProvider>
   );
 }
 

@@ -3,10 +3,10 @@ import { Toaster as HotToaster } from 'react-hot-toast';
 export function Toaster() {
   return (
     <HotToaster
-      position="top-right"
+      position="bottom-right"
       gutter={8}
       containerStyle={{
-        top: 24,
+        bottom: 24,
         right: 24,
       }}
       toastOptions={{
