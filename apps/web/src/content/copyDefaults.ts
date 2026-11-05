@@ -19,8 +19,7 @@ export const DEFAULT_COPY = {
   'topbar.assumptionsTooltip': 'What the model assumes, and what its results do not tell you.',
   'topbar.feedback': 'Feedback',
   'topbar.feedbackAria': 'Usability feedback',
-  'topbar.feedbackTooltip':
-    'Ten usability questions. Answers stay in this browser until you export them.',
+  'topbar.feedbackTooltip': 'Ten usability questions. Responses can be reviewed and exported.',
 
   'results.heading': 'Results',
   'results.updating': 'Updating…',

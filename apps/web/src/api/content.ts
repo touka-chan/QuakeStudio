@@ -30,7 +30,7 @@ type RawState = { published: RawEnvelope | null; draft: RawEnvelope | null };
 function parseEnvelope(raw: RawEnvelope): ApiContentEnvelope {
   const parsed = contentDocumentSchema.safeParse(raw.document);
   if (!parsed.success) {
-    throw new ApiError(0, 'The local API returned content this build cannot read.');
+    throw new ApiError(0, 'The API returned content this build cannot read.');
   }
   return { ...raw, document: parsed.data };
 }

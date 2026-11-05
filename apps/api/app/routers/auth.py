@@ -63,6 +63,7 @@ def login(
         token=token,
         ttl_hours=settings.session_ttl_hours,
         secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
     )
     return LoginOut(
         admin=AdminOut(email=user.email, display_name=user.display_name),
@@ -102,5 +103,10 @@ def logout(
         db.commit()
 
     response = Response(status_code=status.HTTP_204_NO_CONTENT)
-    clear_session_cookie(response, name=settings.session_cookie_name)
+    clear_session_cookie(
+        response,
+        name=settings.session_cookie_name,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+    )
     return response

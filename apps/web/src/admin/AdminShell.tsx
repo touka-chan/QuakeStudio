@@ -215,7 +215,7 @@ export function AdminShell({
     swalConfirm({
       title: 'Sign out of admin?',
       text: backendEnabled
-        ? 'The local API session will be revoked.'
+        ? 'The API session will be revoked.'
         : 'You can sign back in with the demo credentials.',
       confirmLabel: 'Sign out',
       tone: 'primary',
@@ -237,7 +237,7 @@ export function AdminShell({
         logActivity({
           kind: 'publish',
           title: 'Published the current content',
-          detail: `Version ${published.version} in the local API`,
+          detail: `Version ${published.version} in the API`,
           at,
         });
         setPublishedAt(at);
@@ -263,7 +263,7 @@ export function AdminShell({
       showError(
         error instanceof Error
           ? `Publish failed: ${error.message}`
-          : 'Publish failed. The content was not sent to the local API.',
+          : 'Publish failed. The content was not sent to the API.',
       );
     }
   }

@@ -3,8 +3,8 @@
 The structural schema is generated from the browser's Zod schema by
 `npm run backend:content`. Zod refinements cannot be represented in JSON Schema,
 so the cross-field rules that matter most are repeated here. The browser still
-runs the full Zod validation before it saves, and the API is local-only; this is
-a second line of defence, not a replacement for the client schema.
+runs the full Zod validation before it saves; this is a second line of defence,
+not a replacement for the client schema.
 """
 
 from __future__ import annotations

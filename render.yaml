@@ -1,0 +1,54 @@
+# Render Blueprint for the QuakeStudio content API.
+#
+# The static frontend stays on Vercel; this service only owns admin sessions,
+# versioned content, feedback, and the audit trail. See docs/render.md.
+#
+# The free plans are enough to try it, but free web services sleep after a
+# period of inactivity and free databases have their own limits. Change both
+# plans to a paid tier if this is going to be used for real data collection.
+
+databases:
+  - name: quakestudio-db
+    databaseName: quakestudio
+    user: quakestudio
+    plan: free
+    region: singapore
+
+services:
+  - type: web
+    name: quakestudio-api
+    runtime: python
+    plan: free
+    region: singapore
+    rootDir: apps/api
+    buildCommand: pip install -e .
+    startCommand: sh render-start.sh
+    healthCheckPath: /api/v1/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: QUAKESTUDIO_DATABASE_URL
+        fromDatabase:
+          name: quakestudio-db
+          property: connectionString
+      - key: QUAKESTUDIO_ENVIRONMENT
+        value: production
+      # Change this to your real frontend origin. A Vercel preview URL is a
+      # different origin and is deliberately not allowed by a wildcard.
+      - key: QUAKESTUDIO_ALLOWED_ORIGINS
+        value: https://quake-studio.vercel.app
+      - key: QUAKESTUDIO_COOKIE_SECURE
+        value: 'true'
+      - key: QUAKESTUDIO_COOKIE_SAMESITE
+        value: 'none'
+      - key: QUAKESTUDIO_ENABLE_DOCS
+        value: 'false'
+      - key: QUAKESTUDIO_ADMIN_EMAIL
+        value: admin@quakestudio.local
+      - key: QUAKESTUDIO_ADMIN_DISPLAY_NAME
+        value: Administrator
+      # Render prompts for this secret when the Blueprint is created. It is
+      # used only on the first boot, when the admin account does not exist yet.
+      - key: QUAKESTUDIO_ADMIN_PASSWORD
+        sync: false
+      - key: QUAKESTUDIO_SESSION_TTL_HOURS
+        value: '12'

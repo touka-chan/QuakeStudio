@@ -3,8 +3,8 @@ import { useEffect, useState } from 'react';
 import { ContentEffects } from '@/components/content/ContentEffects';
 import { BRANDING } from '@/content/branding';
 import { apiLogin, apiLogout, apiMe, type ApiLogin } from '@/api/auth';
-import { isLocalBackendAvailable } from '@/api/client';
-import { isLocalBackendEnabled } from '@/api/config';
+import { isBackendAvailable } from '@/api/client';
+import { isBackendEnabled, isBackendRequired } from '@/api/config';
 import { readSession, signIn, signOut, type AdminSession } from './auth';
 import { AdminContentProvider, useAdminContent } from './AdminContext';
 import { AdminLogin } from './AdminLogin';
@@ -20,10 +20,11 @@ function toSession(login: ApiLogin): AdminSession {
 }
 
 export default function AdminApp() {
-  const localBackend = isLocalBackendEnabled();
-  const [mode, setMode] = useState<AuthMode>(() => (localBackend ? 'checking' : 'local'));
+  const backendEnabled = isBackendEnabled();
+  const backendRequired = isBackendRequired();
+  const [mode, setMode] = useState<AuthMode>(() => (backendEnabled ? 'checking' : 'local'));
   const [session, setSession] = useState<AdminSession | null>(() =>
-    localBackend ? null : readSession(),
+    backendEnabled ? null : readSession(),
   );
   const [path, setPath] = useState(() => window.location.pathname || '/admin');
 
@@ -34,15 +35,22 @@ export default function AdminApp() {
   }, []);
 
   useEffect(() => {
-    if (!localBackend) return;
+    if (!backendEnabled) return;
     let cancelled = false;
 
     void (async () => {
-      const available = await isLocalBackendAvailable();
+      const available = await isBackendAvailable();
       if (cancelled) return;
       if (!available) {
-        setMode('local');
-        setSession(readSession());
+        if (!backendRequired) {
+          // Local development: keep the offline demo path usable.
+          setMode('local');
+          setSession(readSession());
+          return;
+        }
+        // A hosted build must not fall back to the public demo credentials.
+        setMode('backend');
+        setSession(null);
         return;
       }
 
@@ -61,7 +69,7 @@ export default function AdminApp() {
     return () => {
       cancelled = true;
     };
-  }, [localBackend]);
+  }, [backendEnabled, backendRequired]);
 
   function navigate(to: string): void {
     // App decides between the simulator and the admin workspace from the
@@ -91,7 +99,7 @@ export default function AdminApp() {
   if (mode === 'checking') {
     return (
       <div className="grid min-h-dvh place-items-center bg-background text-sm text-muted-foreground">
-        Checking the local API…
+        Checking the API…
       </div>
     );
   }
@@ -106,15 +114,23 @@ export default function AdminApp() {
               const result = await apiLogin(email, password);
               setSession(toSession(result));
               navigate('/admin');
-              return true;
-            } catch {
-              return false;
+              return { ok: true };
+            } catch (error) {
+              return {
+                ok: false,
+                message:
+                  error instanceof Error
+                    ? error.message
+                    : 'The API did not accept those credentials.',
+              };
             }
           }
-          if (!signIn(email, password)) return false;
+          if (!signIn(email, password)) {
+            return { ok: false, message: 'Those are not the demo credentials.' };
+          }
           setSession(readSession());
           navigate('/admin');
-          return true;
+          return { ok: true };
         }}
       />
     );

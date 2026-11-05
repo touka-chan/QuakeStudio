@@ -26,7 +26,7 @@ import '@fontsource-variable/jetbrains-mono';
 import './index.css';
 
 import App from './App';
-import { syncLocalPublishedContent } from './api/bootstrap';
+import { syncPublishedContent } from './api/bootstrap';
 import './config/hydrateEngineering';
 import { registerBackButton } from './pwa/backButton';
 import { registerServiceWorker } from './pwa/registerServiceWorker';
@@ -44,11 +44,11 @@ createRoot(root).render(
 );
 
 /*
- * Localhost only. If the API has a different published document, this writes it
- * to storage and reloads once so the content modules can read it. On the
- * deployed site and in the APK the function returns immediately.
+ * When an API is enabled, a different published document is written to storage
+ * and the page reloads once so the content modules can read it. Local dev and
+ * hosted builds can use the API; the APK returns immediately.
  */
-void syncLocalPublishedContent();
+void syncPublishedContent();
 
 /*
  * Offline support for the PWA. Registered here rather than injected by

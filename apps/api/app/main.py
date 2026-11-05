@@ -25,13 +25,18 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
             Base.metadata.create_all(bind=engine)
         yield
 
+    docs_url = "/docs" if settings.enable_docs else None
+    openapi_url = "/openapi.json" if settings.enable_docs else None
     app = FastAPI(
         title=settings.app_name,
         version="0.1.0",
         description=(
-            "Local-only API for QuakeStudio content, admin sessions, and SUS feedback. "
+            "API for QuakeStudio content, admin sessions, and SUS feedback. "
             "Simulation stays in the browser Web Worker."
         ),
+        docs_url=docs_url,
+        redoc_url=None,
+        openapi_url=openapi_url,
         lifespan=lifespan,
     )
     app.state.settings = settings
@@ -48,12 +53,12 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.middleware("http")
     async def reject_unknown_origins(request: Request, call_next):
-        """Cookie-authenticated writes must come from the local dev origins.
+        """Cookie-authenticated writes must come from a trusted frontend.
 
         CORS is not an authorisation boundary on its own: a browser sends a
         cross-site POST without reading the response. Checking Origin here stops
-        a random website from driving the local admin API. Requests with no
-        Origin header (curl, pytest, the seed CLI) are allowed.
+        a random website from driving the admin API. Requests with no Origin
+        header (curl, pytest, the seed CLI) are allowed.
         """
 
         if request.method in {"POST", "PUT", "PATCH", "DELETE"}:
@@ -84,12 +89,14 @@ def create_app(settings: Settings | None = None, engine: Engine | None = None) -
 
     @app.get("/")
     def root() -> dict[str, str]:
-        return {
+        payload = {
             "name": settings.app_name,
-            "docs": "/docs",
+            "environment": settings.environment,
             "health": "/api/v1/health",
-            "scope": "local development only",
         }
+        if settings.enable_docs:
+            payload["docs"] = "/docs"
+        return payload
 
     return app
 

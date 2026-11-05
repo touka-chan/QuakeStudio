@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-11-04T07:21:48.557Z",
+  "updatedAt": "2026-11-05T02:20:35.261Z",
   "branding": {
     "appName": "QuakeStudio",
     "documentTitle": "QuakeStudio",
@@ -21,7 +21,7 @@
     "topbar.assumptionsTooltip": "What the model assumes, and what its results do not tell you.",
     "topbar.feedback": "Feedback",
     "topbar.feedbackAria": "Usability feedback",
-    "topbar.feedbackTooltip": "Ten usability questions. Answers stay in this browser until you export them.",
+    "topbar.feedbackTooltip": "Ten usability questions. Responses can be reviewed and exported.",
     "results.heading": "Results",
     "results.updating": "Updating…",
     "results.updatingBuilding": "Updating building {side}",

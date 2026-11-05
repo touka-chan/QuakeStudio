@@ -1,11 +1,12 @@
-"""Seed a local database with one admin and the default content document.
+"""Seed a database with one admin and the default content document.
 
 Run after `alembic upgrade head` (or with QUAKESTUDIO_AUTO_CREATE_TABLES=true):
 
     cd apps/api
     python -m app.seed --email admin@quakestudio.local
 
-The password is prompted for when `--password` is omitted.
+The password is prompted for when `--password` is omitted. On a hosted boot,
+`--if-missing` leaves an existing admin untouched instead of resetting it.
 """
 
 from __future__ import annotations
@@ -31,6 +32,7 @@ def ensure_admin(
     email: str,
     password: str | None = None,
     display_name: str = "Administrator",
+    update_existing: bool = True,
 ) -> tuple[AdminUser, bool]:
     normalised = email.strip().lower()
     user = db.scalar(select(AdminUser).where(AdminUser.email == normalised))
@@ -45,7 +47,7 @@ def ensure_admin(
         )
         db.add(user)
         db.flush()
-    else:
+    elif update_existing:
         user.display_name = display_name
         if password:
             user.password_hash = hash_password(password)
@@ -90,10 +92,15 @@ def ensure_content(
 
 def main() -> None:
     settings = get_settings()
-    parser = argparse.ArgumentParser(description="Seed the local QuakeStudio database.")
+    parser = argparse.ArgumentParser(description="Seed the QuakeStudio database.")
     parser.add_argument("--email", default=settings.admin_email)
     parser.add_argument("--password", default=settings.admin_password or None)
     parser.add_argument("--display-name", default=settings.admin_display_name)
+    parser.add_argument(
+        "--if-missing",
+        action="store_true",
+        help="Leave an existing admin untouched; useful on every hosted boot.",
+    )
     parser.add_argument(
         "--content",
         type=Path,
@@ -108,22 +115,26 @@ def main() -> None:
     args = parser.parse_args()
 
     password = args.password
-    if password is None:
-        password = getpass.getpass("Admin password: ")
-        if not password:
-            raise SystemExit("A password is required.")
-
     engine = build_engine(settings.database_url)
     if settings.auto_create_tables:
         Base.metadata.create_all(bind=engine)
 
     session_factory = build_session_factory(engine)
     with session_factory() as db:
+        existing = db.scalar(
+            select(AdminUser).where(AdminUser.email == args.email.strip().lower())
+        )
+        if existing is None and password is None:
+            password = getpass.getpass("Admin password: ")
+            if not password:
+                raise SystemExit("A password is required when creating the first admin.")
+
         user, created = ensure_admin(
             db,
             email=args.email,
             password=password,
             display_name=args.display_name,
+            update_existing=not args.if_missing,
         )
         version = ensure_content(
             db,
@@ -132,7 +143,12 @@ def main() -> None:
             replace=args.replace_content,
         )
         db.commit()
-        print(f"{'Created' if created else 'Updated'} admin: {user.email}")
+        if created:
+            print(f"Created admin: {user.email}")
+        elif args.if_missing:
+            print(f"Admin already exists; left unchanged: {user.email}")
+        else:
+            print(f"Updated admin: {user.email}")
         if version is None:
             print("Published content already exists; left unchanged.")
         else:

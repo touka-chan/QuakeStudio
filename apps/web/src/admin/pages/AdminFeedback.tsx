@@ -67,8 +67,8 @@ export function AdminFeedback() {
       setServerTotal(0);
       showError(
         error instanceof Error
-          ? `Could not load feedback from the local API: ${error.message}`
-          : 'Could not load feedback from the local API.',
+          ? `Could not load feedback from the API: ${error.message}`
+          : 'Could not load feedback from the API.',
       );
     } finally {
       setLoading(false);
@@ -93,8 +93,8 @@ export function AdminFeedback() {
         setServerTotal(0);
         showError(
           error instanceof Error
-            ? `Could not load feedback from the local API: ${error.message}`
-            : 'Could not load feedback from the local API.',
+            ? `Could not load feedback from the API: ${error.message}`
+            : 'Could not load feedback from the API.',
         );
       } finally {
         if (!cancelled) setLoading(false);
@@ -166,8 +166,7 @@ export function AdminFeedback() {
       } catch (error) {
         swalAlert({
           title: 'Clear failed',
-          text:
-            error instanceof Error ? error.message : 'The local API could not clear the feedback.',
+          text: error instanceof Error ? error.message : 'The API could not clear the feedback.',
           icon: 'error',
         });
       }
@@ -183,7 +182,7 @@ export function AdminFeedback() {
     swalConfirm({
       title: 'Clear feedback',
       text: backendEnabled
-        ? 'This removes all saved SUS responses from the local PostgreSQL database.'
+        ? 'This removes all saved SUS responses from the PostgreSQL database.'
         : 'This removes all saved SUS responses from this browser.',
       confirmLabel: 'Clear all',
       onConfirm: () => {
@@ -201,7 +200,7 @@ export function AdminFeedback() {
           <p className="text-sm font-medium">Saved responses</p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {total} response{total === 1 ? '' : 's'} stored in{' '}
-            {backendEnabled ? 'the local PostgreSQL database' : 'this browser'}.
+            {backendEnabled ? 'the PostgreSQL database' : 'this browser'}.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">

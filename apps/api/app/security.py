@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import secrets
 from datetime import datetime, timedelta, timezone
+from typing import Literal
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
@@ -85,7 +86,13 @@ def revoke_session(db: Session, session: AdminSession) -> None:
 
 
 def set_session_cookie(
-    response: Response, *, name: str, token: str, ttl_hours: int, secure: bool
+    response: Response,
+    *,
+    name: str,
+    token: str,
+    ttl_hours: int,
+    secure: bool,
+    samesite: Literal["lax", "strict", "none"] = "lax",
 ) -> None:
     max_age = max(1, ttl_hours * 3600)
     response.set_cookie(
@@ -94,13 +101,25 @@ def set_session_cookie(
         max_age=max_age,
         httponly=True,
         secure=secure,
-        samesite="lax",
+        samesite=samesite,
         path="/",
     )
 
 
-def clear_session_cookie(response: Response, *, name: str) -> None:
-    response.delete_cookie(key=name, path="/", httponly=True, samesite="lax")
+def clear_session_cookie(
+    response: Response,
+    *,
+    name: str,
+    secure: bool = False,
+    samesite: Literal["lax", "strict", "none"] = "lax",
+) -> None:
+    response.delete_cookie(
+        key=name,
+        path="/",
+        httponly=True,
+        secure=secure,
+        samesite=samesite,
+    )
 
 
 def _as_aware(value: datetime) -> datetime:

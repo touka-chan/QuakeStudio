@@ -15,7 +15,8 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { downloadCsv } from '@/lib/csv';
 import { submitFeedbackToApi } from '@/api/feedback';
-import { isLocalBackendAvailable } from '@/api/client';
+import { isBackendAvailable } from '@/api/client';
+import { isBackendEnabled, isBackendRequired } from '@/api/config';
 import { APP_VERSION } from '@/types';
 import { SUS_ITEMS, SUS_SCALE, type SusAnswers, type SusScaleValue } from './susItems';
 import { appendFeedback } from './feedbackStorage';
@@ -47,10 +48,10 @@ import { aggregateSus, scoreSus, SUS_TARGET_SCORE } from './susScore';
      should be able to reopen and finish; silently persisting a half-finished
      form is how a study ends up with responses nobody knowingly submitted.
 
-   • On the deployed site and in the APK, nothing leaves the device. On
-     localhost only, the local FastAPI service may store the response in the
-     development database; the dialog says so before submission. There is still
-     no third-party or internet service involved.
+   • Without an API, and in the APK, nothing leaves the device. When an API is
+     configured, the response is stored in the QuakeStudio study database; the
+     dialog says so before submission. No third-party analytics service is
+     involved.
    ========================================================================= */
 
 export type SusResponse = {
@@ -65,7 +66,7 @@ export type SusResponse = {
 };
 
 export function FeedbackDialog() {
-  const [localApiEnabled, setLocalApiEnabled] = useState(false);
+  const [apiEnabled, setApiEnabled] = useState(() => isBackendEnabled());
   const [answers, setAnswers] = useState<SusAnswers>({});
   const [comments, setComments] = useState('');
   const [participantId, setParticipantId] = useState('');
@@ -74,8 +75,8 @@ export function FeedbackDialog() {
 
   useEffect(() => {
     let cancelled = false;
-    void isLocalBackendAvailable().then((available) => {
-      if (!cancelled) setLocalApiEnabled(available);
+    void isBackendAvailable().then((available) => {
+      if (!cancelled) setApiEnabled(available);
     });
     return () => {
       cancelled = true;
@@ -107,7 +108,7 @@ export function FeedbackDialog() {
       participantId: participantId.trim() || undefined,
     };
 
-    if (localApiEnabled) {
+    if (apiEnabled) {
       try {
         const saved = await submitFeedbackToApi({
           answers: response.answers as Record<string, number>,
@@ -122,12 +123,12 @@ export function FeedbackDialog() {
         };
         setSubmitted((previous) => [...previous, mirrored]);
         appendFeedback(mirrored);
-        setStatus('Response recorded in the local study database.');
+        setStatus('Response recorded in the study database.');
       } catch {
         setSubmitted((previous) => [...previous, response]);
         appendFeedback(response);
         setStatus(
-          'The local API did not confirm the save. A copy is stored in this browser; check the admin list before submitting again.',
+          'The API did not confirm the save. A copy is stored in this browser; check the admin list before submitting again.',
         );
       }
     } else {
@@ -170,8 +171,10 @@ export function FeedbackDialog() {
       <DialogHeader>
         <DialogTitle>Usability feedback</DialogTitle>
         <DialogDescription>
-          {localApiEnabled
-            ? 'Ten questions about your experience. Your answers are sent to the local study database running on this computer, not to the internet.'
+          {apiEnabled
+            ? isBackendRequired()
+              ? 'Ten questions about your experience. Your answers are sent to the QuakeStudio study database on the configured server, not to any third party.'
+              : 'Ten questions about your experience. Your answers are sent to the local study database running on this computer, not to the internet.'
             : 'Ten questions about your experience. Your answers stay in this browser until you export them, and are never sent anywhere automatically.'}
         </DialogDescription>
       </DialogHeader>

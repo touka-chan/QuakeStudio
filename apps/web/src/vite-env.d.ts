@@ -1,7 +1,11 @@
 /// <reference types="vite/client" />
 
 interface ImportMetaEnv {
-  /** Optional override for the local-only API. Ignored outside localhost. */
+  /**
+   * Optional HTTPS origin or same-origin path for the hosted API, for example
+   * `https://quakestudio-api.onrender.com` or `/`. Unset disables API use in
+   * production; the APK never uses it.
+   */
   readonly VITE_API_URL?: string;
 }
 

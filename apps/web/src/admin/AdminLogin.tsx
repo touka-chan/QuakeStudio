@@ -1,16 +1,19 @@
 import { useState } from 'react';
 
-import { DEMO_CREDENTIALS } from './auth';
+import { isBackendRequired } from '@/api/config';
 import { BrandMark } from '@/components/brand/BrandMark';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DEMO_CREDENTIALS } from './auth';
+
+export type SignInResult = { ok: true } | { ok: false; message: string };
 
 export function AdminLogin({
   onSignIn,
   backendEnabled,
 }: {
-  onSignIn: (email: string, password: string) => Promise<boolean>;
+  onSignIn: (email: string, password: string) => Promise<SignInResult>;
   backendEnabled: boolean;
 }) {
   const [email, setEmail] = useState('');
@@ -22,13 +25,9 @@ export function AdminLogin({
     event.preventDefault();
     setPending(true);
     try {
-      const accepted = await onSignIn(email, password);
-      if (!accepted) {
-        setError(
-          backendEnabled
-            ? 'The local API did not accept those credentials.'
-            : 'Those are not the demo credentials.',
-        );
+      const result = await onSignIn(email, password);
+      if (!result.ok) {
+        setError(result.message);
         return;
       }
       setError(null);
@@ -49,7 +48,7 @@ export function AdminLogin({
             <h1 className="text-xl font-semibold">QuakeStudio admin</h1>
             <p className="text-sm text-muted-foreground">
               {backendEnabled
-                ? 'Sign in to the local FastAPI service.'
+                ? 'Sign in to the QuakeStudio content service.'
                 : 'Demo sign-in for local content management.'}
             </p>
           </div>
@@ -87,8 +86,14 @@ export function AdminLogin({
 
         {backendEnabled ? (
           <p className="rounded-app bg-surface-2 p-3 text-xs text-muted-foreground">
-            Uses the local API at <span className="font-mono">localhost:8000</span>. Start it with{' '}
-            <span className="font-mono">npm run backend:dev</span>.
+            {isBackendRequired() ? (
+              'Uses the hosted content API configured for this build. Ask the project owner for an account.'
+            ) : (
+              <>
+                Uses the local API at <span className="font-mono">localhost:8000</span>. Start it
+                with <span className="font-mono">npm run backend:dev</span>.
+              </>
+            )}
           </p>
         ) : (
           <div className="rounded-app bg-surface-2 p-3 text-xs text-muted-foreground">

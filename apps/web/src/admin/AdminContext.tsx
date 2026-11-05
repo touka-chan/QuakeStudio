@@ -85,7 +85,7 @@ export function AdminContentProvider({
         showError(
           error instanceof Error
             ? `Could not load server content: ${error.message}`
-            : 'Could not load content from the local API. Using this browser copy.',
+            : 'Could not load content from the API. Using this browser copy.',
         );
       }
     })();
@@ -100,8 +100,8 @@ export function AdminContentProvider({
     void saveDraftContent(saved).catch((error: unknown) => {
       showError(
         error instanceof Error
-          ? `Saved in this browser, but the local API rejected it: ${error.message}`
-          : 'Saved in this browser, but the local API did not accept it.',
+          ? `Saved in this browser, but the API rejected it: ${error.message}`
+          : 'Saved in this browser, but the API did not accept it.',
       );
     });
   }
@@ -113,7 +113,7 @@ export function AdminContentProvider({
       logActivity({
         kind: 'save',
         title: changed.length > 0 ? `Updated ${changed.join(', ')}` : 'Saved content',
-        detail: backendEnabled ? 'Saved to the local draft' : 'Saved in this browser',
+        detail: backendEnabled ? 'Saved to the server draft' : 'Saved in this browser',
         at: saved.updatedAt,
       });
       setContent(saved);
@@ -144,7 +144,7 @@ export function AdminContentProvider({
       kind: 'import',
       title: 'Imported a content backup',
       detail: backendEnabled
-        ? 'Replaced the local draft and queued it for the API'
+        ? 'Replaced the draft and queued it for the API'
         : 'Replaced the content saved in this browser',
       at: saved.updatedAt,
     });
@@ -166,8 +166,8 @@ export function AdminContentProvider({
       } catch (error) {
         showError(
           error instanceof Error
-            ? `The local API could not reset the draft: ${error.message}`
-            : 'The local API could not reset the draft.',
+            ? `The API could not reset the draft: ${error.message}`
+            : 'The API could not reset the draft.',
         );
         return;
       }

@@ -1,7 +1,8 @@
-# QuakeStudio local API
+# QuakeStudio API
 
-FastAPI + PostgreSQL for **local development only**. The deployed Vercel app is
-unchanged and keeps using browser storage.
+FastAPI + PostgreSQL for admin sessions, versioned content, feedback, and an
+audit trail. It runs locally for development and can be hosted on Render; the
+static frontend uses it only when an API origin is configured.
 
 The simulation itself does **not** run here. It stays in the browser Web Worker,
 so dragging a slider never waits for a network round trip. This service owns:
@@ -56,9 +57,14 @@ npm run dev
 
 When the page is served by the Vite dev server on `localhost` or `127.0.0.1`,
 the web app detects the local API, loads published content, and uses the API
-for admin sign-in, drafts, publishing, and feedback. Production and preview
-builds make no API request. If the API is not running, the app falls back to
-its existing browser-local behaviour.
+for admin sign-in, drafts, publishing, and feedback. A production build uses
+the API only when `VITE_API_URL` is set; the APK never uses it. If the API is
+not reachable, the app keeps its browser-local content and feedback fallback.
+
+To host this service on Render and connect the Vercel frontend, follow
+[`../../docs/render.md`](../../docs/render.md). The repository root includes a
+`render.yaml` Blueprint and `apps/api/render-start.sh` for migrations and the
+first-boot seed.
 
 ## Content contract
 
@@ -115,10 +121,11 @@ models use JSONB on Postgres and generic JSON on SQLite.
 
 ## Deliberate limits
 
-- Loopback only: the API binds to `127.0.0.1`, CORS trusts the Vite dev origins,
-  and there is no production deployment configuration.
+- Local development binds to `127.0.0.1` and trusts the Vite dev origins. The
+  Render Blueprint opts into a public HTTPS origin and cross-site cookies; it
+  does not change the local defaults.
 - No run storage: simulation histories are large and stay in IndexedDB.
 - No server-side solver: the Python reference solver remains a validation tool,
   not a live endpoint.
 - No password reset by email, no multi-admin roles, no rate limiter. Those are
-  production features, not local prototype features.
+  still production features to add before a public study.

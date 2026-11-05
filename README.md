@@ -128,12 +128,14 @@ Chromium**. Open it on a phone, tablet or laptop and it can be added to the home
 screen, where it opens full-screen with its own icon and — this is the useful
 part for a student in a basement lab — **works with no signal at all**.
 
-That is not a degraded offline mode. The **deployed app makes no server call**:
+That is not a degraded offline mode. **The simulation makes no server call**:
 mass, stiffness, damping, the Newmark integration and the Cholesky solve all
-happen on the device, so the only thing the network provides is the download.
-A local FastAPI + PostgreSQL service exists for development on `localhost` only;
-the Vercel build and APK do not use it. See
-[`apps/api/README.md`](apps/api/README.md).
+happen on the device, so the solver needs no network at all. A separate FastAPI
++ PostgreSQL service owns optional admin content and usability feedback. It can
+run on `localhost` or on Render; a hosted build uses it only when
+`VITE_API_URL` is set, and the APK never uses it. See
+[`apps/api/README.md`](apps/api/README.md) and
+[`docs/render.md`](docs/render.md).
 
 **Android** gets a real one-click install: the **Install app** button in the top
 bar, driven by Chromium's `beforeinstallprompt`.
@@ -591,8 +593,8 @@ development one**.
 - npm 10+
 - Python 3.11+ — for the reference solver and the usability analysis
   (verified on 3.13)
-- Python 3.12+ and PostgreSQL 16 — only if you are running the local API
-  (Docker Compose is provided under `apps/api`)
+- Python 3.12+ and PostgreSQL 16 — only if you are running the API locally
+  (Docker Compose is provided under `apps/api`; Render can host it instead)
 
 ## Getting started
 
@@ -603,14 +605,15 @@ npm run dev
 
 Then open <http://localhost:5173>.
 
-### Optional local backend (localhost only)
+### Optional backend
 
-The admin/content/feedback API is **not part of the deployed app**. It runs on
-loopback, is enabled only when the page is served by the Vite development
-server at `localhost` or `127.0.0.1`, and falls back to browser storage if it
-is not running. Production and preview builds make no API request. Start it
-only when you need server-side sessions, versioned content, or shared SUS
-responses.
+The admin/content/feedback API is separate from the browser simulation. On
+`localhost` it is enabled automatically for the Vite dev origin and falls back
+to browser storage if it is not running. A hosted build uses it only when
+`VITE_API_URL` is set at build time; without that variable the deployed app
+keeps the browser-only behaviour. The APK never uses the API. Start the local
+service when you need server-side sessions, versioned content, or shared SUS
+responses, or follow [`docs/render.md`](docs/render.md) to host it.
 
 ```powershell
 # Terminal 1 — PostgreSQL (Docker), schema, seed, then the API
@@ -628,8 +631,9 @@ python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 Keep the existing `npm run dev` process running in a second terminal. The
 `backend:dev` script works too, but only from a shell where the virtual
 environment is active. The full setup, API surface, and test commands are in
-[`apps/api/README.md`](apps/api/README.md). The content contract is generated
-from the same Zod schema the admin already uses:
+[`apps/api/README.md`](apps/api/README.md). To host the same service on Render
+and point Vercel at it, see [`docs/render.md`](docs/render.md). The content
+contract is generated from the same Zod schema the admin already uses:
 
 ```bash
 npm run backend:content   # regenerate apps/api/app/content_schema.json + seed
@@ -705,7 +709,7 @@ QuakeStudio/
 │     ├─ types/                       # shared types + Zod schemas
 │     ├─ android/                     # Capacitor native project (generated)
 │     └─ lib/
-├─ apps/api/                          # local-only FastAPI + PostgreSQL service
+├─ apps/api/                          # FastAPI + PostgreSQL service (local or Render)
 │  ├─ app/                            # routers, models, validation, security
 │  ├─ alembic/                        # schema migrations
 │  ├─ seed/content.json               # generated from the Zod defaults
@@ -721,6 +725,7 @@ QuakeStudio/
 ├─ tools/analysis/drift-distribution.ts # where story drift actually lands
 ├─ tools/android/build-apk.mjs         # finds a working JDK, then builds the APK
 ├─ docs/
+│  ├─ render.md                        # hosting the API on Render
 │  ├─ review-packet.md                 # ← what the engineering adviser reviews
 │  ├─ assumptions.md                   # the full record behind that packet
 │  ├─ validation-report.md             # generated: TS vs Python (Phase 5)

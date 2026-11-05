@@ -126,9 +126,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
     id: 'content-ready',
     at: content.updatedAt,
     kind: 'save',
-    title: backendEnabled
-      ? 'Content is ready on the local server'
-      : 'Content is ready in this browser',
+    title: backendEnabled ? 'Content is ready on the server' : 'Content is ready in this browser',
     detail: backendEnabled
       ? 'Saved drafts appear in the server version history'
       : 'Changes you save will appear here',
@@ -165,7 +163,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
       swalConfirm({
         title: 'Replace saved content?',
         text: `Importing “${file.name}” replaces everything ${
-          backendEnabled ? 'in the local draft' : 'saved in this browser'
+          backendEnabled ? 'in the server draft' : 'saved in this browser'
         }. Export a backup first if you are unsure.`,
         confirmLabel: 'Import backup',
         tone: 'primary',
@@ -190,7 +188,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
     swalConfirm({
       title: 'Reset all content?',
       text: `Every change ${
-        backendEnabled ? 'in the local draft' : 'saved in this browser'
+        backendEnabled ? 'in the server draft' : 'saved in this browser'
       } is removed and the original defaults are restored. This cannot be undone.`,
       confirmLabel: 'Reset content',
       tone: 'danger',
@@ -225,7 +223,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
               <strong className="font-semibold text-foreground">
                 {feedbackCount} feedback response{feedbackCount === 1 ? '' : 's'}
               </strong>{' '}
-              {backendEnabled ? 'in the local database' : 'saved in this browser'}.
+              {backendEnabled ? 'in the server database' : 'saved in this browser'}.
             </p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <AdminButton
@@ -484,7 +482,7 @@ export function AdminDashboard({ onNavigate }: { onNavigate: (to: string) => voi
                 <span className="block text-sm font-medium text-danger">Reset to defaults</span>
                 <span className="block text-xs text-muted-foreground">
                   {backendEnabled
-                    ? 'Remove every change in the local draft'
+                    ? 'Remove every change in the server draft'
                     : 'Remove every change saved in this browser'}
                 </span>
               </span>

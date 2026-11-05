@@ -1,4 +1,4 @@
-"""SQLAlchemy models for the local backend.
+"""SQLAlchemy models for the QuakeStudio API.
 
 The schema is deliberately small: admin identity, versioned content, feedback,
 and an audit trail. Simulation results stay on the device, so there is no run

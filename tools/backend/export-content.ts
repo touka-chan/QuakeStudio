@@ -1,5 +1,5 @@
 /*
- * Export the frontend's content contract for the local backend.
+ * Export the frontend's content contract for the backend.
  *
  * The backend does not re-declare the 300-line content shape by hand. It loads
  * `content_schema.json`, generated from the same Zod schema the admin already

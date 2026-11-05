@@ -1,7 +1,13 @@
-import { API_PREFIX, apiBaseUrl, isLocalBackendEnabled } from './config';
+import {
+  API_PREFIX,
+  apiBaseUrl,
+  apiRequestTimeoutMs,
+  isBackendEnabled,
+  isBackendRequired,
+} from './config';
 
 /* =========================================================================
-   Small fetch wrapper for the local API
+   Small fetch wrapper for the content API
    -------------------------------------------------------------------------
    Explicit credentials, a timeout, and structured errors. No retry loop: a
    slider moving 20 times a second must not turn a missing API into a queue of
@@ -23,7 +29,7 @@ export class ApiError extends Error {
 type ApiOptions = RequestInit & { timeoutMs?: number };
 
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
-  const { timeoutMs = 6_000, ...init } = options;
+  const { timeoutMs = apiRequestTimeoutMs(), ...init } = options;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   const headers = new Headers(init.headers);
@@ -50,9 +56,9 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   } catch (error) {
     if (error instanceof ApiError) throw error;
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new ApiError(0, 'The local API did not respond in time.');
+      throw new ApiError(0, 'The API did not respond in time.');
     }
-    throw new ApiError(0, 'The local API is not reachable.');
+    throw new ApiError(0, 'The API is not reachable.');
   } finally {
     clearTimeout(timer);
   }
@@ -67,20 +73,24 @@ let backendProbe: Promise<boolean> | null = null;
  * A single timeout used to be enough to send the admin to demo mode while the
  * API was merely busy. Two short attempts and a shared promise keep that
  * fallback deliberate rather than a race, without making a dead API block for
- * long.
+ * long. A hosted API gets one longer attempt because a free host may be waking
+ * from sleep.
  */
-export async function isLocalBackendAvailable(): Promise<boolean> {
-  if (!isLocalBackendEnabled()) return false;
+export async function isBackendAvailable(): Promise<boolean> {
+  if (!isBackendEnabled()) return false;
   if (backendAvailable !== null) return backendAvailable;
   if (!backendProbe) {
+    const hosted = isBackendRequired();
+    const attempts = hosted ? 1 : 2;
+    const timeoutMs = hosted ? 20_000 : 2_000;
     backendProbe = (async () => {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
+      for (let attempt = 0; attempt < attempts; attempt += 1) {
         try {
-          await apiFetch('/health', { timeoutMs: 2_000 });
+          await apiFetch('/health', { timeoutMs });
           backendAvailable = true;
           return true;
         } catch {
-          // Try once more; a dev server restart or a cold worker is common.
+          // Try once more locally; a dev server restart is common.
         }
       }
       backendAvailable = false;
@@ -94,7 +104,7 @@ export async function isLocalBackendAvailable(): Promise<boolean> {
   }
 }
 
-export function resetLocalBackendAvailability(): void {
+export function resetBackendAvailability(): void {
   backendAvailable = null;
 }
 
@@ -113,7 +123,7 @@ async function readErrorDetail(response: Response): Promise<unknown> {
 function messageFor(status: number, detail: unknown): string {
   if (typeof detail === 'string') return detail;
   if (status === 401) return 'Sign in to continue.';
-  if (status === 403) return 'The local API refused this request.';
+  if (status === 403) return 'The API refused this request.';
   if (status === 422) return 'The content did not pass validation.';
-  return `The local API returned ${status}.`;
+  return `The API returned ${status}.`;
 }

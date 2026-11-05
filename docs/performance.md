@@ -104,9 +104,9 @@ dropping frames on every slider drag.
 into `dist` — roughly **nine times the size of the application**. Deploy the
 folder as-is and anyone who guesses the URL gets them.
 
-They are now **off by default**. There is no server-side stack to debug in
-production, and the source is public on GitHub anyway. Opt in when debugging a
-built bundle:
+They are now **off by default**. The simulator has no server-side stack to
+debug, and the source is public on GitHub anyway. Opt in when debugging a built
+bundle:
 
 ```bash
 VITE_SOURCEMAP=true npm run build
@@ -123,8 +123,8 @@ regression, not to police kilobytes.
 
 | Budget | Limit | Actual |
 |---|---|---|
-| Entry chunk, gzipped | 220 KB | 157 KB |
-| Total JavaScript, gzipped | 620 KB | 528 KB |
+| Entry chunk, gzipped | 220 KB | 166 KB |
+| Total JavaScript, gzipped | 620 KB | 615 KB |
 | Simulation worker, gzipped | 30 KB | 3 KB |
 | `Viewport3D`, `Charts` and `FeedbackDialog` must exist as separate chunks | — | ✅ |
 | Every emitted chunk must be precached for offline | — | ✅ |
@@ -138,9 +138,11 @@ chunk-separation check notices, which is why it exists.
 
 A service worker precaches the whole build, so QuakeStudio works with no
 network at all. Android and desktop Chromium; iOS install is out of scope
-because Safari exposes no install API. That is not a downgrade: every byte it needs is either in the
-repository or computed on the device, because there is no server call anywhere
-in the app. A student in a basement lab gets the full simulator.
+because Safari exposes no install API. That is not a downgrade: every byte the
+simulator needs is either in the repository or computed on the device, because
+the simulation itself makes no server call. The optional admin/feedback API is
+not part of the solve and is disabled unless a build configures it. A student in
+a basement lab gets the full simulator.
 
 The precache has to include the **lazy** chunks, and that is the part which is
 easy to get wrong. `Viewport3D`, `Charts` and `FeedbackDialog` are dynamic
